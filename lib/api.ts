@@ -295,6 +295,164 @@ export const reportsApi = {
 
 // ── Me ────────────────────────────────────────────────────────────────
 
+export interface MeData {
+  id:           string
+  name:         string
+  email:        string
+  plan:         string
+  hasOnboarded: boolean
+  profileImage: string | null
+  bio:          string | null
+  city:         string | null
+  occupation:   string | null
+  badges:       Record<string, number>
+  usage: {
+    transactionsThisMonth: number
+    bills:                 number
+    goals:                 number
+    people:                number
+    customCategories:      number
+    recurring:             number
+  }
+  limits: {
+    transactionsPerMonth: number | null
+    bills:                number | null
+    goals:                number | null
+    people:               number | null
+    customCategories:     number | null
+    recurring:            number | null
+    budget:               boolean
+    reports:              boolean
+    projection:           boolean
+    import:               boolean
+  }
+}
+
 export const meApi = {
-  get: () => request<{ data: { id: string; name: string; email: string; plan: string } }>('/api/v1/me'),
+  get: () => request<{ data: MeData }>('/api/v1/me'),
+}
+
+// ── Settings ──────────────────────────────────────────────────────────
+
+export const settingsApi = {
+  update: (body: { name?: string; bio?: string; city?: string; occupation?: string; hasOnboarded?: boolean }) =>
+    request<{ data: MeData }>('/api/v1/settings', {
+      method: 'PATCH',
+      body:   JSON.stringify(body),
+    }),
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────
+
+export interface CalendarEvent {
+  id:     string
+  day:    number
+  type:   'bill' | 'income' | 'recurring'
+  label:  string
+  amount: number
+  status: 'pending' | 'paid' | 'overdue' | 'expected' | 'received'
+  color:  'success' | 'danger' | 'warning'
+}
+
+export interface CalendarData {
+  month:        string
+  daysInMonth:  number
+  firstWeekday: number
+  events:       CalendarEvent[]
+  byDay:        Record<number, CalendarEvent[]>
+}
+
+export const calendarApi = {
+  get: (month?: string) => {
+    const qs = month ? `?month=${month}` : ''
+    return request<{ data: CalendarData }>(`/api/v1/calendar${qs}`)
+  },
+}
+
+// ── Projection ────────────────────────────────────────────────────────
+
+export interface ProjectionItem {
+  id:      string
+  label:   string
+  amount:  number
+  day:     number
+  type:    string
+  actual?: boolean
+  overdue?: boolean
+}
+
+export interface ProjectionMonth {
+  month:             string
+  label:             string
+  totalIncome:       number
+  totalExpense:      number
+  balance:           number
+  cumulativeBalance: number
+  isActual:          boolean
+  incomeItems:       ProjectionItem[]
+  expenseItems:      ProjectionItem[]
+}
+
+export const projectionApi = {
+  get: (months?: number) => {
+    const qs = months ? `?months=${months}` : ''
+    return request<{ data: ProjectionMonth[] }>(`/api/v1/projection${qs}`)
+  },
+}
+
+// ── People ────────────────────────────────────────────────────────────
+
+export interface PersonEntry {
+  id:                 string
+  type:               'THEY_OWE_ME' | 'I_OWE_THEM'
+  description:        string
+  amount:             number
+  date:               string
+  notes:              string | null
+  isSettled:          boolean
+  installmentTotal:   number | null
+  installmentCurrent: number | null
+}
+
+export interface Person {
+  id:          string
+  name:        string
+  theyOweMe:   number
+  iOweThem:    number
+  openEntries: number
+  entries?:    PersonEntry[]
+}
+
+export const peopleApi = {
+  list: () => request<{ data: Person[] }>('/api/v1/people'),
+  get:  (id: string) => request<{ data: Person & { entries: PersonEntry[] } }>(`/api/v1/people/${id}`),
+  create: (body: { name: string; notes?: string }) =>
+    request<{ data: Person }>('/api/v1/people', {
+      method: 'POST',
+      body:   JSON.stringify(body),
+    }),
+  addEntry: (personId: string, body: {
+    type: string; description: string; amount: number; date: string
+    notes?: string; categoryId?: string; installments?: number
+  }) =>
+    request<{ data: PersonEntry }>(`/api/v1/people/${personId}?action=entry`, {
+      method: 'POST',
+      body:   JSON.stringify(body),
+    }),
+  settleEntry: (entryId: string) =>
+    request<{ data: PersonEntry }>(`/api/v1/people/entries/${entryId}?action=settle`, { method: 'POST' }),
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/api/v1/people/${id}`, { method: 'DELETE' }),
+}
+
+// ── Billing ───────────────────────────────────────────────────────────
+
+export const billingApi = {
+  checkout: (annual = false) =>
+    request<{ data: { url: string } }>('/api/v1/billing/checkout', {
+      method: 'POST',
+      body:   JSON.stringify({ annual }),
+    }),
+  portal: () =>
+    request<{ data: { url: string } }>('/api/v1/billing/portal', { method: 'POST' }),
 }

@@ -9,12 +9,13 @@ import { useAuthStore } from '@/lib/auth'
 type FeatherName = React.ComponentProps<typeof Feather>['name']
 
 function MenuItem({
-  icon, label, onPress, danger,
+  icon, label, onPress, danger, pro,
 }: {
   icon: FeatherName
   label: string
   onPress: () => void
   danger?: boolean
+  pro?: boolean
 }) {
   return (
     <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
@@ -22,6 +23,11 @@ function MenuItem({
         <Feather name={icon} size={17} color={danger ? COLORS.danger : COLORS.brand} />
       </View>
       <Text style={[styles.menuLabel, danger && { color: COLORS.danger }]}>{label}</Text>
+      {pro && (
+        <View style={styles.proBadge}>
+          <Text style={styles.proBadgeText}>PRO</Text>
+        </View>
+      )}
       <Feather name="chevron-right" size={16} color={COLORS.muted2} />
     </TouchableOpacity>
   )
@@ -96,7 +102,13 @@ export default function MoreScreen() {
 
       {/* Finanças */}
       <Section title="Finanças">
-        <MenuItem icon="pie-chart"     label="Orçamento"     onPress={() => router.push('/budget')} />
+        <MenuItem icon="calendar"      label="Calendário"    onPress={() => router.push('/calendar')} />
+        <Divider />
+        <MenuItem icon="trending-up"   label="Projeção"      onPress={() => router.push('/projection')} pro={user?.plan !== 'PRO'} />
+        <Divider />
+        <MenuItem icon="users"         label="Pessoas"       onPress={() => router.push('/people')} />
+        <Divider />
+        <MenuItem icon="pie-chart"     label="Orçamento"     onPress={() => router.push('/budget')} pro={user?.plan !== 'PRO'} />
         <Divider />
         <MenuItem icon="briefcase"     label="Rendas"        onPress={() => router.push('/income')} />
         <Divider />
@@ -105,13 +117,15 @@ export default function MoreScreen() {
 
       {/* Análises */}
       <Section title="Análises">
-        <MenuItem icon="bar-chart-2"   label="Relatórios"    onPress={() => router.push('/reports')} />
+        <MenuItem icon="bar-chart-2"   label="Relatórios"    onPress={() => router.push('/reports')} pro={user?.plan !== 'PRO'} />
         <Divider />
         <MenuItem icon="tag"           label="Categorias"    onPress={() => router.push('/categories')} />
       </Section>
 
       {/* Conta */}
       <Section title="Conta">
+        <MenuItem icon="zap"           label="Planos e cobrança" onPress={() => router.push('/billing')} />
+        <Divider />
         <MenuItem icon="settings"      label="Configurações" onPress={() => router.push('/settings')} />
       </Section>
 
@@ -163,4 +177,9 @@ const styles = StyleSheet.create({
   menuIcon: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   menuLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: COLORS.text },
   divider:   { height: 1, backgroundColor: COLORS.border, marginLeft: 62 },
+  proBadge: {
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginRight: 6,
+  },
+  proBadgeText: { fontSize: 10, fontWeight: '700', color: COLORS.warning },
 })

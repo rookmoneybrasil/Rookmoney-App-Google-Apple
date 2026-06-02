@@ -47,12 +47,25 @@ function AuthGate() {
 
   useEffect(() => {
     if (!ready) return
-    const inAuth = segments[0] === '(auth)'
+    const inAuth        = segments[0] === '(auth)'
+    const inOnboarding  = segments[0] === 'onboarding'
 
     if (!token && !inAuth) {
       router.replace('/(auth)/login')
     } else if (token && inAuth) {
-      router.replace('/(tabs)')
+      // Check if user needs onboarding after login
+      const u = useAuthStore.getState().user
+      if (u && !u.hasOnboarded) {
+        router.replace('/onboarding')
+      } else {
+        router.replace('/(tabs)')
+      }
+    } else if (token && !inAuth && !inOnboarding) {
+      // Already logged in — redirect to onboarding if not done
+      const u = useAuthStore.getState().user
+      if (u && !u.hasOnboarded && segments[0] !== 'onboarding') {
+        router.replace('/onboarding')
+      }
     }
   }, [token, ready, segments])
 
@@ -68,13 +81,21 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
 
+        {/* Onboarding */}
+        <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+
         {/* Stack screens */}
-        <Stack.Screen name="budget"     options={{ headerShown: false }} />
-        <Stack.Screen name="income"     options={{ headerShown: false }} />
-        <Stack.Screen name="recurring"  options={{ headerShown: false }} />
-        <Stack.Screen name="reports"    options={{ headerShown: false }} />
-        <Stack.Screen name="categories" options={{ headerShown: false }} />
-        <Stack.Screen name="settings"   options={{ headerShown: false }} />
+        <Stack.Screen name="budget"        options={{ headerShown: false }} />
+        <Stack.Screen name="income"        options={{ headerShown: false }} />
+        <Stack.Screen name="recurring"     options={{ headerShown: false }} />
+        <Stack.Screen name="reports"       options={{ headerShown: false }} />
+        <Stack.Screen name="categories"    options={{ headerShown: false }} />
+        <Stack.Screen name="settings"      options={{ headerShown: false }} />
+        <Stack.Screen name="calendar"      options={{ headerShown: false }} />
+        <Stack.Screen name="projection"    options={{ headerShown: false }} />
+        <Stack.Screen name="people"        options={{ headerShown: false }} />
+        <Stack.Screen name="person-detail" options={{ headerShown: false }} />
+        <Stack.Screen name="billing"       options={{ headerShown: false }} />
 
         {/* Modal screens */}
         <Stack.Screen name="new-transaction" options={{ presentation: 'modal', headerShown: false }} />
@@ -84,6 +105,7 @@ export default function RootLayout() {
         <Stack.Screen name="new-income"      options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="new-recurring"   options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="new-category"    options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="new-person"      options={{ presentation: 'modal', headerShown: false }} />
       </Stack>
     </QueryClientProvider>
   )
