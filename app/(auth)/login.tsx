@@ -1,11 +1,9 @@
 import { useState } from 'react'
-import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform,
-  ScrollView, ActivityIndicator, Linking,
-} from 'react-native'
+import { View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Linking } from 'react-native'
+import { Text, TextInput } from '@/components/text'
 import Svg, { Path } from 'react-native-svg'
 import { Link, useRouter } from 'expo-router'
+import * as ExpoLinking from 'expo-linking'
 import { COLORS, API_BASE_URL } from '@/lib/constants'
 import { authApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
@@ -47,7 +45,10 @@ export default function LoginScreen() {
   }
 
   function handleGoogleLogin() {
-    Linking.openURL(`${API_BASE_URL}/api/auth/google?mobile=1`)
+    const redirect = ExpoLinking.createURL('auth/callback')
+    console.log('[Google] redirect URL:', redirect)
+    const url = `https://rookmoney.com/api/auth/google?mobile=1&redirect=${encodeURIComponent(redirect)}`
+    Linking.openURL(url)
   }
 
   return (
@@ -88,7 +89,12 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Senha</Text>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Senha</Text>
+              <TouchableOpacity onPress={() => Linking.openURL('https://app.rookmoney.com/forgot-password')}>
+                <Text style={styles.forgotLink}>Esqueci a senha</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               style={styles.input}
               value={password}
@@ -162,8 +168,10 @@ const styles = StyleSheet.create({
   },
   errorText: { color: COLORS.danger, fontSize: 13 },
 
-  field: { marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: '500', color: COLORS.text, marginBottom: 6 },
+  field:      { marginBottom: 16 },
+  labelRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  label:      { fontSize: 13, fontWeight: '500', color: COLORS.text },
+  forgotLink: { fontSize: 12, color: COLORS.brand },
   input: {
     height: 48, backgroundColor: COLORS.card2, borderRadius: 12,
     borderWidth: 1, borderColor: COLORS.border,

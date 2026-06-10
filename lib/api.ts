@@ -16,6 +16,9 @@ async function request<T>(
     },
   })
 
+  // 204 No Content (DELETE) — no body to parse
+  if (res.status === 204) return undefined as T
+
   const data = await res.json()
   if (!res.ok) {
     throw new Error(data?.error ?? `HTTP ${res.status}`)
@@ -49,12 +52,56 @@ export const authApi = {
 
 // ── Dashboard ─────────────────────────────────────────────────────────
 
+export interface DashboardProjectionItem {
+  id:     string
+  label:  string
+  amount: number
+  icon?:  string
+}
+
+export interface DashboardProjection {
+  month:            string
+  projectedIncome:  number
+  projectedExpense: number
+  projectedBalance: number
+  incomeItems: {
+    sources:   DashboardProjectionItem[]
+    recurring: DashboardProjectionItem[]
+    people:    DashboardProjectionItem[]
+  }
+  expenseItems: {
+    bills:     DashboardProjectionItem[]
+    recurring: DashboardProjectionItem[]
+    people:    DashboardProjectionItem[]
+  }
+}
+
 export interface DashboardData {
-  monthBalance:       number
-  monthIncome:        number
-  monthExpense:       number
-  recentTransactions: Transaction[]
-  upcomingBills:      Bill[]
+  monthBalance:          number
+  monthIncome:           number
+  monthExpense:          number
+  incomeChange:          number | null
+  expenseChange:         number | null
+  totalReceivable:       number
+  totalPeopleReceivable: number
+  totalIncomeReceivable: number
+  pendingBillsAmount:    number
+  pendingBillsCount:     number
+  personPayablesAmount:  number
+  overdueCount:          number
+  insight:               string
+  mood:                  string
+  topCategories:         { name: string; icon: string; color: string; amount: number; pct: number }[]
+  monthlyHistory:        { month: string; income: number; expense: number; balance: number }[]
+  futurePersonPayables:  { id: string; amount: number; description: string; date: string; person: { name: string } }[]
+  recentTransactions:    Transaction[]
+  upcomingBills:         Bill[]
+  pendingIncomeSources:     { id: string; name: string; amount: number; isRecurring: boolean; dayOfMonth: number | null }[]
+  monthIncomeTransactions:  (Transaction & { isRecurringIncome: boolean })[]
+  monthPeopleReceived:      { id: string; description: string; amount: number; date: string; person: { name: string } }[]
+  upcomingPersonPayables:   { id: string; description: string; amount: number; date: string; person: { name: string } }[]
+  upcomingPeopleReceivable: { id: string; description: string; amount: number; date: string; person: { name: string } }[]
+  projections:              DashboardProjection[]
 }
 
 export const dashboardApi = {
@@ -70,11 +117,11 @@ export interface Transaction {
   description: string | null
   date:        string
   categoryId:  string
-  category:    { id: string; name: string; icon: string }
+  category:    { id: string; name: string; icon: string; color: string }
 }
 
 export const transactionsApi = {
-  list: (params?: { month?: string; type?: string; categoryId?: string; limit?: number }) => {
+  list: (params?: { month?: string; type?: string; categoryId?: string; pageSize?: number }) => {
     // Strip undefined/null so they're not serialized as the string "undefined"
     const clean = params
       ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null))
@@ -82,7 +129,7 @@ export const transactionsApi = {
     const qs = Object.keys(clean).length > 0
       ? '?' + new URLSearchParams(clean as Record<string, string>).toString()
       : ''
-    return request<{ data: Transaction[] }>(`/api/v1/transactions${qs}`)
+    return request<{ data: { items: Transaction[]; total: number; page: number; totalPages: number } }>(`/api/v1/transactions${qs}`)
   },
   create: (body: { amount: number; type: string; description?: string; date: string; categoryId: string }) =>
     request<{ data: { id: string } }>('/api/v1/transactions', {
@@ -111,6 +158,11 @@ export const categoriesApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  update: (id: string, body: { name?: string; icon?: string; color?: string }) =>
+    request<{ data: Category }>(`/api/v1/categories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
   delete: (id: string) =>
     request<{ success: boolean }>(`/api/v1/categories/${id}`, { method: 'DELETE' }),
 }
@@ -118,34 +170,84 @@ export const categoriesApi = {
 // ── Bills ─────────────────────────────────────────────────────────────
 
 export interface Bill {
-  id:        string
-  name:      string
-  amount:    number
-  dueDate:   string
-  isPaid:    boolean
-  isRecurring: boolean
-  category?: { name: string; icon: string } | null
+  id:                 string
+  name:               string
+  amount:             number
+  dueDate:            string
+  isPaid:             boolean
+  isRecurring:        boolean
+  installmentCurrent: number | null
+  installmentTotal:   number | null
+  notes:              string | null
+  categoryId?:        string | null
+  category?: { id?: string; name: string; icon: string; color?: string } | null
+  recurringBillId?:   string | null
+  installmentGroupId?: string | null
 }
 
 export const billsApi = {
   list: () => request<{ data: Bill[] }>('/api/v1/bills'),
-  create: (body: { name: string; amount: number; dueDate: string; isRecurring?: boolean; categoryId?: string }) =>
+  create: (body: { name: string; amount: number; dueDate: string; isRecurring?: boolean; categoryId?: string; installments?: number; alreadyPaid?: number; notes?: string }) =>
     request<{ data: Bill }>('/api/v1/bills', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
   pay: (id: string) =>
-    request<{ data: Bill }>(`/api/v1/bills/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ isPaid: true }),
+    request<{ data: Bill }>(`/api/v1/bills/${id}?action=pay`, {
+      method: 'POST',
+      body: JSON.stringify({ paid: true }),
     }),
-  update: (id: string, body: { isPaid?: boolean; name?: string; amount?: number; dueDate?: string }) =>
+  unpay: (id: string) =>
+    request<{ data: Bill }>(`/api/v1/bills/${id}?action=pay`, {
+      method: 'POST',
+      body: JSON.stringify({ paid: false }),
+    }),
+  update: (id: string, body: { name?: string; amount?: number; dueDate?: string; isRecurring?: boolean; categoryId?: string | null; notes?: string | null }) =>
     request<{ data: Bill }>(`/api/v1/bills/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
   delete: (id: string) =>
     request<{ success: boolean }>(`/api/v1/bills/${id}`, { method: 'DELETE' }),
+}
+
+// ── Recurring Bills (Contas Fixas) ──────────────────────────────────────
+
+export interface RecurringBill {
+  id:             string
+  name:           string
+  amount:         number
+  dayOfMonth:     number
+  isActive:       boolean
+  lastAutoMonth:  string | null
+  notes:          string | null
+  categoryId:     string | null
+  category?: { id: string; name: string; icon: string; color: string } | null
+}
+
+export interface RecurringBillInput {
+  name:        string
+  amount:      number
+  dayOfMonth:  number
+  categoryId?: string | null
+  notes?:      string | null
+  generateNow?: boolean
+}
+
+export const recurringBillsApi = {
+  list: () => request<{ data: RecurringBill[] }>('/api/v1/bills/recurring'),
+  create: (body: RecurringBillInput) =>
+    request<{ data: RecurringBill }>('/api/v1/bills/recurring', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  update: (id: string, body: Partial<RecurringBillInput> & { isActive?: boolean }) =>
+    request<{ data: RecurringBill }>(`/api/v1/bills/recurring/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/api/v1/bills/recurring/${id}`, { method: 'DELETE' }),
 }
 
 // ── Goals ─────────────────────────────────────────────────────────────
@@ -175,7 +277,7 @@ export const goalsApi = {
       body: JSON.stringify(body),
     }),
   contribute: (id: string, amount: number, note?: string) =>
-    request<{ data: { id: string; currentAmount: number; isCompleted: boolean } }>(`/api/v1/goals/${id}/contribute`, {
+    request<{ data: { id: string; currentAmount: number; isCompleted: boolean } }>(`/api/v1/goals/${id}?action=contribute`, {
       method: 'POST',
       body: JSON.stringify({ amount, note }),
     }),
@@ -197,20 +299,20 @@ export interface Budget {
 export const budgetsApi = {
   list: (month?: string) => {
     const qs = month && month !== 'undefined' ? `?month=${month}` : ''
-    return request<{ data: Budget[] }>(`/api/v1/budgets${qs}`)
+    return request<{ data: Budget[] }>(`/api/v1/budget${qs}`)
   },
   create: (body: { categoryId: string; amount: number; month: string }) =>
-    request<{ data: Budget }>('/api/v1/budgets', {
+    request<{ data: Budget }>('/api/v1/budget', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  update: (id: string, body: { amount: number }) =>
-    request<{ data: Budget }>(`/api/v1/budgets/${id}`, {
-      method: 'PATCH',
+  update: (body: { categoryId: string; amount: number; month: string }) =>
+    request<{ data: Budget }>('/api/v1/budget', {
+      method: 'POST',
       body: JSON.stringify(body),
     }),
   delete: (id: string) =>
-    request<{ success: boolean }>(`/api/v1/budgets/${id}`, { method: 'DELETE' }),
+    request<{ success: boolean }>(`/api/v1/budget/${id}`, { method: 'DELETE' }),
 }
 
 // ── Recurring Transactions ────────────────────────────────────────────
@@ -234,7 +336,7 @@ export const recurringApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  update: (id: string, body: { name?: string; amount?: number; isActive?: boolean; dayOfMonth?: number }) =>
+  update: (id: string, body: { name?: string; type?: string; amount?: number; frequency?: string; dayOfMonth?: number; categoryId?: string; description?: string | null; isActive?: boolean }) =>
     request<{ data: Recurring }>(`/api/v1/recurring/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
@@ -251,45 +353,111 @@ export const recurringApi = {
 // ── Income Sources ────────────────────────────────────────────────────
 
 export interface IncomeSource {
-  id:          string
-  name:        string
-  type:        'EMPLOYMENT' | 'FREELANCE' | 'RENTAL' | 'OTHER'
-  amount:      number
-  isRecurring: boolean
-  dayOfMonth:  number | null
-  notes:       string | null
+  id:               string
+  name:             string
+  type:             'EMPLOYMENT' | 'FREELANCE' | 'RENTAL' | 'OTHER'
+  amount:           number
+  isRecurring:      boolean
+  dayOfMonth:       number | null
+  startDate:        string | null
+  lastAutoPayMonth: string | null
+  notes:            string | null
+}
+
+export interface IncomeHistoryEntry {
+  id:       string
+  amount:   number
+  date:     string
+  category: { id: string; name: string; icon: string; color: string } | null
 }
 
 export const incomeSourcesApi = {
   list: () => request<{ data: IncomeSource[] }>('/api/v1/income-sources'),
-  create: (body: { name: string; type: string; amount: number; isRecurring?: boolean; dayOfMonth?: number }) =>
+  history: () => request<{ data: Record<string, IncomeHistoryEntry[]> }>('/api/v1/income-sources/history'),
+  create: (body: { name: string; type: string; amount: number; isRecurring?: boolean; dayOfMonth?: number; startDate?: string; notes?: string; categoryId?: string | null }) =>
     request<{ data: IncomeSource }>('/api/v1/income-sources', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  update: (id: string, body: { name?: string; amount?: number; isRecurring?: boolean; dayOfMonth?: number }) =>
+  update: (id: string, body: { name?: string; type?: string; amount?: number; isRecurring?: boolean; dayOfMonth?: number; startDate?: string | null; notes?: string | null; lastAutoPayMonth?: string | null }) =>
     request<{ data: IncomeSource }>(`/api/v1/income-sources/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
+  revert: (id: string) =>
+    request<{ data: IncomeSource }>(`/api/v1/income-sources/${id}?action=revert`, { method: 'POST' }),
   delete: (id: string) =>
     request<{ success: boolean }>(`/api/v1/income-sources/${id}`, { method: 'DELETE' }),
 }
 
 // ── Reports ───────────────────────────────────────────────────────────
 
-export interface MonthReport {
-  month:             string
+export interface MonthlyReport {
+  monthKey:    string
+  monthFull:   string
+  totalIncome: number
+  totalExpense: number
+  balance:     number
+  savingsRate: number
+}
+
+export interface PeriodReport {
   totalIncome:       number
   totalExpense:      number
   balance:           number
-  categoryBreakdown: { name: string; icon: string; color: string; total: number; pct: number }[]
+  netBalance:        number
+  savingsRate:       number
+  avgMonthlyIncome:  number
+  avgMonthlyExpense: number
+  positiveMonths:    number
+  totalMonths:       number
+  bestMonth:         string | null
+  worstMonth:        string | null
+}
+
+export interface CategoryTrend {
+  categoryId: string
+  name:       string
+  icon:       string
+  color:      string
+  total:      number
+  prevTotal:  number
+  change:     number
+  delta:      number
+  pct:        number
+}
+
+export interface TopExpense {
+  id:          string
+  description: string | null
+  amount:      number
+  date:        string
+  category:    { id: string; name: string; icon: string; color: string }
+}
+
+export interface SpendingDay {
+  day:   number
+  total: number
+}
+
+export interface IncomeSourceReport {
+  name:  string
+  total: number
+}
+
+export interface ReportsData {
+  monthly:       MonthlyReport[]
+  period:        PeriodReport
+  categoryTrend: CategoryTrend[]
+  topExpenses:   TopExpense[]
+  spendingByDay: SpendingDay[]
+  incomeSources: IncomeSourceReport[]
 }
 
 export const reportsApi = {
   get: (months?: number) => {
     const qs = months ? `?months=${months}` : ''
-    return request<{ data: MonthReport[] }>(`/api/v1/reports${qs}`)
+    return request<{ data: ReportsData }>(`/api/v1/reports${qs}`)
   },
 }
 
@@ -329,10 +497,16 @@ export interface MeData {
 }
 
 export const meApi = {
-  get: () => request<{ data: MeData }>('/api/v1/me'),
+  get: () => request<{ data: MeData }>('/api/v1/auth/me'),
 }
 
 // ── Settings ──────────────────────────────────────────────────────────
+
+export interface SettingsPrefs {
+  notifBillReminder:  boolean
+  notifCategoryLimit: boolean
+  notifMonthlyEmail:  boolean
+}
 
 export const settingsApi = {
   update: (body: { name?: string; bio?: string; city?: string; occupation?: string; hasOnboarded?: boolean }) =>
@@ -340,6 +514,20 @@ export const settingsApi = {
       method: 'PATCH',
       body:   JSON.stringify(body),
     }),
+  getPrefs: () =>
+    request<{ data: SettingsPrefs & { name: string; email: string } }>('/api/v1/settings'),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ data: { message: string } }>('/api/v1/settings?action=password', {
+      method: 'PATCH',
+      body:   JSON.stringify({ currentPassword, newPassword }),
+    }),
+  updateNotifications: (body: { notifBillReminder?: boolean; notifCategoryLimit?: boolean; notifMonthlyEmail?: boolean }) =>
+    request<{ data: { message: string } }>('/api/v1/settings?action=notifications', {
+      method: 'PATCH',
+      body:   JSON.stringify(body),
+    }),
+  delete: () =>
+    request<{ data: { message: string } }>('/api/v1/settings', { method: 'DELETE' }),
 }
 
 // ── Calendar ──────────────────────────────────────────────────────────
@@ -351,6 +539,7 @@ export interface CalendarEvent {
   label:  string
   amount: number
   status: 'pending' | 'paid' | 'overdue' | 'expected' | 'received'
+  href:   string
   color:  'success' | 'danger' | 'warning'
 }
 
@@ -403,46 +592,150 @@ export const projectionApi = {
 // ── People ────────────────────────────────────────────────────────────
 
 export interface PersonEntry {
-  id:                 string
-  type:               'THEY_OWE_ME' | 'I_OWE_THEM'
-  description:        string
-  amount:             number
-  date:               string
-  notes:              string | null
-  isSettled:          boolean
-  installmentTotal:   number | null
-  installmentCurrent: number | null
+  id:                  string
+  type:                'THEY_OWE_ME' | 'I_OWE_THEM'
+  description:         string
+  amount:              number
+  date:                string
+  notes:               string | null
+  isSettled:           boolean
+  settledAt?:          string | null
+  settledTransactionId?: string | null
+  installmentTotal:    number | null
+  installmentCurrent:  number | null
+  installmentGroupId?: string | null
+  categoryId?:         string | null
+  category?: { id: string; name: string; icon: string; color: string } | null
 }
 
 export interface Person {
-  id:          string
-  name:        string
-  theyOweMe:   number
-  iOweThem:    number
-  openEntries: number
-  entries?:    PersonEntry[]
+  id:               string
+  name:             string
+  color:            string | null
+  notes?:           string | null
+  theyOweMe:        number
+  iOweThem:         number
+  balance:          number
+  openEntriesCount: number
+  entries?:         PersonEntry[]
 }
 
 export const peopleApi = {
   list: () => request<{ data: Person[] }>('/api/v1/people'),
   get:  (id: string) => request<{ data: Person & { entries: PersonEntry[] } }>(`/api/v1/people/${id}`),
-  create: (body: { name: string; notes?: string }) =>
+  create: (body: { name: string; color?: string | null; notes?: string | null }) =>
     request<{ data: Person }>('/api/v1/people', {
       method: 'POST',
       body:   JSON.stringify(body),
     }),
+  update: (id: string, body: { name?: string; color?: string | null; notes?: string | null }) =>
+    request<{ data: Person }>(`/api/v1/people/${id}`, {
+      method: 'PATCH',
+      body:   JSON.stringify(body),
+    }),
   addEntry: (personId: string, body: {
     type: string; description: string; amount: number; date: string
-    notes?: string; categoryId?: string; installments?: number
+    notes?: string; categoryId?: string; installments?: number; alreadyPaid?: number
   }) =>
     request<{ data: PersonEntry }>(`/api/v1/people/${personId}?action=entry`, {
       method: 'POST',
       body:   JSON.stringify(body),
     }),
+  editEntry: (entryId: string, body: {
+    type?: string; description?: string; amount?: number; date?: string
+    categoryId?: string | null; notes?: string | null; applyToGroup?: boolean
+  }) =>
+    request<{ data: PersonEntry }>(`/api/v1/people/entries/${entryId}`, {
+      method: 'PATCH',
+      body:   JSON.stringify(body),
+    }),
   settleEntry: (entryId: string) =>
     request<{ data: PersonEntry }>(`/api/v1/people/entries/${entryId}?action=settle`, { method: 'POST' }),
+  unsettleEntry: (entryId: string) =>
+    request<{ data: PersonEntry }>(`/api/v1/people/entries/${entryId}?action=unsettle`, { method: 'POST' }),
+  deleteEntry: (entryId: string) =>
+    request<{ success: boolean }>(`/api/v1/people/entries/${entryId}`, { method: 'DELETE' }),
+  deleteEntryGroup: (entryId: string) =>
+    request<{ success: boolean }>(`/api/v1/people/entries/${entryId}?applyToGroup=true`, { method: 'DELETE' }),
   delete: (id: string) =>
     request<{ success: boolean }>(`/api/v1/people/${id}`, { method: 'DELETE' }),
+}
+
+// ── Person Recurring Entries (Recorrentes) ──────────────────────────────
+
+export interface PersonEntryRecurring {
+  id:          string
+  personId:    string
+  type:        'THEY_OWE_ME' | 'I_OWE_THEM'
+  description: string
+  amount:      number
+  dayOfMonth:  number
+  isActive:    boolean
+  lastMonth:   string | null
+  notes:       string | null
+  categoryId:  string | null
+  category?: { id: string; name: string; icon: string; color: string } | null
+}
+
+export interface PersonEntryRecurringInput {
+  personId:    string
+  type:        'THEY_OWE_ME' | 'I_OWE_THEM'
+  description: string
+  amount:      number
+  dayOfMonth?: number
+  firstDate?:  string
+  notes?:      string | null
+  categoryId?: string | null
+}
+
+export const personRecurringApi = {
+  list: (personId: string) =>
+    request<{ data: PersonEntryRecurring[] }>(`/api/v1/people/recurring?personId=${personId}`),
+  create: (body: PersonEntryRecurringInput) =>
+    request<{ data: PersonEntryRecurring }>('/api/v1/people/recurring', {
+      method: 'POST',
+      body:   JSON.stringify(body),
+    }),
+  update: (id: string, body: Partial<PersonEntryRecurringInput> & { isActive?: boolean }) =>
+    request<{ data: PersonEntryRecurring }>(`/api/v1/people/recurring/${id}`, {
+      method: 'PATCH',
+      body:   JSON.stringify(body),
+    }),
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/api/v1/people/recurring/${id}`, { method: 'DELETE' }),
+  migrate: () =>
+    request<{ data: { converted: number; message: string } }>('/api/v1/people/migrate-recurring', { method: 'POST' }),
+}
+
+// ── Notifications ─────────────────────────────────────────────────────
+
+export interface AppNotification {
+  id:      string
+  type:    'bill' | 'goal' | 'budget'
+  title:   string
+  message: string
+  href:    string
+  urgency: 'high' | 'medium'
+}
+
+export const notificationsApi = {
+  list: () => request<{ data: AppNotification[] }>('/api/v1/notifications'),
+}
+
+// ── Export ────────────────────────────────────────────────────────────
+
+export const exportApi = {
+  get: () => request<{ data: Record<string, unknown> }>('/api/v1/export'),
+}
+
+// ── Feedback ──────────────────────────────────────────────────────────
+
+export const feedbackApi = {
+  send: (body: { type: 'bug' | 'suggestion' | 'ticket'; title: string; body: string }) =>
+    request<{ data: { id: string } }>('/api/v1/feedback', {
+      method: 'POST',
+      body:   JSON.stringify(body),
+    }),
 }
 
 // ── Billing ───────────────────────────────────────────────────────────

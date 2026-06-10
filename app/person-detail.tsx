@@ -1,138 +1,106 @@
-import { useState } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, RefreshControl,
-} from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl } from 'react-native'
+import { Text } from '@/components/text'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
-import { format } from 'date-fns'
+import { format, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { COLORS } from '@/lib/constants'
-import { peopleApi, categoriesApi, type PersonEntry } from '@/lib/api'
+import { peopleApi, personRecurringApi, type PersonEntry, type PersonEntryRecurring } from '@/lib/api'
+import { PersonAvatar } from '@/components/people/avatar'
+import { PersonSheet } from '@/components/people/person-sheet'
+import { EntryModal } from '@/components/people/entry-modal'
+import { EditEntryModal } from '@/components/people/edit-entry-modal'
+import { EditRecurringModal } from '@/components/people/edit-recurring-modal'
+import { EntryActions } from '@/components/people/entry-actions'
+import { InstallmentGroup } from '@/components/people/installment-group'
+import { RecurringEntryRow } from '@/components/people/recurring-entry-row'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
 
-type EntryType = 'THEY_OWE_ME' | 'I_OWE_THEM'
+// ─── Single entry card ──────────────────────────────────────────────────────
 
-function EntryRow({ entry, onSettle }: { entry: PersonEntry; onSettle: () => void }) {
-  const isOwed = entry.type === 'THEY_OWE_ME'
-  const color  = isOwed ? COLORS.success : COLORS.danger
+function EntryCard({ entry, personId, settled = false }: { entry: PersonEntry; personId: string; settled?: boolean }) {
+  const [editOpen, setEditOpen] = useState(false)
+  const isTheyOwe = entry.type === 'THEY_OWE_ME'
+  const dirColor  = isTheyOwe ? COLORS.success : COLORS.danger
+
+  if (settled) {
+    return (
+      <View style={[styles.entryCard, styles.entryCardSettled]}>
+        <View style={styles.entryTop}>
+          <View style={[styles.entryIcon, styles.entryIconSettled]}>
+            <Feather name="check-circle" size={15} color={COLORS.muted} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[styles.entryTitle, styles.entryTitleSettled]} numberOfLines={1}>{entry.description}</Text>
+            <View style={styles.entryMetaRow}>
+              <Text style={styles.entrySubtitle} numberOfLines={1}>
+                Acertado em {format(new Date(entry.settledAt ?? entry.date), "d 'de' MMM", { locale: ptBR })}
+              </Text>
+              {entry.category && (
+                <Text style={styles.entrySubtitle}>· {entry.category.icon} {entry.category.name}</Text>
+              )}
+            </View>
+          </View>
+          <Text style={[styles.entryAmount, { color: COLORS.muted }]}>{fmt(entry.amount)}</Text>
+        </View>
+        <View style={styles.entryActions}>
+          <TouchableOpacity style={styles.iconBtnSmall} onPress={() => setEditOpen(true)}>
+            <Feather name="edit-2" size={12} color={COLORS.muted} />
+          </TouchableOpacity>
+          <EntryActions entryId={entry.id} personId={personId} isSettled />
+        </View>
+        <EditEntryModal visible={editOpen} entry={entry} personId={personId} onClose={() => setEditOpen(false)} />
+      </View>
+    )
+  }
 
   return (
-    <View style={[styles.entryRow, entry.isSettled && styles.entrySettled]}>
-      <View style={[styles.entryIcon, { backgroundColor: color + '22' }]}>
-        <Feather name={isOwed ? 'arrow-down-left' : 'arrow-up-right'} size={14} color={color} />
-      </View>
-      <View style={styles.entryInfo}>
-        <Text style={styles.entryDesc} numberOfLines={1}>{entry.description}</Text>
-        <Text style={styles.entryDate}>
-          {format(new Date(entry.date), "d 'de' MMM yyyy", { locale: ptBR })}
-          {entry.isSettled ? ' · Quitado' : ''}
+    <View style={styles.entryCard}>
+      <View style={styles.entryTop}>
+        <View style={[styles.entryIcon, { backgroundColor: dirColor + '1a' }]}>
+          <Feather name={isTheyOwe ? 'trending-up' : 'trending-down'} size={15} color={dirColor} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.entryTitle} numberOfLines={1}>{entry.description}</Text>
+          <View style={styles.entryMetaRow}>
+            <Text style={styles.entrySubtitle}>{format(new Date(entry.date), "d 'de' MMM yyyy", { locale: ptBR })}</Text>
+            {entry.category && (
+              <View style={[styles.catPill, { backgroundColor: entry.category.color + '18', borderColor: entry.category.color + '40' }]}>
+                <Text style={[styles.catPillText, { color: entry.category.color }]}>{entry.category.icon} {entry.category.name}</Text>
+              </View>
+            )}
+            {entry.notes && <Text style={styles.entrySubtitle} numberOfLines={1}>· {entry.notes}</Text>}
+          </View>
+        </View>
+        <Text style={[styles.entryAmount, { color: dirColor }]}>
+          {isTheyOwe ? '+' : '-'}{fmt(entry.amount)}
         </Text>
       </View>
-      <View style={styles.entryRight}>
-        <Text style={[styles.entryAmount, { color }]}>
-          {isOwed ? '+' : '-'}{fmt(entry.amount)}
-        </Text>
-        {!entry.isSettled && (
-          <TouchableOpacity style={styles.settleBtn} onPress={onSettle}>
-            <Text style={styles.settleBtnText}>Quitar</Text>
-          </TouchableOpacity>
-        )}
+      <View style={styles.entryActions}>
+        <TouchableOpacity style={styles.iconBtnSmall} onPress={() => setEditOpen(true)}>
+          <Feather name="edit-2" size={12} color={COLORS.muted} />
+        </TouchableOpacity>
+        <EntryActions entryId={entry.id} personId={personId} isSettled={false} />
       </View>
+      <EditEntryModal visible={editOpen} entry={entry} personId={personId} onClose={() => setEditOpen(false)} />
     </View>
   )
 }
 
-function AddEntryForm({ personId, onDone }: { personId: string; onDone: () => void }) {
-  const [type, setType]         = useState<EntryType>('THEY_OWE_ME')
-  const [desc, setDesc]         = useState('')
-  const [amount, setAmount]     = useState('')
-  const qc = useQueryClient()
-
-  const mutation = useMutation({
-    mutationFn: () => peopleApi.addEntry(personId, {
-      type,
-      description: desc.trim(),
-      amount:      parseFloat(amount.replace(',', '.')),
-      date:        new Date().toISOString().slice(0, 10),
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['person', personId] })
-      qc.invalidateQueries({ queryKey: ['people'] })
-      setDesc('')
-      setAmount('')
-      onDone()
-    },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
-  })
-
-  const canSave = desc.trim().length > 0 && parseFloat(amount.replace(',', '.')) > 0
-
-  // Minimal inline form - full amount input
-  const { TextInput } = require('react-native')
-
-  return (
-    <View style={styles.addForm}>
-      <Text style={styles.addFormTitle}>Adicionar lançamento</Text>
-
-      <View style={styles.typeToggle}>
-        {(['THEY_OWE_ME', 'I_OWE_THEM'] as EntryType[]).map(t => (
-          <TouchableOpacity
-            key={t}
-            style={[styles.typeBtn, type === t && styles.typeBtnActive]}
-            onPress={() => setType(t)}
-          >
-            <Text style={[styles.typeBtnText, type === t && styles.typeBtnTextActive]}>
-              {t === 'THEY_OWE_ME' ? 'Me deve' : 'Devo a ele(a)'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <TextInput
-        style={styles.addInput}
-        value={desc}
-        onChangeText={setDesc}
-        placeholder="Descrição"
-        placeholderTextColor={COLORS.muted}
-        maxLength={80}
-      />
-      <TextInput
-        style={styles.addInput}
-        value={amount}
-        onChangeText={setAmount}
-        placeholder="Valor (ex: 50,00)"
-        placeholderTextColor={COLORS.muted}
-        keyboardType="decimal-pad"
-      />
-
-      <View style={styles.addFormActions}>
-        <TouchableOpacity style={styles.cancelBtn} onPress={onDone}>
-          <Text style={styles.cancelBtnText}>Cancelar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
-          onPress={() => mutation.mutate()}
-          disabled={!canSave || mutation.isPending}
-        >
-          {mutation.isPending
-            ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={styles.saveBtnText}>Salvar</Text>
-          }
-        </TouchableOpacity>
-      </View>
-    </View>
-  )
-}
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function PersonDetailScreen() {
-  const router       = useRouter()
-  const qc           = useQueryClient()
-  const { id }       = useLocalSearchParams<{ id: string }>()
-  const [adding, setAdding] = useState(false)
+  const router = useRouter()
+  const qc     = useQueryClient()
+  const { id } = useLocalSearchParams<{ id: string }>()
+
+  const [entryModalOpen, setEntryModalOpen]   = useState(false)
+  const [personSheetOpen, setPersonSheetOpen] = useState(false)
+  const [editingRecurring, setEditingRecurring] = useState<PersonEntryRecurring | null>(null)
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['person', id],
@@ -140,20 +108,174 @@ export default function PersonDetailScreen() {
     enabled:  !!id,
   })
 
-  const settleMutation = useMutation({
-    mutationFn: (entryId: string) => peopleApi.settleEntry(entryId),
+  const { data: recurring, refetch: refetchRecurring } = useQuery({
+    queryKey: ['personRecurring', id],
+    queryFn:  () => personRecurringApi.list(id).then(r => r.data),
+    enabled:  !!id,
+  })
+
+  const deletePersonMutation = useMutation({
+    mutationFn: () => peopleApi.delete(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['person', id] })
       qc.invalidateQueries({ queryKey: ['people'] })
+      router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
-  const netOwed  = (data?.theyOweMe ?? 0) - (data?.iOweThem ?? 0)
-  const netColor = netOwed > 0 ? COLORS.success : netOwed < 0 ? COLORS.danger : COLORS.muted
+  function confirmDeletePerson() {
+    Alert.alert('Excluir pessoa', `Remover ${data?.name} e todas as pendências?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Excluir', style: 'destructive', onPress: () => deletePersonMutation.mutate() },
+    ])
+  }
 
-  const openEntries   = data?.entries?.filter(e => !e.isSettled) ?? []
-  const closedEntries = data?.entries?.filter(e => e.isSettled) ?? []
+  const allEntries   = data?.entries ?? []
+  const recurringList = recurring ?? []
+
+  const now        = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+
+  // Map: recurringId → entry this month (settled or not)
+  const recurringEntryMap = new Map<string, PersonEntry>()
+  for (const r of recurringList) {
+    const match = allEntries.find(e =>
+      e.description === r.description &&
+      e.type        === r.type &&
+      !e.installmentGroupId &&
+      new Date(e.date) >= monthStart &&
+      new Date(e.date) <= monthEnd
+    )
+    if (match) recurringEntryMap.set(r.id, match)
+  }
+
+  const cutoff = new Date(now.getTime() + 45 * 24 * 60 * 60 * 1000)
+
+  const openEntries    = allEntries.filter(e => !e.isSettled)
+  const settledEntries = allEntries.filter(e =>  e.isSettled)
+
+  const groupSeen = new Set<string>()
+  let theyOweTotal = 0
+  let iOweTotal    = 0
+  for (const e of openEntries) {
+    const isOldRecurring = (e.installmentTotal ?? 0) >= 24
+    if (isOldRecurring && new Date(e.date) > cutoff) continue
+
+    if (e.installmentGroupId) {
+      if (groupSeen.has(e.installmentGroupId)) continue
+      groupSeen.add(e.installmentGroupId)
+    }
+
+    if (e.type === 'THEY_OWE_ME') theyOweTotal += e.amount
+    else                           iOweTotal    += e.amount
+  }
+
+  let recurringTheyOwe = 0
+  let recurringIOwe    = 0
+  for (const r of recurringList) {
+    if (recurringEntryMap.has(r.id)) continue
+    if (r.type === 'THEY_OWE_ME') recurringTheyOwe += r.amount
+    else                           recurringIOwe    += r.amount
+  }
+
+  const theyOweTotalWithRecurring = theyOweTotal + recurringTheyOwe
+  const iOweTotalWithRecurring    = iOweTotal    + recurringIOwe
+  const balance = theyOweTotalWithRecurring - iOweTotalWithRecurring
+
+  const settledThisMonth = settledEntries
+    .filter(e => new Date(e.date) >= monthStart && new Date(e.date) <= monthEnd)
+    .reduce((s, e) => s + e.amount, 0)
+
+  const monthLabel = format(now, 'MMMM', { locale: ptBR })
+  const projection = Array.from({ length: 3 }, (_, i) => {
+    const d = addMonths(now, i)
+    const label = format(d, "MMM/yy", { locale: ptBR })
+
+    const dueEntries = openEntries.filter(e => {
+      const eDate = new Date(e.date)
+      return eDate.getFullYear() === d.getFullYear() && eDate.getMonth() === d.getMonth()
+    })
+
+    let projTheyOwe = 0
+    let projIOwe    = 0
+    const seenGroups = new Set<string>()
+
+    for (const e of dueEntries) {
+      if (e.installmentGroupId) {
+        if (seenGroups.has(e.installmentGroupId)) continue
+        seenGroups.add(e.installmentGroupId)
+      }
+      if (e.type === 'THEY_OWE_ME') projTheyOwe += e.amount
+      else                           projIOwe    += e.amount
+    }
+
+    const dStart = new Date(d.getFullYear(), d.getMonth(), 1)
+    const dEnd   = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
+
+    for (const r of recurringList) {
+      const alreadyHasEntry = allEntries.some(e =>
+        !e.isSettled &&
+        e.description === r.description &&
+        e.type        === r.type &&
+        !e.installmentGroupId &&
+        new Date(e.date) >= dStart &&
+        new Date(e.date) <= dEnd
+      )
+      if (alreadyHasEntry) continue
+
+      if (r.type === 'THEY_OWE_ME') projTheyOwe += r.amount
+      else                           projIOwe    += r.amount
+    }
+
+    return { label, theyOwe: projTheyOwe, iOwe: projIOwe, balance: projTheyOwe - projIOwe }
+  })
+
+  const hasOldRecurring = openEntries.some(e => (e.installmentTotal ?? 0) >= 24)
+
+  // Silent auto-migration of old-style recurring groups
+  useEffect(() => {
+    if (!hasOldRecurring || !id) return
+    personRecurringApi.migrate()
+      .then(({ data }) => {
+        if (data.converted > 0) {
+          qc.invalidateQueries({ queryKey: ['person', id] })
+          qc.invalidateQueries({ queryKey: ['personRecurring', id] })
+          qc.invalidateQueries({ queryKey: ['people'] })
+        }
+      })
+      .catch(() => {})
+  }, [hasOldRecurring, id, qc])
+
+  const singleOpen    = openEntries.filter(e => !e.installmentGroupId)
+  const singleSettled = settledEntries.filter(e => !e.installmentGroupId)
+
+  const openGroupIds = new Set(openEntries.filter(e => e.installmentGroupId).map(e => e.installmentGroupId as string))
+  const allGroupMap  = new Map<string, PersonEntry[]>()
+  for (const e of allEntries) {
+    if (e.installmentGroupId) {
+      const arr = allGroupMap.get(e.installmentGroupId) ?? []
+      arr.push(e)
+      allGroupMap.set(e.installmentGroupId, arr)
+    }
+  }
+
+  const activeGroups = Array.from(allGroupMap.entries())
+    .filter(([gid]) => openGroupIds.has(gid))
+    .map(([, g]) => g.sort((a, b) => (a.installmentCurrent ?? 0) - (b.installmentCurrent ?? 0)))
+
+  const doneGroupIds = new Set(Array.from(allGroupMap.keys()).filter(gid => !openGroupIds.has(gid)))
+  const doneGroups = Array.from(allGroupMap.entries())
+    .filter(([gid]) => doneGroupIds.has(gid))
+    .map(([, g]) => g.sort((a, b) => (a.installmentCurrent ?? 0) - (b.installmentCurrent ?? 0)))
+
+  const pendingCount = singleOpen.length + activeGroups.length
+  const settledCount = singleSettled.length + doneGroups.length
+
+  function onRefresh() {
+    refetch()
+    refetchRecurring()
+  }
 
   return (
     <View style={styles.screen}>
@@ -161,171 +283,303 @@ export default function PersonDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
           <Feather name="arrow-left" size={22} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{data?.name ?? '...'}</Text>
-        <TouchableOpacity onPress={() => setAdding(v => !v)} hitSlop={12}>
-          <Feather name="plus" size={22} color={COLORS.brand} />
+        <TouchableOpacity style={styles.addBtn} onPress={() => setEntryModalOpen(true)}>
+          <Feather name="plus" size={22} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {isLoading ? (
-        <ActivityIndicator color={COLORS.brand} style={{ marginTop: 40 }} />
+      {isLoading || !data ? (
+        <ActivityIndicator color={COLORS.brand} style={{ marginTop: 60 }} />
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={COLORS.brand} />}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={COLORS.brand} />}
         >
-          {/* Balance cards */}
-          <View style={styles.balanceRow}>
-            <View style={styles.balanceCard}>
-              <Text style={styles.balanceLabel}>Te deve</Text>
-              <Text style={[styles.balanceVal, { color: COLORS.success }]}>{fmt(data?.theyOweMe ?? 0)}</Text>
-            </View>
-            <View style={styles.balanceCard}>
-              <Text style={styles.balanceLabel}>Você deve</Text>
-              <Text style={[styles.balanceVal, { color: COLORS.danger }]}>{fmt(data?.iOweThem ?? 0)}</Text>
-            </View>
-            <View style={[styles.balanceCard, styles.balanceCardNet]}>
-              <Text style={styles.balanceLabel}>Líquido</Text>
-              <Text style={[styles.balanceVal, { color: netColor }]}>{fmt(Math.abs(netOwed))}</Text>
+          {/* Profile */}
+          <View style={styles.profileRow}>
+            <PersonAvatar name={data.name} color={data.color} size="lg" />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.name} numberOfLines={1}>{data.name}</Text>
+              {data.notes && <Text style={styles.notes} numberOfLines={2}>{data.notes}</Text>}
+              <View style={styles.profileActions}>
+                <TouchableOpacity style={styles.profileActionBtn} onPress={() => setPersonSheetOpen(true)}>
+                  <Feather name="edit-2" size={12} color={COLORS.muted} />
+                  <Text style={styles.profileActionText}>Editar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.profileActionBtn} onPress={confirmDeletePerson}>
+                  <Feather name="trash-2" size={12} color={COLORS.danger} />
+                  <Text style={[styles.profileActionText, { color: COLORS.danger }]}>Excluir</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
-          {/* Add entry form */}
-          {adding && (
-            <AddEntryForm personId={id} onDone={() => setAdding(false)} />
+          {/* Balance summary */}
+          <View style={styles.balanceCard}>
+            <View style={styles.balanceCardHeader}>
+              <View style={styles.balanceCardLabelRow}>
+                <Feather name="trending-up" size={14} color={COLORS.success} />
+                <Text style={styles.balanceCardLabel}>Te deve</Text>
+              </View>
+              <Text style={styles.balanceCardMonth}>{monthLabel}</Text>
+            </View>
+            <Text style={[styles.balanceCardValue, { color: COLORS.success }]}>{fmt(theyOweTotalWithRecurring)}</Text>
+            {recurringTheyOwe > 0 && theyOweTotal > 0 && (
+              <Text style={styles.balanceCardSub}>{fmt(theyOweTotal)} avulso + {fmt(recurringTheyOwe)} recorrente</Text>
+            )}
+            {recurringTheyOwe > 0 && theyOweTotal === 0 && (
+              <Text style={styles.balanceCardSub}>recorrente mensal</Text>
+            )}
+          </View>
+
+          <View style={styles.balanceCard}>
+            <View style={styles.balanceCardHeader}>
+              <View style={styles.balanceCardLabelRow}>
+                <Feather name="trending-down" size={14} color={COLORS.danger} />
+                <Text style={styles.balanceCardLabel}>Você deve</Text>
+              </View>
+              <Text style={styles.balanceCardMonth}>{monthLabel}</Text>
+            </View>
+            <Text style={[styles.balanceCardValue, { color: COLORS.danger }]}>{fmt(iOweTotalWithRecurring)}</Text>
+            {recurringIOwe > 0 && iOweTotal > 0 && (
+              <Text style={styles.balanceCardSub}>{fmt(iOweTotal)} avulso + {fmt(recurringIOwe)} recorrente</Text>
+            )}
+            {recurringIOwe > 0 && iOweTotal === 0 && (
+              <Text style={styles.balanceCardSub}>recorrente mensal</Text>
+            )}
+          </View>
+
+          <View style={[styles.balanceCard, { marginBottom: 16 }]}>
+            <View style={styles.balanceCardLabelRow}>
+              <Feather name="check-circle" size={14} color={balance >= 0 ? COLORS.brand : COLORS.danger} />
+              <Text style={styles.balanceCardLabel}>Saldo líquido</Text>
+            </View>
+            <Text style={[styles.balanceCardValue, { color: balance >= 0 ? COLORS.brand : COLORS.danger }]}>
+              {balance === 0
+                ? 'Quitado 🎉'
+                : balance > 0
+                ? `${fmt(balance)} a receber`
+                : `${fmt(-balance)} a pagar`}
+            </Text>
+            {balance === 0 && settledThisMonth > 0 && (
+              <Text style={styles.balanceCardSub}>{fmt(settledThisMonth)} quitado este mês</Text>
+            )}
+          </View>
+
+          {/* Projeção dos próximos meses */}
+          {recurringList.length > 0 && (
+            <View style={styles.projectionCard}>
+              <View style={styles.projectionHeader}>
+                <Feather name="calendar" size={14} color={COLORS.brand} />
+                <Text style={styles.projectionTitle}>Projeção dos próximos meses</Text>
+              </View>
+              <View style={styles.projectionGrid}>
+                {projection.map((m, i) => (
+                  <View key={m.label} style={[styles.projectionMonth, i === 0 ? styles.projectionMonthCurrent : styles.projectionMonthOther]}>
+                    <View style={styles.projectionLabelRow}>
+                      {i === 0 && <View style={styles.projectionDot} />}
+                      <Text style={styles.projectionLabel}>{m.label}</Text>
+                    </View>
+                    {m.theyOwe > 0 && <Text style={styles.projectionPos}>+{fmt(m.theyOwe)}</Text>}
+                    {m.iOwe > 0 && <Text style={styles.projectionNeg}>-{fmt(m.iOwe)}</Text>}
+                    <Text style={[styles.projectionBalance, { color: m.balance >= 0 ? COLORS.success : COLORS.danger }]}>
+                      {m.balance >= 0 ? '+' : ''}{fmt(m.balance)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <Text style={styles.projectionFootnote}>Baseado nos recorrentes ativos + lançamentos pendentes</Text>
+            </View>
           )}
 
-          {/* Open entries */}
-          {openEntries.length > 0 && (
+          {/* Recorrentes ativos */}
+          {recurringList.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Pendentes</Text>
-              <View style={styles.sectionCard}>
-                {openEntries.map((entry, i) => (
-                  <View key={entry.id}>
-                    <EntryRow
-                      entry={entry}
-                      onSettle={() =>
-                        Alert.alert('Quitar lançamento', 'Marcar como quitado?', [
-                          { text: 'Cancelar', style: 'cancel' },
-                          { text: 'Quitar', onPress: () => settleMutation.mutate(entry.id) },
-                        ])
-                      }
+              <Text style={styles.sectionTitleUpper}>Recorrentes ativos</Text>
+              <View style={styles.infoBox}>
+                <Text style={styles.infoBoxText}>
+                  🔁 <Text style={styles.infoBoxStrong}>Como funciona:</Text> cada recorrente gera automaticamente uma conta pendente no dia configurado, todo mês. Toque em <Text style={styles.infoBoxStrong}>Pago</Text> para quitar o mês atual, ou acerte pelo bloco <Text style={styles.infoBoxStrong}>Pendentes</Text> abaixo. Meses não pagos acumulam em Pendentes.
+                </Text>
+              </View>
+              <View style={styles.list}>
+                {recurringList.map(item => {
+                  const monthEntry = recurringEntryMap.get(item.id)
+                  return (
+                    <RecurringEntryRow
+                      key={item.id}
+                      item={item}
+                      personId={id}
+                      monthEntryId={monthEntry?.id ?? null}
+                      paidThisMonth={monthEntry?.isSettled ?? false}
+                      onEdit={() => setEditingRecurring(item)}
                     />
-                    {i < openEntries.length - 1 && <View style={styles.divider} />}
-                  </View>
-                ))}
+                  )
+                })}
               </View>
             </View>
           )}
 
-          {/* Settled entries */}
-          {closedEntries.length > 0 && (
+          {/* Pendentes */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Feather name="clock" size={15} color={COLORS.muted} />
+              <Text style={styles.sectionTitle}>Pendentes ({pendingCount})</Text>
+            </View>
+
+            {pendingCount === 0 ? (
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyBoxText}>Nenhum lançamento pendente</Text>
+              </View>
+            ) : (
+              <View style={styles.list}>
+                {activeGroups.map(grp => (
+                  <InstallmentGroup key={grp[0].installmentGroupId} personId={id} entries={grp} />
+                ))}
+                {singleOpen.map(entry => (
+                  <EntryCard key={entry.id} entry={entry} personId={id} />
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* Acertados */}
+          {settledCount > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Quitados</Text>
-              <View style={styles.sectionCard}>
-                {closedEntries.map((entry, i) => (
-                  <View key={entry.id}>
-                    <EntryRow entry={entry} onSettle={() => {}} />
-                    {i < closedEntries.length - 1 && <View style={styles.divider} />}
-                  </View>
+              <View style={styles.sectionHeader}>
+                <Feather name="check-circle" size={15} color={COLORS.muted} />
+                <Text style={styles.sectionTitleMuted}>Acertados ({settledCount})</Text>
+              </View>
+              <View style={styles.list}>
+                {doneGroups.map(grp => (
+                  <InstallmentGroup key={grp[0].installmentGroupId} personId={id} entries={grp} />
+                ))}
+                {singleSettled.map(entry => (
+                  <EntryCard key={entry.id} entry={entry} personId={id} settled />
                 ))}
               </View>
-            </View>
-          )}
-
-          {openEntries.length === 0 && closedEntries.length === 0 && !adding && (
-            <View style={styles.empty}>
-              <Text style={styles.emptyText}>Nenhum lançamento ainda.</Text>
-              <TouchableOpacity onPress={() => setAdding(true)}>
-                <Text style={styles.emptyLink}>Adicionar primeiro lançamento</Text>
-              </TouchableOpacity>
             </View>
           )}
 
           <View style={{ height: 40 }} />
         </ScrollView>
       )}
+
+      <EntryModal
+        visible={entryModalOpen}
+        personId={id}
+        personName={data?.name ?? ''}
+        onClose={() => setEntryModalOpen(false)}
+      />
+      <PersonSheet visible={personSheetOpen} person={data} onClose={() => setPersonSheetOpen(false)} />
+      <EditRecurringModal
+        visible={!!editingRecurring}
+        item={editingRecurring}
+        personId={id}
+        onClose={() => setEditingRecurring(null)}
+      />
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.bg },
+
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
+    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 8,
   },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, flex: 1, textAlign: 'center' },
+  addBtn: {
+    width: 38, height: 38, borderRadius: 11, backgroundColor: COLORS.brand,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: COLORS.brand, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4,
+  },
 
-  balanceRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 16 },
+  // Profile
+  profileRow: { flexDirection: 'row', gap: 14, alignItems: 'flex-start', paddingHorizontal: 20, marginTop: 8, marginBottom: 16 },
+  name:  { fontSize: 20, fontWeight: '700', color: COLORS.text },
+  notes: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  profileActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  profileActionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border,
+  },
+  profileActionText: { fontSize: 12, fontWeight: '600', color: COLORS.muted },
+
+  // Balance cards
   balanceCard: {
-    flex: 1, backgroundColor: COLORS.card, borderRadius: 14,
-    borderWidth: 1, borderColor: COLORS.border, padding: 12, alignItems: 'center',
-  },
-  balanceCardNet: { borderColor: COLORS.brandDim },
-  balanceLabel:   { fontSize: 11, color: COLORS.muted, marginBottom: 4 },
-  balanceVal:     { fontSize: 15, fontWeight: '700' },
-
-  addForm: {
-    margin: 16, marginTop: 0,
     backgroundColor: COLORS.card, borderRadius: 16,
-    borderWidth: 1, borderColor: COLORS.brand + '44',
-    padding: 16,
+    borderWidth: 1, borderColor: COLORS.border, padding: 14,
+    marginHorizontal: 20, marginBottom: 8,
   },
-  addFormTitle: { fontSize: 14, fontWeight: '700', color: COLORS.text, marginBottom: 12 },
-  typeToggle: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  typeBtn: {
-    flex: 1, paddingVertical: 9, borderRadius: 10,
-    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border,
-    alignItems: 'center',
-  },
-  typeBtnActive:     { backgroundColor: COLORS.brandDim, borderColor: COLORS.brand },
-  typeBtnText:       { fontSize: 13, fontWeight: '500', color: COLORS.muted },
-  typeBtnTextActive: { color: COLORS.brand },
-  addInput: {
-    backgroundColor: COLORS.card2, borderRadius: 10,
-    borderWidth: 1, borderColor: COLORS.border,
-    paddingHorizontal: 12, paddingVertical: 10,
-    fontSize: 14, color: COLORS.text, marginBottom: 8,
-  },
-  addFormActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  cancelBtn: {
-    flex: 1, paddingVertical: 11, borderRadius: 10,
-    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border,
-    alignItems: 'center',
-  },
-  cancelBtnText: { fontSize: 14, color: COLORS.muted },
-  saveBtn: {
-    flex: 1, paddingVertical: 11, borderRadius: 10,
-    backgroundColor: COLORS.brand, alignItems: 'center',
-  },
-  saveBtnDisabled: { opacity: 0.4 },
-  saveBtnText:     { fontSize: 14, fontWeight: '700', color: '#fff' },
+  balanceCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  balanceCardLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  balanceCardLabel:  { fontSize: 12, color: COLORS.muted, fontWeight: '600' },
+  balanceCardMonth:  { fontSize: 10, color: COLORS.muted2, textTransform: 'capitalize' },
+  balanceCardValue:  { fontSize: 20, fontWeight: '700' },
+  balanceCardSub:    { fontSize: 11, color: COLORS.muted2, marginTop: 4 },
 
-  section: { paddingHorizontal: 16, marginBottom: 16 },
-  sectionTitle: { fontSize: 12, fontWeight: '700', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
-  sectionCard: {
+  // Projeção
+  projectionCard: {
     backgroundColor: COLORS.card, borderRadius: 16,
-    borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden',
+    borderWidth: 1, borderColor: COLORS.border, padding: 14,
+    marginHorizontal: 20, marginBottom: 16,
   },
-  entryRow: {
-    flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10,
-  },
-  entrySettled: { opacity: 0.5 },
-  entryIcon: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  entryInfo:  { flex: 1 },
-  entryDesc:  { fontSize: 14, fontWeight: '500', color: COLORS.text },
-  entryDate:  { fontSize: 11, color: COLORS.muted, marginTop: 2 },
-  entryRight: { alignItems: 'flex-end', gap: 4 },
-  entryAmount: { fontSize: 14, fontWeight: '700' },
-  settleBtn: {
-    backgroundColor: COLORS.success + '22', borderRadius: 6,
-    paddingHorizontal: 8, paddingVertical: 3,
-  },
-  settleBtnText: { fontSize: 11, color: COLORS.success, fontWeight: '700' },
-  divider: { height: 1, backgroundColor: COLORS.border, marginLeft: 56 },
+  projectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  projectionTitle:  { fontSize: 13, fontWeight: '700', color: COLORS.text },
+  projectionGrid:   { flexDirection: 'row', gap: 8 },
+  projectionMonth:  { flex: 1, borderRadius: 12, borderWidth: 1, padding: 10 },
+  projectionMonthCurrent: { borderColor: COLORS.brand + '40', backgroundColor: COLORS.brand + '14' },
+  projectionMonthOther:   { borderColor: COLORS.border, backgroundColor: COLORS.card2 },
+  projectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
+  projectionDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.brand },
+  projectionLabel:  { fontSize: 10, color: COLORS.muted, textTransform: 'capitalize' },
+  projectionPos:    { fontSize: 11, color: COLORS.success, fontWeight: '600' },
+  projectionNeg:    { fontSize: 11, color: COLORS.danger, fontWeight: '600' },
+  projectionBalance: { fontSize: 13, fontWeight: '700', marginTop: 4 },
+  projectionFootnote: { fontSize: 10, color: COLORS.muted2, marginTop: 10 },
 
-  empty: { alignItems: 'center', paddingTop: 48 },
-  emptyText: { fontSize: 14, color: COLORS.muted, marginBottom: 8 },
-  emptyLink: { fontSize: 14, color: COLORS.brand, fontWeight: '600' },
+  // Sections
+  section: { paddingHorizontal: 20, marginBottom: 16 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  sectionTitle:      { fontSize: 15, fontWeight: '700', color: COLORS.text },
+  sectionTitleMuted: { fontSize: 15, fontWeight: '700', color: COLORS.muted },
+  sectionTitleUpper: { fontSize: 11, fontWeight: '700', color: COLORS.muted2, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+
+  infoBox: {
+    backgroundColor: COLORS.brand + '14', borderWidth: 1, borderColor: COLORS.brand + '33',
+    borderRadius: 12, padding: 12, marginBottom: 10,
+  },
+  infoBoxText:   { fontSize: 11, color: COLORS.muted, lineHeight: 17 },
+  infoBoxStrong: { color: COLORS.text, fontWeight: '700' },
+
+  list: { gap: 8 },
+  emptyBox: {
+    paddingVertical: 32, alignItems: 'center',
+    backgroundColor: COLORS.card, borderRadius: 16,
+    borderWidth: 1, borderColor: COLORS.border, borderStyle: 'dashed',
+  },
+  emptyBoxText: { fontSize: 13, color: COLORS.muted2 },
+
+  // Entry card
+  entryCard: {
+    backgroundColor: COLORS.card, borderRadius: 16,
+    borderWidth: 1, borderColor: COLORS.border, padding: 12,
+  },
+  entryCardSettled: { opacity: 0.6 },
+  entryTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  entryIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  entryIconSettled: { backgroundColor: COLORS.card2 },
+  entryTitle: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  entryTitleSettled: { textDecorationLine: 'line-through', color: COLORS.muted },
+  entryMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' },
+  entrySubtitle: { fontSize: 11, color: COLORS.muted },
+  catPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },
+  catPillText: { fontSize: 10, fontWeight: '600' },
+  entryAmount: { fontSize: 14, fontWeight: '700', flexShrink: 0 },
+  entryActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 6, marginTop: 8 },
+  iconBtnSmall: {
+    width: 26, height: 26, borderRadius: 8, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: COLORS.card2,
+  },
 })

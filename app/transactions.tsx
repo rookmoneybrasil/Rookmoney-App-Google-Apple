@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import {
-  View, Text, FlatList, TouchableOpacity, ScrollView,
-  StyleSheet, RefreshControl, ActivityIndicator, Alert,
-} from 'react-native'
+import { View, FlatList, TouchableOpacity, ScrollView, StyleSheet, RefreshControl, ActivityIndicator, Alert } from 'react-native'
+import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
@@ -20,14 +18,15 @@ const TYPE_FILTERS = [
   { label: 'Receitas', value: 'INCOME'   },
 ]
 
-function TxItem({ item, onDelete }: { item: Transaction; onDelete: () => void }) {
+function TxItem({ item, onEdit, onDelete }: { item: Transaction; onEdit: () => void; onDelete: () => void }) {
   const isIncome = item.type === 'INCOME'
   return (
     <TouchableOpacity
       style={styles.item}
       onLongPress={() =>
-        Alert.alert('Excluir transação', `Remover "${item.description ?? item.category.name}"?`, [
+        Alert.alert('Opções', item.description ?? item.category.name, [
           { text: 'Cancelar', style: 'cancel' },
+          { text: 'Editar', onPress: onEdit },
           { text: 'Excluir', style: 'destructive', onPress: onDelete },
         ])
       }
@@ -42,9 +41,14 @@ function TxItem({ item, onDelete }: { item: Transaction; onDelete: () => void })
           {format(new Date(item.date), "d MMM yyyy", { locale: ptBR })} · {item.category.name}
         </Text>
       </View>
-      <Text style={[styles.amount, { color: isIncome ? COLORS.success : COLORS.danger }]}>
-        {isIncome ? '+' : '-'}{fmt(item.amount)}
-      </Text>
+      <View style={styles.itemRight}>
+        <Text style={[styles.amount, { color: isIncome ? COLORS.success : COLORS.danger }]}>
+          {isIncome ? '+' : '-'}{fmt(item.amount)}
+        </Text>
+        <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
+          <Feather name="edit-2" size={13} color={COLORS.muted} />
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   )
 }
@@ -66,8 +70,8 @@ export default function TransactionsScreen() {
         month:      monthStr,
         type:       typeFilter,
         categoryId: catFilter,
-        limit:      200,
-      }).then((r) => r.data),
+        pageSize:   200,
+      }).then((r) => r.data?.items ?? []),
   })
 
   const { data: categories } = useQuery({
@@ -91,6 +95,9 @@ export default function TransactionsScreen() {
     <View style={styles.screen}>
       {/* Header */}
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Feather name="arrow-left" size={22} color={COLORS.text} />
+        </TouchableOpacity>
         <Text style={styles.title}>Transações</Text>
         <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/new-transaction')}>
           <Feather name="plus" size={22} color="#fff" />
@@ -164,7 +171,11 @@ export default function TransactionsScreen() {
           data={data ?? []}
           keyExtractor={(t) => t.id}
           renderItem={({ item }) => (
-            <TxItem item={item} onDelete={() => deleteMutation.mutate(item.id)} />
+            <TxItem
+              item={item}
+              onEdit={() => router.push(`/edit-transaction?id=${item.id}`)}
+              onDelete={() => deleteMutation.mutate(item.id)}
+            />
           )}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={COLORS.brand} />}
@@ -186,7 +197,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingTop: 56, paddingBottom: 8,
   },
-  title:  { fontSize: 22, fontWeight: '700', color: COLORS.text },
+  backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
+  title:  { fontSize: 20, fontWeight: '700', color: COLORS.text },
   addBtn: {
     width: 38, height: 38, borderRadius: 11, backgroundColor: COLORS.brand,
     justifyContent: 'center', alignItems: 'center',
@@ -223,18 +235,20 @@ const styles = StyleSheet.create({
   pillTextActive: { color: COLORS.brand, fontWeight: '600' },
   pillEmoji:      { fontSize: 13 },
 
-  list: { paddingHorizontal: 20, paddingBottom: 32 },
+  list: { paddingHorizontal: 20, paddingBottom: 100 },
   item: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: 12,
     borderBottomWidth: 1, borderBottomColor: COLORS.border,
   },
-  icon:   { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  emoji:  { fontSize: 18 },
-  info:   { flex: 1 },
-  name:   { fontSize: 14, fontWeight: '500', color: COLORS.text },
-  meta:   { fontSize: 12, color: COLORS.muted, marginTop: 2 },
-  amount: { fontSize: 14, fontWeight: '600' },
+  icon:      { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  emoji:     { fontSize: 18 },
+  info:      { flex: 1 },
+  name:      { fontSize: 14, fontWeight: '500', color: COLORS.text },
+  meta:      { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  itemRight: { alignItems: 'flex-end', gap: 4 },
+  amount:    { fontSize: 14, fontWeight: '600' },
+  editBtn:   { width: 24, height: 24, borderRadius: 6, backgroundColor: COLORS.muted + '18', justifyContent: 'center', alignItems: 'center' },
 
   empty:     { paddingTop: 60, alignItems: 'center', gap: 8 },
   emptyText: { color: COLORS.muted, fontSize: 14 },

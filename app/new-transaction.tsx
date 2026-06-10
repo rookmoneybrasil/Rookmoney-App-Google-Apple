@@ -1,11 +1,9 @@
 import { useState } from 'react'
-import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform,
-} from 'react-native'
+import { View, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, TextInput } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Ionicons } from '@expo/vector-icons'
+import { Feather } from '@expo/vector-icons'
 import { format } from 'date-fns'
 import { COLORS } from '@/lib/constants'
 import { transactionsApi, categoriesApi, type Category } from '@/lib/api'
@@ -21,6 +19,7 @@ export default function NewTransactionModal() {
   const [amount,      setAmount]      = useState('')
   const [description, setDescription] = useState('')
   const [categoryId,  setCategoryId]  = useState('')
+  const [date,        setDate]        = useState(format(new Date(), 'yyyy-MM-dd'))
   const [error,       setError]       = useState('')
   const [saving,      setSaving]      = useState(false)
 
@@ -29,12 +28,11 @@ export default function NewTransactionModal() {
     queryFn:  () => categoriesApi.list().then((r) => r.data),
   })
 
-  const today = format(new Date(), 'yyyy-MM-dd')
-
   async function handleSave() {
     const num = parseFloat(amount.replace(',', '.'))
     if (!num || num <= 0)  { setError('Informe um valor válido.'); return }
     if (!categoryId)       { setError('Selecione uma categoria.'); return }
+    if (!date.match(/^\d{4}-\d{2}-\d{2}$/)) { setError('Data inválida (use AAAA-MM-DD).'); return }
     setError('')
     setSaving(true)
     try {
@@ -42,7 +40,7 @@ export default function NewTransactionModal() {
         amount: num,
         type,
         description: description.trim() || undefined,
-        date: new Date().toISOString(),
+        date,
         categoryId,
       })
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
@@ -68,7 +66,7 @@ export default function NewTransactionModal() {
         <View style={styles.header}>
           <Text style={styles.title}>Nova transação</Text>
           <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-            <Ionicons name="close" size={20} color={COLORS.muted} />
+            <Feather name="x" size={20} color={COLORS.muted} />
           </TouchableOpacity>
         </View>
 
@@ -121,8 +119,15 @@ export default function NewTransactionModal() {
         <View style={styles.field}>
           <Text style={styles.label}>Data</Text>
           <View style={[styles.input, styles.dateField]}>
-            <Ionicons name="calendar-outline" size={16} color={COLORS.muted} />
-            <Text style={styles.dateText}>{today}</Text>
+            <Feather name="calendar" size={16} color={COLORS.muted} />
+            <TextInput
+              style={styles.dateInput}
+              value={date}
+              onChangeText={setDate}
+              placeholder="AAAA-MM-DD"
+              placeholderTextColor={COLORS.muted}
+              keyboardType="numeric"
+            />
           </View>
         </View>
 
@@ -207,7 +212,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, color: COLORS.text, fontSize: 14,
   },
   dateField: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dateText:  { color: COLORS.text, fontSize: 14 },
+  dateInput: { flex: 1, color: COLORS.text, fontSize: 14, paddingVertical: 0 },
 
   cats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   cat: {

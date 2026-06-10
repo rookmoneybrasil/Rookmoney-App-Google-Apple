@@ -1,6 +1,5 @@
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
-} from 'react-native'
+import { View, TouchableOpacity, StyleSheet, ScrollView, Dimensions, Alert } from 'react-native'
+import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
@@ -8,44 +7,53 @@ import { useAuthStore } from '@/lib/auth'
 
 type FeatherName = React.ComponentProps<typeof Feather>['name']
 
-function MenuItem({
-  icon, label, onPress, danger, pro,
-}: {
-  icon: FeatherName
+interface GridItem {
   label: string
-  onPress: () => void
-  danger?: boolean
-  pro?: boolean
-}) {
+  icon:  FeatherName
+  route: string
+  pro?:  boolean
+}
+
+const GRID_ITEMS: GridItem[] = [
+  { label: 'Extratos',     icon: 'list',         route: '/transactions' },
+  { label: 'Metas',        icon: 'target',       route: '/goals'      },
+  { label: 'Orçamento',    icon: 'pie-chart',    route: '/budget',    pro: true },
+  { label: 'Calendário',   icon: 'calendar',     route: '/calendar'   },
+  { label: 'Relatórios',   icon: 'bar-chart-2',  route: '/reports',   pro: true },
+  { label: 'Recorrências', icon: 'repeat',       route: '/recurring'  },
+  { label: 'Categorias',   icon: 'tag',          route: '/categories' },
+  { label: 'Projeção',     icon: 'activity',     route: '/projection', pro: true },
+  { label: 'Planos',       icon: 'star',         route: '/billing'    },
+  { label: 'Suporte',      icon: 'help-circle',  route: '/feedback'   },
+  { label: 'Configurações',icon: 'settings',     route: '/settings'   },
+]
+
+const SCREEN_W = Dimensions.get('window').width
+const COLS     = 3
+const GAP      = 10
+const H_PAD    = 20
+const ITEM_W   = (SCREEN_W - H_PAD * 2 - GAP * (COLS - 1)) / COLS
+
+function GridCard({ item, isPro }: { item: GridItem; isPro: boolean }) {
+  const router  = useRouter()
+  const locked  = item.pro && !isPro
   return (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
-      <View style={[styles.menuIcon, { backgroundColor: danger ? 'rgba(239,68,68,0.12)' : COLORS.brandDim }]}>
-        <Feather name={icon} size={17} color={danger ? COLORS.danger : COLORS.brand} />
-      </View>
-      <Text style={[styles.menuLabel, danger && { color: COLORS.danger }]}>{label}</Text>
-      {pro && (
-        <View style={styles.proBadge}>
-          <Text style={styles.proBadgeText}>PRO</Text>
+    <TouchableOpacity
+      style={[styles.card, locked && styles.cardLocked]}
+      onPress={() => router.push(item.route as any)}
+      activeOpacity={0.75}
+    >
+      {locked && (
+        <View style={styles.lockBadge}>
+          <Feather name="lock" size={9} color={COLORS.warning} />
         </View>
       )}
-      <Feather name="chevron-right" size={16} color={COLORS.muted2} />
+      <View style={styles.iconWrap}>
+        <Feather name={item.icon} size={22} color={locked ? COLORS.muted : COLORS.brand} />
+      </View>
+      <Text style={[styles.cardLabel, locked && { color: COLORS.muted }]}>{item.label}</Text>
     </TouchableOpacity>
   )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>{title.toUpperCase()}</Text>
-      <View style={styles.card}>
-        {children}
-      </View>
-    </View>
-  )
-}
-
-function Divider() {
-  return <View style={styles.divider} />
 }
 
 export default function MoreScreen() {
@@ -53,133 +61,144 @@ export default function MoreScreen() {
   const user      = useAuthStore((s) => s.user)
   const clearAuth = useAuthStore((s) => s.clearAuth)
 
-  const initials = (user?.name ?? 'U')
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
+  const isPro     = user?.plan === 'PRO'
+  const initials  = (user?.name ?? 'U')
+    .split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
 
   function handleLogout() {
-    Alert.alert(
-      'Sair da conta',
-      'Tem certeza que deseja sair?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Sair',
-          style: 'destructive',
-          onPress: () => {
-            clearAuth()
-            router.replace('/(auth)/login')
-          },
-        },
-      ]
-    )
+    Alert.alert('Sair da conta', 'Tem certeza que deseja sair?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Sair', style: 'destructive', onPress: () => {
+        clearAuth()
+        router.replace('/(auth)/login')
+      }},
+    ])
   }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Mais</Text>
+        <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/settings')}>
+          <Feather name="settings" size={20} color={COLORS.muted} />
+        </TouchableOpacity>
+      </View>
+
       {/* User card */}
-      <View style={styles.userCard}>
+      <TouchableOpacity style={styles.userCard} onPress={() => router.push('/settings')} activeOpacity={0.85}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>{user?.name}</Text>
-          <Text style={styles.userEmail}>{user?.email}</Text>
+          <Text style={styles.userName} numberOfLines={1}>{user?.name ?? '—'}</Text>
+          <Text style={styles.userEmail} numberOfLines={1}>{user?.email ?? '—'}</Text>
         </View>
-        {user?.plan === 'PRO' ? (
+        {isPro ? (
           <View style={styles.proBadge}>
-            <Text style={styles.proBadgeText}>⚡ PRO</Text>
+            <Text style={styles.proText}>PRO</Text>
           </View>
         ) : (
           <View style={styles.freeBadge}>
-            <Text style={styles.freeBadgeText}>FREE</Text>
+            <Text style={styles.freeText}>Free</Text>
           </View>
         )}
+      </TouchableOpacity>
+
+      {/* Grid */}
+      <View style={styles.grid}>
+        {GRID_ITEMS.map((item) => (
+          <GridCard key={item.route} item={item} isPro={isPro} />
+        ))}
       </View>
-
-      {/* Finanças */}
-      <Section title="Finanças">
-        <MenuItem icon="calendar"      label="Calendário"    onPress={() => router.push('/calendar')} />
-        <Divider />
-        <MenuItem icon="trending-up"   label="Projeção"      onPress={() => router.push('/projection')} pro={user?.plan !== 'PRO'} />
-        <Divider />
-        <MenuItem icon="users"         label="Pessoas"       onPress={() => router.push('/people')} />
-        <Divider />
-        <MenuItem icon="pie-chart"     label="Orçamento"     onPress={() => router.push('/budget')} pro={user?.plan !== 'PRO'} />
-        <Divider />
-        <MenuItem icon="briefcase"     label="Rendas"        onPress={() => router.push('/income')} />
-        <Divider />
-        <MenuItem icon="refresh-cw"    label="Recorrências"  onPress={() => router.push('/recurring')} />
-      </Section>
-
-      {/* Análises */}
-      <Section title="Análises">
-        <MenuItem icon="bar-chart-2"   label="Relatórios"    onPress={() => router.push('/reports')} pro={user?.plan !== 'PRO'} />
-        <Divider />
-        <MenuItem icon="tag"           label="Categorias"    onPress={() => router.push('/categories')} />
-      </Section>
-
-      {/* Conta */}
-      <Section title="Conta">
-        <MenuItem icon="zap"           label="Planos e cobrança" onPress={() => router.push('/billing')} />
-        <Divider />
-        <MenuItem icon="settings"      label="Configurações" onPress={() => router.push('/settings')} />
-      </Section>
 
       {/* Logout */}
-      <View style={styles.section}>
-        <View style={styles.card}>
-          <MenuItem icon="log-out" label="Sair da conta" onPress={handleLogout} danger />
-        </View>
-      </View>
+      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+        <Feather name="log-out" size={16} color={COLORS.danger} />
+        <Text style={styles.logoutText}>Sair da conta</Text>
+      </TouchableOpacity>
     </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: COLORS.bg },
-  content: { padding: 20, paddingTop: 56, paddingBottom: 40 },
+  content: { paddingHorizontal: H_PAD, paddingBottom: 100 },
 
-  userCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: COLORS.card, borderRadius: 18, padding: 16,
-    borderWidth: 1, borderColor: COLORS.border, marginBottom: 28,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 56,
+    paddingBottom: 20,
   },
-  avatar: {
-    width: 52, height: 52, borderRadius: 16, backgroundColor: COLORS.brand,
+  title:       { fontSize: 22, fontWeight: '700', color: COLORS.text },
+  settingsBtn: {
+    width: 38, height: 38, borderRadius: 11,
+    backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border,
     justifyContent: 'center', alignItems: 'center',
   },
-  avatarText:  { fontSize: 20, fontWeight: '700', color: '#fff' },
-  userInfo:    { flex: 1 },
-  userName:    { fontSize: 16, fontWeight: '700', color: COLORS.text },
-  userEmail:   { fontSize: 12, color: COLORS.muted, marginTop: 1 },
-  proBadge:    {
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+
+  userCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: COLORS.card, borderRadius: 18, padding: 16,
+    borderWidth: 1, borderColor: COLORS.border, marginBottom: 20,
+  },
+  avatar: {
+    width: 48, height: 48, borderRadius: 14,
+    backgroundColor: COLORS.brand,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  avatarText: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  userInfo:   { flex: 1 },
+  userName:   { fontSize: 15, fontWeight: '600', color: COLORS.text },
+  userEmail:  { fontSize: 12, color: COLORS.muted, marginTop: 1 },
+  proBadge: {
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
     backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)',
   },
-  proBadgeText: { color: COLORS.warning, fontSize: 11, fontWeight: '700' },
-  freeBadge:    {
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
-    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border,
+  proText:   { color: '#F59E0B', fontSize: 11, fontWeight: '700' },
+  freeBadge: {
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+    backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border,
   },
-  freeBadgeText: { color: COLORS.muted, fontSize: 11, fontWeight: '700' },
+  freeText: { color: COLORS.muted, fontSize: 11, fontWeight: '600' },
 
-  section:      { marginBottom: 20 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', color: COLORS.muted, letterSpacing: 1, marginBottom: 8, marginLeft: 4 },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: GAP,
+    marginBottom: 24,
+  },
   card: {
-    backgroundColor: COLORS.card, borderRadius: 16,
-    borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden',
+    width: ITEM_W,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingVertical: 18,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    gap: 8,
   },
-  menuItem: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
-  menuIcon: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  menuLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: COLORS.text },
-  divider:   { height: 1, backgroundColor: COLORS.border, marginLeft: 62 },
-  proBadge: {
-    backgroundColor: 'rgba(245,158,11,0.12)',
-    borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginRight: 6,
+  cardLocked: { opacity: 0.6 },
+  iconWrap: {
+    width: 48, height: 48, borderRadius: 14,
+    backgroundColor: COLORS.brand + '18',
+    justifyContent: 'center', alignItems: 'center',
   },
-  proBadgeText: { fontSize: 10, fontWeight: '700', color: COLORS.warning },
+  cardLabel: { fontSize: 11, fontWeight: '600', color: COLORS.text, textAlign: 'center' },
+  lockBadge: {
+    position: 'absolute', top: 8, right: 8,
+    backgroundColor: 'rgba(245,158,11,0.15)',
+    borderRadius: 6, padding: 3,
+  },
+
+  logoutBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 14, borderRadius: 14,
+    borderWidth: 1, borderColor: COLORS.danger + '44',
+    backgroundColor: COLORS.danger + '0D',
+  },
+  logoutText: { fontSize: 14, fontWeight: '600', color: COLORS.danger },
 })

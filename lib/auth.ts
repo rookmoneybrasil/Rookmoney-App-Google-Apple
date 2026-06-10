@@ -38,12 +38,13 @@ export interface AuthUser {
 }
 
 interface AuthState {
-  token:    string | null
-  user:     AuthUser | null
-  ready:    boolean
-  setAuth:  (token: string, user: AuthUser) => void
-  clearAuth: () => void
-  hydrate:  () => Promise<void>
+  token:      string | null
+  user:       AuthUser | null
+  ready:      boolean
+  setAuth:    (token: string, user: AuthUser) => void
+  clearAuth:  () => void
+  hydrate:    () => Promise<void>
+  updateUser: (patch: Partial<AuthUser>) => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -61,6 +62,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     storage.del(TOKEN_KEY)
     storage.del(USER_KEY)
     set({ token: null, user: null })
+  },
+
+  updateUser: (patch) => {
+    set((s) => {
+      if (!s.user) return s
+      const updated = { ...s.user, ...patch }
+      storage.set(USER_KEY, JSON.stringify(updated))
+      return { user: updated }
+    })
   },
 
   hydrate: async () => {

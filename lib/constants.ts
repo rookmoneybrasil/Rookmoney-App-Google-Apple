@@ -1,18 +1,18 @@
 import { Platform } from 'react-native'
 
 // Web (expo start --web) → localhost:3000
-// Native device na rede local  → IP da máquina
-// Produção → rookmoney.com.br
+// Native dev/teste → Railway direto (mesma API do web)
+// Produção → rookmoney-api-production.up.railway.app
 export const API_BASE_URL = __DEV__
   ? Platform.OS === 'web'
     ? 'http://localhost:3000'
-    : 'http://192.168.0.11:3000'
-  : 'https://rookmoney.com.br'
+    : 'https://rookmoney-api-production.up.railway.app'
+  : 'https://rookmoney-api-production.up.railway.app'
 
 export const COLORS = {
-  bg:       '#020f21',
-  card:     '#0c1625',
-  card2:    '#111d30',
+  bg:       '#080e1d',
+  card:     '#0c1628',
+  card2:    '#111e32',
   border:   'rgba(255,255,255,0.08)',
   brand:    '#3b82f6',
   brandDim: '#1e3a5f',

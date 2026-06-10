@@ -1,8 +1,6 @@
 import { useState, useRef } from 'react'
-import {
-  View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Dimensions, ActivityIndicator,
-} from 'react-native'
+import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator } from 'react-native'
+import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useMutation } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'

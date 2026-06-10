@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, ActivityIndicator,
-} from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native'
+import { Text, TextInput } from '@/components/text'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import { COLORS } from '@/lib/constants'
 import { budgetsApi, categoriesApi, type Category } from '@/lib/api'
 
@@ -19,6 +18,7 @@ export default function NewBudgetScreen() {
   const [categoryId, setCategoryId] = useState('')
   const [amount, setAmount]         = useState('')
   const [month] = useState(defaultMonth)
+  const monthLabel = format(parseISO(`${defaultMonth}-01`), "MMMM 'de' yyyy", { locale: ptBR })
 
   const { data: categories, isLoading: loadingCats } = useQuery({
     queryKey: ['categories'],
@@ -50,7 +50,7 @@ export default function NewBudgetScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.monthInfo}>Mês: {month}</Text>
+        <Text style={styles.monthInfo}>{monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</Text>
 
         <Text style={styles.label}>Categoria *</Text>
         {loadingCats ? (

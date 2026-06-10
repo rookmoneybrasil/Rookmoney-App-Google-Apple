@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Linking,
-} from 'react-native'
+import { View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Linking } from 'react-native'
+import { Text, TextInput } from '@/components/text'
 import Svg, { Path } from 'react-native-svg'
 import { Link, useRouter } from 'expo-router'
 import { COLORS, API_BASE_URL } from '@/lib/constants'
@@ -47,7 +45,7 @@ export default function RegisterScreen() {
   }
 
   function handleGoogleLogin() {
-    Linking.openURL(`${API_BASE_URL}/api/auth/google?mobile=1`)
+    Linking.openURL('https://rookmoney.com/api/auth/google?mobile=1')
   }
 
   return (

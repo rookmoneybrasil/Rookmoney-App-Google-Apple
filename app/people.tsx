@@ -1,7 +1,6 @@
-import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
-  RefreshControl, ActivityIndicator, Alert,
-} from 'react-native'
+import { View, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal } from 'react-native'
+import { Text, TextInput } from '@/components/text'
+import { useState } from 'react'
 import { useRouter } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
@@ -12,7 +11,7 @@ import { ProGate } from '@/components/pro-gate'
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
 
-function PersonCard({ person, onDelete }: { person: Person; onDelete: () => void }) {
+function PersonCard({ person, onDelete, onRename }: { person: Person; onDelete: () => void; onRename: () => void }) {
   const router   = useRouter()
   const netOwed  = person.theyOweMe - person.iOweThem
   const netColor = netOwed > 0 ? COLORS.success : netOwed < 0 ? COLORS.danger : COLORS.muted
@@ -25,6 +24,7 @@ function PersonCard({ person, onDelete }: { person: Person; onDelete: () => void
       onLongPress={() =>
         Alert.alert('Opções', person.name, [
           { text: 'Cancelar', style: 'cancel' },
+          { text: 'Renomear', onPress: onRename },
           { text: 'Excluir', style: 'destructive', onPress: onDelete },
         ])
       }
@@ -38,7 +38,7 @@ function PersonCard({ person, onDelete }: { person: Person; onDelete: () => void
       <View style={styles.info}>
         <Text style={styles.name}>{person.name}</Text>
         <Text style={styles.entries}>
-          {person.openEntries} {person.openEntries === 1 ? 'pendência' : 'pendências'}
+          {person.openEntriesCount} {person.openEntriesCount === 1 ? 'pendência' : 'pendências'}
         </Text>
       </View>
       <View style={styles.right}>
@@ -55,6 +55,9 @@ export default function PeopleScreen() {
   const router = useRouter()
   const qc     = useQueryClient()
 
+  const [editing,  setEditing]  = useState<Person | null>(null)
+  const [editName, setEditName] = useState('')
+
   const { data: me } = useQuery({
     queryKey: ['me'],
     queryFn:  () => meApi.get().then(r => r.data),
@@ -63,7 +66,6 @@ export default function PeopleScreen() {
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['people'],
     queryFn:  () => peopleApi.list().then(r => r.data),
-    enabled:  !!me,
   })
 
   const deleteMutation = useMutation({
@@ -71,6 +73,23 @@ export default function PeopleScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['people'] }),
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
+
+  const renameMutation = useMutation({
+    mutationFn: () => {
+      if (!editName.trim()) throw new Error('Nome não pode ser vazio')
+      return peopleApi.update(editing!.id, { name: editName.trim() })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['people'] })
+      setEditing(null)
+    },
+    onError: (e: Error) => Alert.alert('Erro', e.message),
+  })
+
+  function openRename(person: Person) {
+    setEditName(person.name)
+    setEditing(person)
+  }
 
   const isPro     = me?.plan === 'PRO'
   const atLimit   = !isPro && (data?.length ?? 0) >= (me?.limits?.people ?? 2)
@@ -131,6 +150,7 @@ export default function PeopleScreen() {
           renderItem={({ item }) => (
             <PersonCard
               person={item}
+              onRename={() => openRename(item)}
               onDelete={() => {
                 Alert.alert(
                   'Excluir pessoa',
@@ -165,6 +185,39 @@ export default function PeopleScreen() {
           </Text>
         </View>
       )}
+
+      <Modal
+        visible={!!editing}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditing(null)}
+      >
+        <TouchableOpacity style={styles.modalBg} activeOpacity={1} onPress={() => setEditing(null)}>
+          <TouchableOpacity activeOpacity={1} style={styles.modalSheet} onPress={() => {}}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Renomear pessoa</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Nome"
+              placeholderTextColor={COLORS.muted}
+              autoFocus
+              selectTextOnFocus
+              maxLength={60}
+            />
+            <TouchableOpacity
+              style={[styles.modalSaveBtn, renameMutation.isPending && { opacity: 0.6 }]}
+              onPress={() => renameMutation.mutate()}
+              disabled={renameMutation.isPending}
+            >
+              <Text style={styles.modalSaveBtnText}>
+                {renameMutation.isPending ? 'Salvando...' : 'Salvar'}
+              </Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   )
 }
@@ -237,4 +290,21 @@ const styles = StyleSheet.create({
   },
   limitBannerText: { flex: 1, fontSize: 13, color: COLORS.warning },
   limitBannerLink: { fontWeight: '700', textDecorationLine: 'underline' },
+
+  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: COLORS.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingBottom: 40,
+  },
+  modalHandle: {
+    width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border,
+    alignSelf: 'center', marginBottom: 20,
+  },
+  modalTitle:  { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 16 },
+  modalInput: {
+    backgroundColor: COLORS.bg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+    color: COLORS.text, fontSize: 15, borderWidth: 1, borderColor: COLORS.border, marginBottom: 16,
+  },
+  modalSaveBtn: { backgroundColor: COLORS.brand, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+  modalSaveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 })

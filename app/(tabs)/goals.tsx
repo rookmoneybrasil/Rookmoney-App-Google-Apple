@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  RefreshControl, ActivityIndicator, Alert, TextInput,
-} from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert } from 'react-native'
+import { Text, TextInput } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
@@ -38,12 +36,123 @@ function CircularProgress({ pct, size = 56, color }: { pct: number; size?: numbe
   )
 }
 
+function EditGoalSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
+  const [name,        setName]        = useState(goal.name)
+  const [target,      setTarget]      = useState(String(goal.targetAmount))
+  const [deadline,    setDeadline]    = useState(goal.deadline?.slice(0, 10) ?? '')
+  const [description, setDescription] = useState(goal.description ?? '')
+  const qc = useQueryClient()
+
+  const deleteMutation = useMutation({
+    mutationFn: () => goalsApi.delete(goal.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['goals'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      onClose()
+    },
+    onError: (e: Error) => Alert.alert('Erro', e.message),
+  })
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      const amt = parseFloat(target.replace(',', '.'))
+      if (!name.trim())           throw new Error('Nome é obrigatório')
+      if (isNaN(amt) || amt <= 0) throw new Error('Meta inválida')
+      return goalsApi.update(goal.id, {
+        name:        name.trim(),
+        targetAmount: amt,
+        deadline:    deadline.trim() || undefined,
+        description: description.trim() || undefined,
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['goals'] })
+      onClose()
+    },
+    onError: (e: Error) => Alert.alert('Erro', e.message),
+  })
+
+  return (
+    <View style={styles.sheet}>
+      <View style={styles.sheetHandle} />
+      <View style={styles.sheetHeaderRow}>
+        <Text style={styles.sheetTitle}>Editar meta</Text>
+        <TouchableOpacity
+          onPress={() =>
+            Alert.alert('Excluir meta', `Excluir "${goal.name}"?`, [
+              { text: 'Cancelar', style: 'cancel' },
+              { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate() },
+            ])
+          }
+          style={styles.sheetDeleteBtn}
+        >
+          <Feather name="trash-2" size={16} color={COLORS.danger} />
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.label}>Nome *</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Ex: Viagem, Reserva..."
+        placeholderTextColor={COLORS.muted}
+        value={name}
+        onChangeText={setName}
+      />
+
+      <Text style={styles.label}>Valor alvo (R$) *</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="0,00"
+        placeholderTextColor={COLORS.muted}
+        keyboardType="decimal-pad"
+        value={target}
+        onChangeText={setTarget}
+      />
+
+      <Text style={styles.label}>Prazo (AAAA-MM-DD, opcional)</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="2026-12-31"
+        placeholderTextColor={COLORS.muted}
+        value={deadline}
+        onChangeText={setDeadline}
+      />
+
+      <Text style={styles.label}>Descrição (opcional)</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Motivo ou detalhe"
+        placeholderTextColor={COLORS.muted}
+        value={description}
+        onChangeText={setDescription}
+      />
+
+      <View style={styles.sheetActions}>
+        <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+          <Text style={styles.cancelBtnText}>Cancelar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.saveBtn, mutation.isPending && { opacity: 0.6 }]}
+          onPress={() => mutation.mutate()}
+          disabled={mutation.isPending}
+        >
+          <Text style={styles.saveBtnText}>
+            {mutation.isPending ? 'Salvando...' : 'Salvar'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
+}
+
 function GoalCard({
   goal,
   onContribute,
+  onEdit,
 }: {
   goal: Goal
   onContribute: (goal: Goal) => void
+  onEdit: (goal: Goal) => void
 }) {
   const pct   = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0
   const color = goal.isCompleted ? COLORS.success : (goal.color ?? COLORS.brand)
@@ -75,18 +184,23 @@ function GoalCard({
 
       <View style={styles.goalBottom}>
         <Text style={[styles.pctText, { color }]}>{pct.toFixed(0)}%</Text>
-        {!goal.isCompleted && (
-          <TouchableOpacity style={styles.contributeBtn} onPress={() => onContribute(goal)}>
-            <Feather name="plus" size={14} color={COLORS.brand} />
-            <Text style={styles.contributeBtnText}>Contribuir</Text>
+        <View style={styles.goalActions}>
+          <TouchableOpacity style={styles.editGoalBtn} onPress={() => onEdit(goal)}>
+            <Feather name="edit-2" size={13} color={COLORS.muted} />
           </TouchableOpacity>
-        )}
-        {goal.isCompleted && (
-          <View style={styles.completedBadge}>
-            <Feather name="check-circle" size={14} color={COLORS.success} />
-            <Text style={styles.completedText}>Concluída</Text>
-          </View>
-        )}
+          {!goal.isCompleted && (
+            <TouchableOpacity style={styles.contributeBtn} onPress={() => onContribute(goal)}>
+              <Feather name="plus" size={14} color={COLORS.brand} />
+              <Text style={styles.contributeBtnText}>Contribuir</Text>
+            </TouchableOpacity>
+          )}
+          {goal.isCompleted && (
+            <View style={styles.completedBadge}>
+              <Feather name="check-circle" size={14} color={COLORS.success} />
+              <Text style={styles.completedText}>Concluída</Text>
+            </View>
+          )}
+        </View>
       </View>
     </View>
   )
@@ -167,6 +281,7 @@ function ContributeSheet({ goal, onClose }: { goal: Goal; onClose: () => void })
 export default function GoalsScreen() {
   const router  = useRouter()
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
+  const [editingGoal,  setEditingGoal]  = useState<Goal | null>(null)
   const [showCompleted, setShowCompleted] = useState(false)
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
@@ -202,7 +317,7 @@ export default function GoalsScreen() {
           )}
 
           {active.map((g) => (
-            <GoalCard key={g.id} goal={g} onContribute={setSelectedGoal} />
+            <GoalCard key={g.id} goal={g} onContribute={setSelectedGoal} onEdit={setEditingGoal} />
           ))}
 
           {completed.length > 0 && (
@@ -218,7 +333,7 @@ export default function GoalsScreen() {
           )}
 
           {showCompleted && completed.map((g) => (
-            <GoalCard key={g.id} goal={g} onContribute={setSelectedGoal} />
+            <GoalCard key={g.id} goal={g} onContribute={setSelectedGoal} onEdit={setEditingGoal} />
           ))}
         </ScrollView>
       )}
@@ -227,6 +342,13 @@ export default function GoalsScreen() {
         <View style={styles.overlay}>
           <TouchableOpacity style={styles.overlayBg} onPress={() => setSelectedGoal(null)} />
           <ContributeSheet goal={selectedGoal} onClose={() => setSelectedGoal(null)} />
+        </View>
+      )}
+
+      {editingGoal && (
+        <View style={styles.overlay}>
+          <TouchableOpacity style={styles.overlayBg} onPress={() => setEditingGoal(null)} />
+          <EditGoalSheet goal={editingGoal} onClose={() => setEditingGoal(null)} />
         </View>
       )}
     </View>
@@ -268,9 +390,15 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: 6, borderRadius: 3 },
 
-  goalBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pctText:    { fontSize: 13, fontWeight: '700' },
+  goalBottom:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  pctText:     { fontSize: 13, fontWeight: '700' },
+  goalActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
+  editGoalBtn: {
+    width: 28, height: 28, borderRadius: 8,
+    backgroundColor: COLORS.muted + '18',
+    justifyContent: 'center', alignItems: 'center',
+  },
   contributeBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
@@ -302,8 +430,10 @@ const styles = StyleSheet.create({
     width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.muted2,
     alignSelf: 'center', marginBottom: 20,
   },
-  sheetTitle: { fontSize: 17, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
-  sheetSub:   { fontSize: 13, color: COLORS.muted, marginBottom: 20 },
+  sheetHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  sheetTitle:     { fontSize: 17, fontWeight: '700', color: COLORS.text },
+  sheetDeleteBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(239,68,68,0.1)', justifyContent: 'center', alignItems: 'center' },
+  sheetSub:       { fontSize: 13, color: COLORS.muted, marginBottom: 20 },
 
   label: { fontSize: 12, color: COLORS.muted, marginBottom: 6, marginTop: 12 },
   input: {

@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator,
-} from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
@@ -170,7 +168,7 @@ export default function CalendarScreen() {
               <Text style={styles.empty}>Nenhum evento neste dia</Text>
             ) : (
               selectedEvents.map(ev => (
-                <EventRow key={ev.id} event={ev} />
+                <EventRow key={ev.id} event={ev} onPress={() => router.push(ev.href as any)} />
               ))
             )}
           </View>
@@ -196,13 +194,13 @@ function LegendItem({ color, label }: { color: string; label: string }) {
   )
 }
 
-function EventRow({ event }: { event: CalendarEvent }) {
+function EventRow({ event, onPress }: { event: CalendarEvent; onPress: () => void }) {
   const color = EVENT_COLORS[event.color] ?? COLORS.muted
   const icon  = event.type === 'income' ? 'trending-up'
               : event.type === 'bill'   ? 'file-text'
               : 'refresh-cw'
   return (
-    <View style={styles.eventRow}>
+    <TouchableOpacity style={styles.eventRow} onPress={onPress} activeOpacity={0.7}>
       <View style={[styles.eventIcon, { backgroundColor: color + '22' }]}>
         <Feather name={icon as any} size={15} color={color} />
       </View>
@@ -215,7 +213,8 @@ function EventRow({ event }: { event: CalendarEvent }) {
       <Text style={[styles.eventAmount, { color }]}>
         {event.type === 'income' || event.status === 'received' ? '+' : '-'}{fmt(event.amount)}
       </Text>
-    </View>
+      <Feather name="chevron-right" size={16} color={COLORS.muted} style={{ marginLeft: 4 }} />
+    </TouchableOpacity>
   )
 }
 

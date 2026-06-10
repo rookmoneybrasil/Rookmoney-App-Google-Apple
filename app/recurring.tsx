@@ -1,7 +1,5 @@
-import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
-  RefreshControl, ActivityIndicator, Alert,
-} from 'react-native'
+import { View, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert } from 'react-native'
+import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
@@ -19,10 +17,12 @@ const FREQ_LABEL: Record<string, string> = {
 
 function RecurringItem({
   item,
+  onEdit,
   onToggle,
   onDelete,
 }: {
   item: Recurring
+  onEdit: () => void
   onToggle: () => void
   onDelete: () => void
 }) {
@@ -34,6 +34,7 @@ function RecurringItem({
       onLongPress={() =>
         Alert.alert('Opções', item.name, [
           { text: 'Cancelar', style: 'cancel' },
+          { text: 'Editar', onPress: onEdit },
           { text: item.isActive ? 'Desativar' : 'Ativar', onPress: onToggle },
           { text: 'Excluir', style: 'destructive', onPress: onDelete },
         ])
@@ -49,11 +50,19 @@ function RecurringItem({
           {item.category.name} · {FREQ_LABEL[item.frequency] ?? item.frequency}
           {item.dayOfMonth ? ` · Dia ${item.dayOfMonth}` : ''}
         </Text>
+        {!!item.description && (
+          <Text style={styles.desc} numberOfLines={1}>{item.description}</Text>
+        )}
       </View>
       <View style={styles.right}>
-        <Text style={[styles.amount, { color: isIncome ? COLORS.success : COLORS.danger }]}>
-          {isIncome ? '+' : '-'}{fmt(item.amount)}
-        </Text>
+        <View style={styles.rightTop}>
+          <Text style={[styles.amount, { color: isIncome ? COLORS.success : COLORS.danger }]}>
+            {isIncome ? '+' : '-'}{fmt(item.amount)}
+          </Text>
+          <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
+            <Feather name="edit-2" size={12} color={COLORS.muted} />
+          </TouchableOpacity>
+        </View>
         <View style={[styles.typeBadge, { backgroundColor: isIncome ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.10)' }]}>
           <Text style={[styles.typeText, { color: isIncome ? COLORS.success : COLORS.danger }]}>
             {isIncome ? 'Receita' : 'Despesa'}
@@ -125,6 +134,7 @@ export default function RecurringScreen() {
             return (
               <RecurringItem
                 item={item.item}
+                onEdit={() => router.push(`/edit-recurring?id=${item.item.id}`)}
                 onToggle={() => toggleMutation.mutate({ id: item.item.id, isActive: !item.item.isActive })}
                 onDelete={() => deleteMutation.mutate(item.item.id)}
               />
@@ -175,8 +185,11 @@ const styles = StyleSheet.create({
   info:   { flex: 1 },
   name:   { fontSize: 14, fontWeight: '600', color: COLORS.text },
   meta:   { fontSize: 12, color: COLORS.muted, marginTop: 2 },
-  right:  { alignItems: 'flex-end', gap: 4 },
-  amount: { fontSize: 14, fontWeight: '700' },
+  desc:   { fontSize: 11, color: COLORS.muted2, marginTop: 2, fontStyle: 'italic' },
+  right:    { alignItems: 'flex-end', gap: 4 },
+  rightTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  amount:   { fontSize: 14, fontWeight: '700' },
+  editBtn:  { width: 24, height: 24, borderRadius: 6, backgroundColor: COLORS.muted + '18', justifyContent: 'center', alignItems: 'center' },
   typeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   typeText:  { fontSize: 11, fontWeight: '600' },
 
