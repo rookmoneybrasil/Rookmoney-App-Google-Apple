@@ -23,6 +23,7 @@
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.12",
     "expo-modules-core": "~3.0.30",
+    "expo-notifications": "^56.0.18",
     "expo-print": "~15.0.8",
     "expo-router": "~6.0.23",
     "expo-secure-store": "~15.0.8",

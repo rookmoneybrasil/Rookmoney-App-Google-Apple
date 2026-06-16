@@ -834,6 +834,18 @@ export const chatApi = {
     }),
 }
 
+// ── Push token ────────────────────────────────────────────────────────
+
+export const pushTokenApi = {
+  register: (token: string) =>
+    request<{ data: {} }>('/api/v1/push-token', {
+      method: 'POST',
+      body:   JSON.stringify({ token }),
+    }),
+  unregister: () =>
+    request<{ data: {} }>('/api/v1/push-token', { method: 'DELETE' }),
+}
+
 // ── Billing ───────────────────────────────────────────────────────────
 
 export const billingApi = {

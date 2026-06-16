@@ -5,7 +5,8 @@ import { useRouter } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather, MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
-import { meApi, settingsApi, exportApi, type MeData, type SettingsData } from '@/lib/api'
+import { meApi, settingsApi, exportApi, pushTokenApi, type MeData, type SettingsData } from '@/lib/api'
+import * as Notifications from 'expo-notifications'
 import { useAuthStore } from '@/lib/auth'
 import { isHapticsEnabled, setHapticsEnabled } from '@/lib/haptics'
 
@@ -289,9 +290,15 @@ export default function SettingsScreen() {
   const [notifBillReminder,  setNotifBillReminder]  = useState<boolean | null>(null)
   const [notifCategoryLimit, setNotifCategoryLimit] = useState<boolean | null>(null)
   const [notifMonthlyEmail,  setNotifMonthlyEmail]  = useState<boolean | null>(null)
+  const [pushEnabled,        setPushEnabled]        = useState<boolean | null>(null)
   const [currency,           setCurrency]           = useState<string | null>(null)
   const [dateFormat,         setDateFormat]         = useState<string | null>(null)
   const [hapticsOn,          setHapticsOn]          = useState(isHapticsEnabled())
+
+  // Load push permission state on mount
+  useState(() => {
+    Notifications.getPermissionsAsync().then(({ status }) => setPushEnabled(status === 'granted'))
+  })
 
   const { data, isLoading } = useQuery({
     queryKey: ['me'],
@@ -362,6 +369,32 @@ export default function SettingsScreen() {
     if (key === 'notifCategoryLimit') setNotifCategoryLimit(val)
     if (key === 'notifMonthlyEmail')  setNotifMonthlyEmail(val)
     notifMutation.mutate({ [key]: val })
+  }
+
+  async function togglePush(val: boolean) {
+    setPushEnabled(val)
+    if (val) {
+      const { status } = await Notifications.requestPermissionsAsync()
+      if (status !== 'granted') {
+        setPushEnabled(false)
+        Alert.alert(
+          'Permissão necessária',
+          'Ative as notificações do app nas configurações do sistema.',
+          [{ text: 'OK' }],
+        )
+        return
+      }
+      try {
+        const token = (await Notifications.getExpoPushTokenAsync({
+          projectId: '158da268-5531-48b4-a07f-a4e383f34a9d',
+        })).data
+        await pushTokenApi.register(token)
+      } catch (e) {
+        console.warn('[push] register failed:', e)
+      }
+    } else {
+      await pushTokenApi.unregister().catch(() => {})
+    }
   }
 
   function savePrefs(next: { currency?: string; dateFormat?: string }) {
@@ -634,6 +667,19 @@ export default function SettingsScreen() {
                   <Switch
                     value={categoryLimitVal}
                     onValueChange={(v) => toggleNotif('notifCategoryLimit', v)}
+                    trackColor={{ false: COLORS.muted2, true: COLORS.brand }}
+                    thumbColor="#fff"
+                  />
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.notifRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.notifLabel}>Push notifications</Text>
+                    <Text style={styles.notifSub}>Alertas no celular mesmo com app fechado</Text>
+                  </View>
+                  <Switch
+                    value={pushEnabled ?? false}
+                    onValueChange={togglePush}
                     trackColor={{ false: COLORS.muted2, true: COLORS.brand }}
                     thumbColor="#fff"
                   />

@@ -14,13 +14,40 @@ import {
   Poppins_700Bold,
   Poppins_800ExtraBold,
 } from '@expo-google-fonts/poppins'
+import * as Notifications from 'expo-notifications'
 import { useAuthStore } from '@/lib/auth'
 import { COLORS } from '@/lib/constants'
 import { AnimatedSplash } from '@/components/animated-splash'
 import { loadHapticsPreference } from '@/lib/haptics'
+import { pushTokenApi } from '@/lib/api'
 
 SplashScreen.preventAutoHideAsync()
 loadHapticsPreference()
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList:   true,
+    shouldPlaySound:  true,
+    shouldSetBadge:   false,
+  }),
+})
+
+async function registerPushToken() {
+  const { status } = await Notifications.getPermissionsAsync()
+  const granted    = status === 'granted'
+    ? true
+    : (await Notifications.requestPermissionsAsync()).status === 'granted'
+  if (!granted) return
+  try {
+    const token = (await Notifications.getExpoPushTokenAsync({
+      projectId: '158da268-5531-48b4-a07f-a4e383f34a9d',
+    })).data
+    await pushTokenApi.register(token)
+  } catch (e) {
+    console.warn('[push] token registration failed:', e)
+  }
+}
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
@@ -70,7 +97,16 @@ function AuthGate() {
 
     // App was already open, URL arrives as an event
     const sub = Linking.addEventListener('url', ({ url }) => handleURL(url))
-    return () => sub.remove()
+
+    // Navigate when user taps a push notification
+    const notifSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const screen = response.notification.request.content.data?.screen as string | undefined
+      if (screen === 'bills')   router.push('/(tabs)/bills')
+      if (screen === 'reports') router.push('/reports')
+      if (screen === 'goals')   router.push('/(tabs)')
+    })
+
+    return () => { sub.remove(); notifSub.remove() }
   }, [])
 
   useEffect(() => {
@@ -83,7 +119,7 @@ function AuthGate() {
     if (!token && !inAuth) {
       router.replace('/(auth)/login')
     } else if (token && inAuth) {
-      // Check if user needs onboarding after login
+      registerPushToken()
       const u = useAuthStore.getState().user
       if (u && !u.hasOnboarded) {
         router.replace('/onboarding')
@@ -91,7 +127,6 @@ function AuthGate() {
         router.replace('/(tabs)')
       }
     } else if (token && !inAuth && !inOnboarding) {
-      // Already logged in — redirect to onboarding if not done
       const u = useAuthStore.getState().user
       if (u && !u.hasOnboarded && segments[0] !== 'onboarding') {
         router.replace('/onboarding')
