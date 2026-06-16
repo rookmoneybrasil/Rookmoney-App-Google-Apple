@@ -10,22 +10,28 @@ const TYPE_ICON: Record<AppNotification['type'], keyof typeof Feather.glyphMap> 
   bill:   'file-text',
   goal:   'target',
   budget: 'pie-chart',
+  person: 'users',
+  income: 'trending-up',
 }
 
 const TYPE_COLOR: Record<AppNotification['type'], string> = {
   bill:   COLORS.warning,
   goal:   COLORS.brand,
   budget: COLORS.danger,
+  person: '#a78bfa',
+  income: COLORS.success,
 }
 
 const URGENCY_DOT: Record<AppNotification['urgency'], string> = {
   high:   COLORS.danger,
   medium: COLORS.warning,
+  low:    COLORS.muted,
 }
 
 const GROUP_LABELS: Record<AppNotification['urgency'], string> = {
   high:   '🔴 Urgente',
   medium: '🟡 Atenção',
+  low:    '🔵 Informativo',
 }
 
 function NotificationRow({ item, onPress }: { item: AppNotification; onPress: () => void }) {
@@ -53,7 +59,7 @@ export default function NotificationsScreen() {
     queryFn:  () => notificationsApi.list().then((r) => r.data),
   })
 
-  const groups = (['high', 'medium'] as const)
+  const groups = (['high', 'medium', 'low'] as const)
     .map((urgency) => ({ urgency, items: (data ?? []).filter((n) => n.urgency === urgency) }))
     .filter((g) => g.items.length > 0)
 

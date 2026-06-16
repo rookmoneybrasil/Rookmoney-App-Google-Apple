@@ -178,16 +178,31 @@ function PaidRow({ item, onUnpay, onEdit, onDelete }: {
   )
 }
 
-function InstallmentGroupCard({ group, onPay }: {
+function InstallmentGroupCard({ group, onPay, onDeleteGroup }: {
   group: InstallmentGroup
   onPay: (id: string) => void
+  onDeleteGroup: () => void
 }) {
   const [open, setOpen] = useState(true)
   const pct = Math.round((group.paidCount / group.total) * 100)
 
   return (
     <View style={styles.groupCard}>
-      <TouchableOpacity style={styles.groupHeader} onPress={() => setOpen((v) => !v)} activeOpacity={0.8}>
+      <TouchableOpacity
+        style={styles.groupHeader}
+        onPress={() => setOpen((v) => !v)}
+        onLongPress={() =>
+          Alert.alert(
+            'Excluir parcelamento',
+            `Excluir todas as ${group.total} parcelas de "${group.name}"?`,
+            [
+              { text: 'Cancelar', style: 'cancel' },
+              { text: 'Excluir tudo', style: 'destructive', onPress: onDeleteGroup },
+            ],
+          )
+        }
+        activeOpacity={0.8}
+      >
         <View style={[styles.rowIcon, { backgroundColor: COLORS.brand + '22' }]}>
           <Feather name="layers" size={15} color={COLORS.brand} />
         </View>
@@ -380,6 +395,16 @@ export default function BillsScreen() {
     mutationFn: (id: string) => recurringBillsApi.delete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recurringBills'] })
+      qc.invalidateQueries({ queryKey: ['bills'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+    onError: (e: Error) => Alert.alert('Erro', e.message),
+  })
+  const deleteGroupMutation = useMutation({
+    mutationFn: (group: InstallmentGroup) =>
+      Promise.all(group.items.map((inst) => billsApi.delete(inst.id))),
+    onSuccess: () => {
+      hapticSuccess()
       qc.invalidateQueries({ queryKey: ['bills'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
@@ -673,6 +698,7 @@ export default function BillsScreen() {
                         key={group.groupId}
                         group={group}
                         onPay={(id) => payMutation.mutate(id)}
+                        onDeleteGroup={() => deleteGroupMutation.mutate(group)}
                       />
                     ))}
                   </View>

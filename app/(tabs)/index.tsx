@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Feather } from '@expo/vector-icons'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import Svg, { Circle } from 'react-native-svg'
+import Svg, { Circle, Path } from 'react-native-svg'
 import { COLORS } from '@/lib/constants'
 import { dashboardApi, goalsApi, budgetsApi, type Transaction, type Goal, type Budget } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
@@ -42,12 +42,32 @@ function SectionLabel({ children }: { children: string }) {
   return <Text style={styles.sectionLabel}>{children}</Text>
 }
 
+// ── Sparkline ─────────────────────────────────────────────────────────────
+function Sparkline({ change, color }: { change: number; color: string }) {
+  const W = 54, H = 20
+  const mag = Math.min(Math.abs(change) / 40, 1) * (H * 0.38)
+  const mid = H / 2
+  const up  = change >= 0
+  const ys  = up
+    ? [mid + mag * 1.8, mid + mag * 1.1, mid, mid - mag * 0.9, mid - mag * 1.6]
+    : [mid - mag * 1.8, mid - mag * 1.1, mid, mid + mag * 0.9, mid + mag * 1.6]
+  const xs  = [0, W * 0.25, W * 0.5, W * 0.75, W]
+  const d   = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ')
+  return (
+    <Svg width={W} height={H}>
+      <Path d={d} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.5} />
+      <Circle cx={W} cy={ys[4]} r={2.5} fill={color} opacity={0.75} />
+    </Svg>
+  )
+}
+
 // ── KPI Card ──────────────────────────────────────────────────────────────
 function KpiCard({
-  label, value, sub, icon, gradientColors, valueColor, glowColor, onPress,
+  label, value, sub, icon, gradientColors, valueColor, glowColor, onPress, sparkChange,
 }: {
   label: string; value: string; sub?: string; icon: string
-  gradientColors: readonly [string, string]; valueColor: string; glowColor: string; onPress?: () => void
+  gradientColors: readonly [string, string]; valueColor: string; glowColor: string
+  onPress?: () => void; sparkChange?: number | null
 }) {
   return (
     <TouchableOpacity style={[styles.kpiWrap, { shadowColor: glowColor }]} onPress={onPress} activeOpacity={onPress ? 0.75 : 1}>
@@ -58,6 +78,11 @@ function KpiCard({
         </View>
         <Text style={[styles.kpiValue, { color: valueColor }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
         {sub ? <Text style={styles.kpiSub} numberOfLines={1}>{sub}</Text> : null}
+        {sparkChange != null && (
+          <View style={styles.kpiSparkline}>
+            <Sparkline change={sparkChange} color={valueColor} />
+          </View>
+        )}
       </LinearGradient>
     </TouchableOpacity>
   )
@@ -365,6 +390,7 @@ export default function DashboardScreen() {
               valueColor={COLORS.success}
               glowColor={COLORS.success}
               onPress={() => setKpiDrawer('income')}
+              sparkChange={data?.incomeChange ?? null}
             />
             <KpiCard
               label="A PAGAR"
@@ -377,6 +403,7 @@ export default function DashboardScreen() {
               valueColor="#f43f5e"
               glowColor="#ef4444"
               onPress={() => setKpiDrawer('bills')}
+              sparkChange={data?.expenseChange ?? null}
             />
             <KpiCard
               label="SALDO DO MÊS"
@@ -635,9 +662,10 @@ const styles = StyleSheet.create({
   },
   kpiCard: { borderRadius: 16, padding: 14, borderWidth: 1, minHeight: 90 },
   kpiTop:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  kpiLabel:{ fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.6 },
-  kpiValue:{ fontSize: 20, fontWeight: '800', marginBottom: 4 },
-  kpiSub:  { fontSize: 10, color: 'rgba(255,255,255,0.35)' },
+  kpiLabel:    { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.6 },
+  kpiValue:    { fontSize: 20, fontWeight: '800', marginBottom: 4 },
+  kpiSub:      { fontSize: 10, color: 'rgba(255,255,255,0.35)' },
+  kpiSparkline:{ marginTop: 6, alignSelf: 'flex-end' },
 
   // Card
   card: {

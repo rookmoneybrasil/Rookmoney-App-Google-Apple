@@ -787,11 +787,11 @@ export const personRecurringApi = {
 
 export interface AppNotification {
   id:      string
-  type:    'bill' | 'goal' | 'budget'
+  type:    'bill' | 'goal' | 'budget' | 'person' | 'income'
   title:   string
   message: string
   href:    string
-  urgency: 'high' | 'medium'
+  urgency: 'high' | 'medium' | 'low'
 }
 
 export const notificationsApi = {
