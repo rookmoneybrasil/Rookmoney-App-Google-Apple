@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { View, FlatList, TouchableOpacity, ScrollView, StyleSheet, RefreshControl, ActivityIndicator, Alert } from 'react-native'
-import { Text } from '@/components/text'
+import { Text, TextInput } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
@@ -56,9 +56,10 @@ function TxItem({ item, onEdit, onDelete }: { item: Transaction; onEdit: () => v
 export default function TransactionsScreen() {
   const router  = useRouter()
   const qc      = useQueryClient()
-  const [typeFilter, setTypeFilter]   = useState<string | undefined>(undefined)
-  const [catFilter, setCatFilter]     = useState<string | undefined>(undefined)
-  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [typeFilter,    setTypeFilter]    = useState<string | undefined>(undefined)
+  const [catFilter,     setCatFilter]     = useState<string | undefined>(undefined)
+  const [currentMonth,  setCurrentMonth]  = useState(new Date())
+  const [search,        setSearch]        = useState('')
 
   const monthStr   = format(currentMonth, 'yyyy-MM')
   const monthLabel = format(currentMonth, "MMMM 'yy", { locale: ptBR })
@@ -74,6 +75,23 @@ export default function TransactionsScreen() {
       }).then((r) => r.data?.items ?? []),
   })
 
+  const filtered = useMemo(() => {
+    if (!search.trim()) return data ?? []
+    const q = search.toLowerCase()
+    return (data ?? []).filter((t) =>
+      (t.description ?? '').toLowerCase().includes(q) ||
+      t.category.name.toLowerCase().includes(q),
+    )
+  }, [data, search])
+
+  const hasActiveFilters = !!typeFilter || !!catFilter || !!search.trim()
+
+  function clearFilters() {
+    setTypeFilter(undefined)
+    setCatFilter(undefined)
+    setSearch('')
+  }
+
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn:  () => categoriesApi.list().then((r) => r.data),
@@ -88,8 +106,8 @@ export default function TransactionsScreen() {
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
-  const totalIncome  = data?.filter((t) => t.type === 'INCOME').reduce((s, t) => s + t.amount, 0) ?? 0
-  const totalExpense = data?.filter((t) => t.type === 'EXPENSE').reduce((s, t) => s + t.amount, 0) ?? 0
+  const totalIncome  = filtered.filter((t) => t.type === 'INCOME').reduce((s, t) => s + t.amount, 0)
+  const totalExpense = filtered.filter((t) => t.type === 'EXPENSE').reduce((s, t) => s + t.amount, 0)
 
   return (
     <View style={styles.screen}>
@@ -102,6 +120,26 @@ export default function TransactionsScreen() {
         <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/new-transaction')}>
           <Feather name="plus" size={22} color="#fff" />
         </TouchableOpacity>
+      </View>
+
+      {/* Search */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchBox}>
+          <Feather name="search" size={15} color={COLORS.muted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar por descrição ou categoria..."
+            placeholderTextColor={COLORS.muted}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+              <Feather name="x" size={15} color={COLORS.muted} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Month picker */}
@@ -130,7 +168,7 @@ export default function TransactionsScreen() {
         </View>
       )}
 
-      {/* Type Filter Pills */}
+      {/* Type + Category Filter Pills */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -149,8 +187,7 @@ export default function TransactionsScreen() {
           </TouchableOpacity>
         ))}
 
-        {/* Category pills */}
-        {(categories ?? []).slice(0, 8).map((c) => (
+        {(categories ?? []).map((c) => (
           <TouchableOpacity
             key={c.id}
             style={[styles.pill, catFilter === c.id && styles.pillActive]}
@@ -162,13 +199,25 @@ export default function TransactionsScreen() {
             </Text>
           </TouchableOpacity>
         ))}
+
+        {hasActiveFilters && (
+          <TouchableOpacity style={styles.clearPill} onPress={clearFilters}>
+            <Feather name="x" size={13} color={COLORS.danger} />
+            <Text style={styles.clearPillText}>Limpar</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
+
+      {/* Result count */}
+      {!isLoading && hasActiveFilters && (
+        <Text style={styles.resultCount}>{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</Text>
+      )}
 
       {isLoading ? (
         <ActivityIndicator color={COLORS.brand} style={{ marginTop: 60 }} />
       ) : (
         <FlatList
-          data={data ?? []}
+          data={filtered}
           keyExtractor={(t) => t.id}
           renderItem={({ item }) => (
             <TxItem
@@ -182,7 +231,9 @@ export default function TransactionsScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Feather name="repeat" size={36} color={COLORS.muted} />
-              <Text style={styles.emptyText}>Nenhuma transação encontrada.</Text>
+              <Text style={styles.emptyText}>
+                {hasActiveFilters ? 'Nenhum resultado para os filtros aplicados.' : 'Nenhuma transação encontrada.'}
+              </Text>
             </View>
           }
         />
@@ -204,6 +255,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
     shadowColor: COLORS.brand, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4,
   },
+
+  searchRow:   { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: COLORS.card, borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: COLORS.text, paddingVertical: 0 },
+
+  resultCount: { fontSize: 12, color: COLORS.muted, paddingHorizontal: 20, paddingBottom: 4 },
+
+  clearPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+    backgroundColor: COLORS.danger + '15', borderWidth: 1, borderColor: COLORS.danger + '40',
+  },
+  clearPillText: { fontSize: 13, color: COLORS.danger },
 
   monthPicker: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',

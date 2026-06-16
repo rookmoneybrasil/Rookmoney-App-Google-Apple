@@ -357,7 +357,9 @@ export default function DashboardScreen() {
             <KpiCard
               label="RECEITAS"
               value={fmtShort(data?.monthIncome ?? 0)}
-              sub="Total recebido"
+              sub={data?.incomeChange != null
+                ? `${data.incomeChange >= 0 ? '↑' : '↓'}${Math.abs(Math.round(data.incomeChange))}% vs mês ant.`
+                : 'Total recebido'}
               icon="trending-up"
               gradientColors={['#052e16', '#0a4020']}
               valueColor={COLORS.success}
@@ -367,7 +369,9 @@ export default function DashboardScreen() {
             <KpiCard
               label="A PAGAR"
               value={fmtShort((data?.pendingBillsAmount ?? 0) + (data?.personPayablesAmount ?? 0))}
-              sub={(data?.pendingBillsCount ?? 0) > 0 ? `${data?.pendingBillsCount} conta(s) pendente(s)` : 'Em dia'}
+              sub={(data?.pendingBillsCount ?? 0) > 0
+                ? `${data?.pendingBillsCount} conta(s)${data?.expenseChange != null ? ` · ${data.expenseChange >= 0 ? '↑' : '↓'}${Math.abs(Math.round(data.expenseChange))}%` : ''}`
+                : 'Em dia'}
               icon="trending-down"
               gradientColors={['#450a0a', '#5c1414']}
               valueColor="#f43f5e"
@@ -384,23 +388,6 @@ export default function DashboardScreen() {
               glowColor={COLORS.brand}
               onPress={() => setKpiDrawer('balance')}
             />
-          </View>
-
-          {/* Quick Actions */}
-          <View style={styles.quickActions}>
-            {([
-              { label: 'Transação', icon: 'repeat',    color: COLORS.brand,   route: '/new-transaction' },
-              { label: 'Conta',     icon: 'file-text', color: COLORS.warning,  route: '/new-bill' },
-              { label: 'Meta',      icon: 'target',    color: COLORS.success,  route: '/new-goal' },
-              { label: 'Ver tudo',  icon: 'list',      color: '#a855f7',       route: '/transactions' },
-            ] as const).map((a) => (
-              <TouchableOpacity key={a.label} style={styles.quickBtn} onPress={() => router.push(a.route as never)}>
-                <View style={[styles.quickBtnIcon, { backgroundColor: a.color + '22' }]}>
-                  <Feather name={a.icon as never} size={18} color={a.color} />
-                </View>
-                <Text style={styles.quickBtnLabel}>{a.label}</Text>
-              </TouchableOpacity>
-            ))}
           </View>
 
           {/* ── ATENÇÃO ──────────────────────────────────────────────── */}
@@ -651,12 +638,6 @@ const styles = StyleSheet.create({
   kpiLabel:{ fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.6 },
   kpiValue:{ fontSize: 20, fontWeight: '800', marginBottom: 4 },
   kpiSub:  { fontSize: 10, color: 'rgba(255,255,255,0.35)' },
-
-  // Quick actions
-  quickActions: { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  quickBtn: { flex: 1, alignItems: 'center', gap: 5 },
-  quickBtnIcon: { width: 50, height: 50, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
-  quickBtnLabel: { fontSize: 11, color: COLORS.muted, fontWeight: '500' },
 
   // Card
   card: {

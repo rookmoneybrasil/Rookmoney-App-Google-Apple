@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
-import { recurringApi, type Recurring } from '@/lib/api'
+import { recurringApi, categoriesApi, type Recurring } from '@/lib/api'
 
 const TYPES = [
   { value: 'EXPENSE', label: 'Despesa', color: COLORS.danger },
@@ -47,11 +47,17 @@ export default function EditRecurringScreen() {
     }
   }, [id])
 
+  const { data: categories, isLoading: loadingCats } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => categoriesApi.list().then((r) => r.data),
+  })
+
   const mutation = useMutation({
     mutationFn: () => {
       const amt = parseFloat(amount.replace(',', '.'))
       if (!name.trim())           throw new Error('Nome é obrigatório')
       if (isNaN(amt) || amt <= 0) throw new Error('Valor inválido')
+      if (!categoryId)            throw new Error('Selecione uma categoria')
       const day = dayOfMonth ? parseInt(dayOfMonth, 10) : undefined
       if (day !== undefined && (isNaN(day) || day < 1 || day > 31)) {
         throw new Error('Dia inválido (1-31)')
@@ -103,23 +109,22 @@ export default function EditRecurringScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Tipo — read-only indicator */}
         <View style={styles.typeRow}>
           {TYPES.map((t) => (
-            <View
+            <TouchableOpacity
               key={t.value}
               style={[
                 styles.typeBtn,
                 type === t.value && { borderColor: t.color, backgroundColor: t.color + '18' },
               ]}
+              onPress={() => setType(t.value)}
             >
               <Text style={[styles.typeLabel, type === t.value && { color: t.color }]}>
                 {t.label}
               </Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
-        <Text style={styles.readOnlyHint}>Tipo e categoria não podem ser alterados</Text>
 
         <Text style={styles.label}>Nome *</Text>
         <TextInput
@@ -157,11 +162,23 @@ export default function EditRecurringScreen() {
           ))}
         </View>
 
-        {/* Categoria — read-only */}
-        {rec.category && (
-          <View style={styles.catReadOnly}>
-            <Text style={styles.catEmoji}>{rec.category.icon}</Text>
-            <Text style={styles.catName}>{rec.category.name}</Text>
+        <Text style={styles.label}>Categoria *</Text>
+        {loadingCats ? (
+          <ActivityIndicator color={COLORS.brand} />
+        ) : (
+          <View style={styles.categoryGrid}>
+            {(categories ?? []).map((cat) => (
+              <TouchableOpacity
+                key={cat.id}
+                style={[styles.catBtn, categoryId === cat.id && styles.catBtnActive]}
+                onPress={() => setCategoryId(cat.id)}
+              >
+                <Text style={styles.catEmoji}>{cat.icon}</Text>
+                <Text style={[styles.catName, categoryId === cat.id && { color: COLORS.brand }]} numberOfLines={1}>
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         )}
 
@@ -224,7 +241,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   typeLabel:     { fontSize: 14, fontWeight: '600', color: COLORS.muted },
-  readOnlyHint:  { fontSize: 11, color: COLORS.muted2, marginTop: 6 },
 
   freqRow: { flexDirection: 'row', gap: 10 },
   freqBtn: {
@@ -235,13 +251,16 @@ const styles = StyleSheet.create({
   freqBtnActive: { borderColor: COLORS.brand, backgroundColor: COLORS.brandDim },
   freqLabel:     { fontSize: 13, color: COLORS.muted },
 
-  catReadOnly: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12,
-    backgroundColor: COLORS.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  catBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: COLORS.card, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 8,
     borderWidth: 1, borderColor: COLORS.border,
   },
-  catEmoji: { fontSize: 18 },
-  catName:  { fontSize: 14, color: COLORS.muted },
+  catBtnActive: { borderColor: COLORS.brand, backgroundColor: COLORS.brandDim },
+  catEmoji: { fontSize: 16 },
+  catName:  { fontSize: 13, color: COLORS.text, maxWidth: 80 },
 
   saveBtn: {
     backgroundColor: COLORS.brand, borderRadius: 14, paddingVertical: 16,

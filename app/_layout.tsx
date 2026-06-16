@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { ThemeProvider, DarkTheme, type Theme } from '@react-navigation/native'
@@ -16,8 +16,11 @@ import {
 } from '@expo-google-fonts/poppins'
 import { useAuthStore } from '@/lib/auth'
 import { COLORS } from '@/lib/constants'
+import { AnimatedSplash } from '@/components/animated-splash'
+import { loadHapticsPreference } from '@/lib/haptics'
 
 SplashScreen.preventAutoHideAsync()
+loadHapticsPreference()
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
@@ -108,6 +111,7 @@ export default function RootLayout() {
     Poppins_700Bold,
     Poppins_800ExtraBold,
   })
+  const [showSplash, setShowSplash] = useState(true)
 
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync()
@@ -141,6 +145,7 @@ export default function RootLayout() {
           <Stack.Screen name="people"        options={{ headerShown: false }} />
           <Stack.Screen name="person-detail" options={{ headerShown: false }} />
           <Stack.Screen name="billing"       options={{ headerShown: false }} />
+          <Stack.Screen name="ai-chat"       options={{ headerShown: false }} />
 
           {/* Google OAuth callback */}
           <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
@@ -151,6 +156,7 @@ export default function RootLayout() {
           <Stack.Screen name="edit-income"         options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="edit-recurring"      options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="edit-recurring-bill" options={{ presentation: 'modal', headerShown: false }} />
+          <Stack.Screen name="edit-category"       options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="feedback"            options={{ headerShown: false }} />
 
           {/* Modal screens */}
@@ -164,6 +170,8 @@ export default function RootLayout() {
           <Stack.Screen name="new-category"      options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="new-person"        options={{ presentation: 'modal', headerShown: false }} />
         </Stack>
+
+        {showSplash && <AnimatedSplash onFinish={() => setShowSplash(false)} />}
       </ThemeProvider>
     </QueryClientProvider>
   )

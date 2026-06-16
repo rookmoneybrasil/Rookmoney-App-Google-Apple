@@ -1,20 +1,26 @@
 import React, { useState } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Share } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Share, Alert } from 'react-native'
 import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
-import { Feather } from '@expo/vector-icons'
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
 import Svg, { Rect, Text as SvgText, Circle, Polyline, Line } from 'react-native-svg'
-import { format } from 'date-fns'
+import { format, addMonths, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { COLORS } from '@/lib/constants'
-import { reportsApi, meApi, type MonthlyReport, type CategoryTrend, type ReportsData } from '@/lib/api'
-import { API_BASE_URL } from '@/lib/constants'
-import { useAuthStore } from '@/lib/auth'
+import {
+  reportsApi, meApi,
+  type MonthlyReport, type PeriodReport, type CategoryTrend,
+  type TopExpense, type SpendingDay, type IncomeSourceReport,
+} from '@/lib/api'
 import { ProGate } from '@/components/pro-gate'
+import * as Print from 'expo-print'
+import * as Sharing from 'expo-sharing'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 const PERIOD_OPTIONS = [
   { label: '3M',  value: 3 },
@@ -22,34 +28,366 @@ const PERIOD_OPTIONS = [
   { label: '12M', value: 12 },
 ]
 
-// ── Bar chart (income vs expense) ──────────────────────────────────────────
+function savingsRateInfo(rate: number) {
+  if (rate >= 20) return { color: COLORS.success, message: 'Excelente 🎉' }
+  if (rate >= 10) return { color: COLORS.warning, message: 'Bom 👍' }
+  if (rate >= 0)  return { color: COLORS.warning, message: 'Atenção ⚠️' }
+  return { color: COLORS.danger, message: 'Gastos acima da renda 🚨' }
+}
 
-function BarChart({ data }: { data: MonthlyReport[] }) {
-  const BAR_H   = 110
-  const BAR_W   = 16
-  const GAP     = 5
-  const GRP_GAP = 20
-  const TOTAL_H = BAR_H + 28
+function buildPDF(monthly: MonthlyReport[], period: PeriodReport, label: string): string {
+  const rows = monthly.map((m) => `
+    <tr>
+      <td>${capitalize(m.monthFull)}</td>
+      <td style="color:#22c55e">R$ ${m.totalIncome.toFixed(2).replace('.', ',')}</td>
+      <td style="color:#ef4444">R$ ${m.totalExpense.toFixed(2).replace('.', ',')}</td>
+      <td style="color:${m.balance >= 0 ? '#22c55e' : '#ef4444'}">${m.balance >= 0 ? '+' : ''}R$ ${m.balance.toFixed(2).replace('.', ',')}</td>
+      <td style="color:${m.savingsRate >= 10 ? '#22c55e' : '#f59e0b'}">${m.savingsRate}%</td>
+    </tr>`).join('')
 
-  const maxVal = Math.max(...data.flatMap((m) => [m.totalIncome, m.totalExpense]), 1)
-  const totalW = data.length * (BAR_W * 2 + GAP + GRP_GAP)
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  body { font-family: Arial, sans-serif; margin: 32px; color: #1e293b; }
+  h1 { font-size: 22px; color: #3b82f6; margin-bottom: 4px; }
+  h2 { font-size: 14px; color: #64748b; font-weight: normal; margin-bottom: 24px; }
+  .kpis { display: flex; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+  .kpi { background: #f1f5f9; border-radius: 10px; padding: 14px 18px; min-width: 140px; }
+  .kpi-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi-value { font-size: 18px; font-weight: 700; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #f1f5f9; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; }
+  td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+  tr:hover td { background: #f8fafc; }
+  .footer { margin-top: 32px; font-size: 11px; color: #94a3b8; text-align: center; }
+</style>
+</head><body>
+<h1>Rook Money — Relatório Financeiro</h1>
+<h2>${label}</h2>
+<div class="kpis">
+  <div class="kpi">
+    <div class="kpi-label">Receitas</div>
+    <div class="kpi-value" style="color:#22c55e">R$ ${period.totalIncome.toFixed(2).replace('.', ',')}</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Despesas</div>
+    <div class="kpi-value" style="color:#ef4444">R$ ${period.totalExpense.toFixed(2).replace('.', ',')}</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Saldo</div>
+    <div class="kpi-value" style="color:${period.netBalance >= 0 ? '#22c55e' : '#ef4444'}">R$ ${period.netBalance.toFixed(2).replace('.', ',')}</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Taxa de poupança</div>
+    <div class="kpi-value" style="color:${period.savingsRate >= 10 ? '#22c55e' : '#f59e0b'}">${period.savingsRate}%</div>
+  </div>
+</div>
+<table>
+  <thead><tr>
+    <th>Mês</th><th>Receitas</th><th>Despesas</th><th>Saldo</th><th>Poupança</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="footer">Gerado pelo Rook Money em ${new Date().toLocaleDateString('pt-BR')}</div>
+</body></html>`
+}
+
+function buildCSV(monthly: MonthlyReport[], period: PeriodReport) {
+  const header = ['Mês', 'Receitas (R$)', 'Despesas (R$)', 'Saldo (R$)', '% Poupança']
+  const rows = monthly.map((m) => [
+    capitalize(m.monthFull),
+    m.totalIncome.toFixed(2).replace('.', ','),
+    m.totalExpense.toFixed(2).replace('.', ','),
+    m.balance.toFixed(2).replace('.', ','),
+    `${m.savingsRate}%`,
+  ])
+  rows.push([
+    'TOTAL',
+    period.totalIncome.toFixed(2).replace('.', ','),
+    period.totalExpense.toFixed(2).replace('.', ','),
+    period.netBalance.toFixed(2).replace('.', ','),
+    `${period.savingsRate}%`,
+  ])
+  return [header, ...rows].map((r) => r.join(';')).join('\n')
+}
+
+// ── Reusable bits ───────────────────────────────────────────────────────────
+
+function KpiCard({ icon, iconLib, label, value, sub, color }: {
+  icon: string
+  iconLib?: 'material'
+  label: string
+  value: string
+  sub?: string
+  color: string
+}) {
+  return (
+    <View style={styles.kpiCard}>
+      <View style={styles.kpiHeader}>
+        {iconLib === 'material'
+          ? <MaterialCommunityIcons name={icon as any} size={14} color={color} />
+          : <Feather name={icon as any} size={14} color={color} />}
+        <Text style={styles.kpiLabel} numberOfLines={1}>{label}</Text>
+      </View>
+      <Text style={[styles.kpiValue, { color }]}>{value}</Text>
+      {sub && <Text style={styles.kpiSub} numberOfLines={1}>{sub}</Text>}
+    </View>
+  )
+}
+
+function ReportCard({ icon, iconColor = COLORS.text, title, sub, caption, children }: {
+  icon: string
+  iconColor?: string
+  title: string
+  sub?: React.ReactNode
+  caption?: string
+  children: React.ReactNode
+}) {
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionTitleRow}>
+          <Feather name={icon as any} size={15} color={iconColor} />
+          <Text style={styles.sectionTitle}>{title}</Text>
+        </View>
+        {sub && <Text style={styles.sectionSub}>{sub}</Text>}
+      </View>
+      <View style={styles.card}>
+        {children}
+      </View>
+      {caption && <Text style={styles.caption}>{caption}</Text>}
+    </View>
+  )
+}
+
+function LegendItem({ color, label, variant = 'dot' }: { color: string; label: string; variant?: 'dot' | 'line' | 'dashed' }) {
+  return (
+    <View style={styles.legendItem}>
+      {variant === 'dot' ? (
+        <View style={[styles.legendDot, { backgroundColor: color }]} />
+      ) : variant === 'line' ? (
+        <View style={[styles.legendLine, { backgroundColor: color }]} />
+      ) : (
+        <View style={[styles.legendLine, { backgroundColor: 'transparent', borderTopWidth: 2, borderColor: color, borderStyle: 'dashed' }]} />
+      )}
+      <Text style={styles.legendText}>{label}</Text>
+    </View>
+  )
+}
+
+function ChangeBadge({ change }: { change: number }) {
+  if (change > 0) {
+    return (
+      <View style={[styles.changeBadge, { backgroundColor: COLORS.danger + '18' }]}>
+        <Feather name="trending-up" size={10} color={COLORS.danger} />
+        <Text style={[styles.changeBadgeText, { color: COLORS.danger }]}>+{change}%</Text>
+      </View>
+    )
+  }
+  if (change < 0) {
+    return (
+      <View style={[styles.changeBadge, { backgroundColor: COLORS.success + '18' }]}>
+        <Feather name="trending-down" size={10} color={COLORS.success} />
+        <Text style={[styles.changeBadgeText, { color: COLORS.success }]}>{change}%</Text>
+      </View>
+    )
+  }
+  return (
+    <View style={[styles.changeBadge, { backgroundColor: COLORS.muted2 + '60' }]}>
+      <Feather name="minus" size={10} color={COLORS.muted} />
+      <Text style={[styles.changeBadgeText, { color: COLORS.muted }]}>0%</Text>
+    </View>
+  )
+}
+
+// ── Evolução mensal (bars + lines) ──────────────────────────────────────────
+
+function MonthlyChart({ data }: { data: MonthlyReport[] }) {
+  const BAR_H   = 120
+  const BAR_W   = 14
+  const GAP     = 4
+  const GRP_GAP = 26
+  const PAD_TOP = 8
+  const LABEL_H = 22
+  const TOTAL_H = BAR_H + PAD_TOP + LABEL_H
+
+  const groupW = BAR_W * 2 + GAP + GRP_GAP
+  const totalW = Math.max(data.length * groupW, 260)
+
+  const allBRL = data.flatMap((m) => [m.totalIncome, m.totalExpense, m.balance])
+  const minBRL = Math.min(0, ...allBRL)
+  const maxBRL = Math.max(1, ...allBRL)
+  const rangeBRL = maxBRL - minBRL || 1
+  const yBRL = (v: number) => PAD_TOP + (1 - (v - minBRL) / rangeBRL) * BAR_H
+  const zeroY = yBRL(0)
+
+  const pcts    = data.map((m) => m.savingsRate)
+  const minPct  = Math.min(0, ...pcts)
+  const maxPct  = Math.max(0, ...pcts)
+  const rangePct = (maxPct - minPct) || 1
+  const yPct = (v: number) => PAD_TOP + (1 - (v - minPct) / rangePct) * BAR_H
+
+  const centerX = (i: number) => i * groupW + GRP_GAP / 2 + BAR_W + GAP / 2
+
+  const balancePoints  = data.map((m, i) => `${centerX(i)},${yBRL(m.balance)}`).join(' ')
+  const savingsPoints  = data.map((m, i) => `${centerX(i)},${yPct(m.savingsRate)}`).join(' ')
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
       <Svg width={totalW} height={TOTAL_H}>
-        {data.map((month, i) => {
-          const x    = i * (BAR_W * 2 + GAP + GRP_GAP)
-          const incH = (month.totalIncome  / maxVal) * BAR_H
-          const expH = (month.totalExpense / maxVal) * BAR_H
-          const label = format(new Date(month.monthKey + '-01'), 'MMM', { locale: ptBR })
-
+        {minBRL < 0 && (
+          <Line x1={0} y1={zeroY} x2={totalW} y2={zeroY} stroke={COLORS.border} strokeWidth={1} strokeDasharray="4 3" />
+        )}
+        {data.map((m, i) => {
+          const x = i * groupW + GRP_GAP / 2
+          const incH = Math.max(zeroY - yBRL(m.totalIncome), m.totalIncome > 0 ? 2 : 0)
+          const expH = Math.max(zeroY - yBRL(m.totalExpense), m.totalExpense > 0 ? 2 : 0)
+          const label = format(new Date(m.monthKey + '-01'), 'MMM', { locale: ptBR })
           return (
-            <React.Fragment key={month.monthKey}>
-              <Rect x={x}            y={BAR_H - incH} width={BAR_W} height={Math.max(incH, 2)} rx={4} fill={COLORS.success} />
-              <Rect x={x + BAR_W + GAP} y={BAR_H - expH} width={BAR_W} height={Math.max(expH, 2)} rx={4} fill={COLORS.danger} />
+            <React.Fragment key={m.monthKey}>
+              <Rect x={x}              y={zeroY - incH} width={BAR_W} height={incH} rx={3} fill={COLORS.success} />
+              <Rect x={x + BAR_W + GAP} y={zeroY - expH} width={BAR_W} height={expH} rx={3} fill={COLORS.danger} />
               <SvgText x={x + BAR_W + GAP / 2} y={TOTAL_H - 4} fontSize="9" fill={COLORS.muted} textAnchor="middle">
                 {label}
               </SvgText>
+            </React.Fragment>
+          )
+        })}
+        <Polyline points={savingsPoints} fill="none" stroke={COLORS.warning} strokeWidth={1.5} strokeDasharray="4 3" strokeLinecap="round" strokeLinejoin="round" />
+        <Polyline points={balancePoints} fill="none" stroke={COLORS.brand} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+        {data.map((m, i) => (
+          <Circle key={m.monthKey} cx={centerX(i)} cy={yBRL(m.balance)} r={2.5} fill={COLORS.brand} />
+        ))}
+      </Svg>
+    </ScrollView>
+  )
+}
+
+// ── Gastos por categoria ─────────────────────────────────────────────────────
+
+function CategoryBreakdown({ categories, totalExpense }: { categories: CategoryTrend[]; totalExpense: number }) {
+  const [expanded, setExpanded] = useState(false)
+
+  if (categories.length === 0) {
+    return <Text style={styles.emptyCardText}>Sem despesas no período.</Text>
+  }
+
+  const maxTotal = categories[0]?.total ?? 1
+  const visible  = expanded ? categories : categories.slice(0, 6)
+
+  return (
+    <View>
+      {visible.map((cat) => {
+        const barW = maxTotal > 0 ? (cat.total / maxTotal) * 100 : 0
+        return (
+          <View key={cat.categoryId} style={styles.catRow}>
+            <View style={[styles.catRowIcon, { backgroundColor: (cat.color || COLORS.brand) + '22' }]}>
+              <Text style={styles.catRowEmoji}>{cat.icon}</Text>
+            </View>
+            <View style={styles.catRowInfo}>
+              <View style={styles.catRowTop}>
+                <Text style={styles.catRowName} numberOfLines={1}>{cat.name}</Text>
+                <Text style={styles.catRowPct}>{cat.pct}%</Text>
+              </View>
+              <View style={styles.catRowTrack}>
+                <View style={[styles.catRowFill, { width: `${barW}%`, backgroundColor: cat.color || COLORS.brand }]} />
+              </View>
+            </View>
+            <View style={styles.catRowRight}>
+              <Text style={styles.catRowAmount}>{fmt(cat.total)}</Text>
+              <ChangeBadge change={cat.change} />
+            </View>
+          </View>
+        )
+      })}
+
+      {categories.length > 6 && (
+        <TouchableOpacity onPress={() => setExpanded((e) => !e)} style={styles.toggleBtn}>
+          <Text style={styles.toggleBtnText}>
+            {expanded ? 'Ver menos' : `Ver mais ${categories.length - 6} categorias`}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      <View style={styles.cardFooter}>
+        <Text style={styles.cardFooterLabel}>Total de despesas</Text>
+        <Text style={styles.cardFooterValue}>{fmt(totalExpense)}</Text>
+      </View>
+    </View>
+  )
+}
+
+// ── Maiores despesas ─────────────────────────────────────────────────────────
+
+function TopExpensesList({ expenses, periodExpense }: { expenses: TopExpense[]; periodExpense: number }) {
+  if (expenses.length === 0) {
+    return <Text style={styles.emptyCardText}>Sem despesas no período.</Text>
+  }
+
+  const maxAmt = expenses[0]?.amount ?? 1
+
+  return (
+    <View>
+      {expenses.map((exp, i) => {
+        const barW = maxAmt > 0 ? (exp.amount / maxAmt) * 100 : 0
+        const pct  = periodExpense > 0 ? Math.round((exp.amount / periodExpense) * 100) : 0
+        return (
+          <View key={exp.id} style={styles.expRow}>
+            <Text style={styles.expRank}>{i + 1}</Text>
+            <View style={[styles.expIcon, { backgroundColor: (exp.category.color || COLORS.brand) + '22' }]}>
+              <Text style={styles.expEmoji}>{exp.category.icon}</Text>
+            </View>
+            <View style={styles.expInfo}>
+              <Text style={styles.expDesc} numberOfLines={1}>{exp.description || exp.category.name}</Text>
+              <View style={styles.expBarTrack}>
+                <View style={[styles.expBarFill, { width: `${barW}%` }]} />
+              </View>
+              <Text style={styles.expDate}>{format(new Date(exp.date), "dd 'de' MMM yyyy", { locale: ptBR })}</Text>
+            </View>
+            <View style={styles.expRight}>
+              <Text style={styles.expAmount}>{fmt(exp.amount)}</Text>
+              <Text style={styles.expPct}>{pct}% do total</Text>
+            </View>
+          </View>
+        )
+      })}
+    </View>
+  )
+}
+
+// ── Padrão de gasto por dia ──────────────────────────────────────────────────
+
+function SpendingPatternChart({ data }: { data: SpendingDay[] }) {
+  const hasData = data.some((d) => d.total > 0)
+  if (!hasData) {
+    return <Text style={styles.emptyCardText}>Sem dados de despesas.</Text>
+  }
+
+  const BAR_H = 90
+  const BAR_W = 6
+  const GAP   = 2
+  const LABEL_H = 16
+  const maxTotal = Math.max(...data.map((d) => d.total), 1)
+  const totalW   = data.length * (BAR_W + GAP)
+
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <Svg width={totalW} height={BAR_H + LABEL_H}>
+        {data.map((d, i) => {
+          const h = Math.max((d.total / maxTotal) * BAR_H, d.total > 0 ? 2 : 1)
+          const x = i * (BAR_W + GAP)
+          const color = d.total >= maxTotal * 0.7 ? COLORS.danger
+                      : d.total >= maxTotal * 0.4 ? COLORS.warning
+                      : COLORS.brand
+          const opacity = d.total > 0 ? 0.8 : 0.15
+          return (
+            <React.Fragment key={d.day}>
+              <Rect x={x} y={BAR_H - h} width={BAR_W} height={h} rx={2} fill={color} fillOpacity={opacity} />
+              {d.day % 5 === 0 && (
+                <SvgText x={x + BAR_W / 2} y={BAR_H + 12} fontSize="8" fill={COLORS.muted} textAnchor="middle">
+                  {d.day}
+                </SvgText>
+              )}
             </React.Fragment>
           )
         })}
@@ -58,217 +396,207 @@ function BarChart({ data }: { data: MonthlyReport[] }) {
   )
 }
 
-// ── Balance line chart ─────────────────────────────────────────────────────
+// ── Fontes de receita ─────────────────────────────────────────────────────────
 
-function BalanceLine({ data }: { data: MonthlyReport[] }) {
-  const W = 320
-  const H = 80
-  const PAD_X = 12
-  const PAD_Y = 12
+function IncomeSourcesList({ sources, totalIncome }: { sources: IncomeSourceReport[]; totalIncome: number }) {
+  if (sources.length === 0) {
+    return <Text style={styles.emptyCardText}>Sem receitas no período.</Text>
+  }
 
-  const balances  = data.map((m) => m.balance)
-  const minB      = Math.min(...balances)
-  const maxB      = Math.max(...balances, 1)
-  const range     = maxB - minB || 1
-
-  const points = data.map((m, i) => {
-    const x = PAD_X + (i / Math.max(data.length - 1, 1)) * (W - PAD_X * 2)
-    const y = PAD_Y + (1 - (m.balance - minB) / range) * (H - PAD_Y * 2)
-    return `${x},${y}`
-  }).join(' ')
-
-  const zeroY = minB < 0
-    ? PAD_Y + (1 - (0 - minB) / range) * (H - PAD_Y * 2)
-    : null
-
-  const lastBalance = data[data.length - 1]?.balance ?? 0
+  const maxTotal = sources[0]?.total ?? 1
 
   return (
     <View>
-      <Svg width={W} height={H}>
-        {/* Zero line */}
-        {zeroY !== null && (
-          <Line x1={PAD_X} y1={zeroY} x2={W - PAD_X} y2={zeroY}
-            stroke={COLORS.border} strokeWidth={1} strokeDasharray="4 3" />
-        )}
-        {/* Balance polyline */}
-        <Polyline
-          points={points}
-          fill="none"
-          stroke={lastBalance >= 0 ? COLORS.success : COLORS.danger}
-          strokeWidth={2.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {/* Dots */}
-        {data.map((m, i) => {
-          const x = PAD_X + (i / Math.max(data.length - 1, 1)) * (W - PAD_X * 2)
-          const y = PAD_Y + (1 - (m.balance - minB) / range) * (H - PAD_Y * 2)
-          return (
-            <Circle key={m.monthKey} cx={x} cy={y} r={3}
-              fill={m.balance >= 0 ? COLORS.success : COLORS.danger} />
-          )
-        })}
-      </Svg>
-      <View style={styles.lineLabels}>
-        <Text style={styles.lineLabelVal}>{fmt(Math.min(...balances))}</Text>
-        <Text style={[styles.lineLabelCurrent, { color: lastBalance >= 0 ? COLORS.success : COLORS.danger }]}>
-          {fmt(lastBalance)}
-        </Text>
-        <Text style={styles.lineLabelVal}>{fmt(Math.max(...balances))}</Text>
-      </View>
-    </View>
-  )
-}
-
-// ── Donut chart ────────────────────────────────────────────────────────────
-
-function DonutChart({ data }: { data: CategoryTrend[] }) {
-  const SIZE  = 140
-  const CX    = SIZE / 2
-  const CY    = SIZE / 2
-  const R     = 52
-  const STR   = 18
-  const CIRC  = 2 * Math.PI * R
-
-  const top   = data.slice(0, 6)
-  let usedPct = 0
-
-  return (
-    <Svg width={SIZE} height={SIZE}>
-      <Circle cx={CX} cy={CY} r={R} fill="none" stroke={COLORS.border} strokeWidth={STR} />
-      {top.map((cat) => {
-        const dash   = (cat.pct / 100) * CIRC
-        const offset = CIRC / 4 - (usedPct / 100) * CIRC
-        usedPct += cat.pct
+      {sources.map((src, i) => {
+        const barW = maxTotal > 0 ? (src.total / maxTotal) * 100 : 0
+        const pct  = totalIncome > 0 ? Math.round((src.total / totalIncome) * 100) : 0
         return (
-          <Circle
-            key={cat.categoryId}
-            cx={CX} cy={CY} r={R}
-            fill="none"
-            stroke={cat.color || COLORS.brand}
-            strokeWidth={STR - 1}
-            strokeDasharray={`${dash} ${CIRC - dash}`}
-            strokeDashoffset={offset}
-            strokeLinecap="butt"
-          />
+          <View key={`${src.name}-${i}`} style={styles.incRow}>
+            <View style={styles.incInfo}>
+              <View style={styles.incTop}>
+                <Text style={styles.incName} numberOfLines={1}>{src.name}</Text>
+                <Text style={styles.incPct}>{pct}%</Text>
+              </View>
+              <View style={styles.incTrack}>
+                <View style={[styles.incFill, { width: `${barW}%` }]} />
+              </View>
+            </View>
+            <Text style={styles.incAmount}>+{fmt(src.total)}</Text>
+          </View>
         )
       })}
-    </Svg>
+
+      <View style={styles.cardFooter}>
+        <Text style={styles.cardFooterLabel}>Total de receitas</Text>
+        <Text style={[styles.cardFooterValue, { color: COLORS.success }]}>+{fmt(totalIncome)}</Text>
+      </View>
+    </View>
   )
 }
 
-// ── Insights ───────────────────────────────────────────────────────────────
+// ── Resumo por mês ────────────────────────────────────────────────────────────
 
-function Insights({ data }: { data: ReportsData }) {
-  const { monthly, period, categoryTrend } = data
-  if (monthly.length < 2) return null
-
-  const latest = monthly[monthly.length - 1]
-  const prev   = monthly[monthly.length - 2]
-
-  const expDiff = latest.totalExpense - prev.totalExpense
-  const topCat  = categoryTrend[0]
-
+function MonthlySummaryTable({ monthly, period }: { monthly: MonthlyReport[]; period: PeriodReport }) {
   return (
-    <View style={styles.insightsGrid}>
-      <View style={styles.insightCard}>
-        <Text style={styles.insightEmoji}>💰</Text>
-        <Text style={styles.insightValue}>{latest.savingsRate}%</Text>
-        <Text style={styles.insightLabel}>Taxa de poupança</Text>
-      </View>
-      <View style={styles.insightCard}>
-        <Text style={styles.insightEmoji}>{expDiff > 0 ? '📈' : '📉'}</Text>
-        <Text style={[styles.insightValue, { color: expDiff > 0 ? COLORS.danger : COLORS.success }]}>
-          {expDiff > 0 ? '+' : ''}{fmt(expDiff)}
-        </Text>
-        <Text style={styles.insightLabel}>vs mês anterior</Text>
-      </View>
-      {period.bestMonth && (
-        <View style={styles.insightCard}>
-          <Text style={styles.insightEmoji}>🏆</Text>
-          <Text style={styles.insightValue} numberOfLines={1}>{period.bestMonth}</Text>
-          <Text style={styles.insightLabel}>Melhor mês</Text>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View>
+        <View style={[styles.summaryRow, styles.summaryHeaderRow]}>
+          <Text style={[styles.summaryCellMonth, styles.summaryHeaderText]}>Mês</Text>
+          <Text style={[styles.summaryCell, styles.summaryHeaderText]}>Receitas</Text>
+          <Text style={[styles.summaryCell, styles.summaryHeaderText]}>Despesas</Text>
+          <Text style={[styles.summaryCell, styles.summaryHeaderText]}>Saldo</Text>
+          <Text style={[styles.summaryCellPct, styles.summaryHeaderText]}>% Poup.</Text>
         </View>
-      )}
-      {topCat && (
-        <View style={styles.insightCard}>
-          <Text style={styles.insightEmoji}>{topCat.icon}</Text>
-          <Text style={styles.insightValue} numberOfLines={1}>{topCat.pct}%</Text>
-          <Text style={styles.insightLabel} numberOfLines={1}>{topCat.name}</Text>
+        {[...monthly].reverse().map((m, i) => (
+          <View key={m.monthKey} style={[styles.summaryRow, i % 2 === 0 && styles.summaryRowAlt]}>
+            <Text style={styles.summaryCellMonth} numberOfLines={1}>{capitalize(m.monthFull)}</Text>
+            <Text style={[styles.summaryCell, { color: COLORS.success }]}>+{fmt(m.totalIncome)}</Text>
+            <Text style={[styles.summaryCell, { color: COLORS.danger }]}>-{fmt(m.totalExpense)}</Text>
+            <Text style={[styles.summaryCell, { color: m.balance >= 0 ? COLORS.success : COLORS.danger }]}>
+              {m.balance >= 0 ? '+' : ''}{fmt(m.balance)}
+            </Text>
+            <Text style={[styles.summaryCellPct, { color: savingsRateInfo(m.savingsRate).color }]}>
+              {m.savingsRate}%
+            </Text>
+          </View>
+        ))}
+        <View style={[styles.summaryRow, styles.summaryFooterRow]}>
+          <Text style={[styles.summaryCellMonth, styles.summaryFooterText]}>TOTAL</Text>
+          <Text style={[styles.summaryCell, styles.summaryFooterText, { color: COLORS.success }]}>+{fmt(period.totalIncome)}</Text>
+          <Text style={[styles.summaryCell, styles.summaryFooterText, { color: COLORS.danger }]}>-{fmt(period.totalExpense)}</Text>
+          <Text style={[styles.summaryCell, styles.summaryFooterText, { color: period.netBalance >= 0 ? COLORS.success : COLORS.danger }]}>
+            {period.netBalance >= 0 ? '+' : ''}{fmt(period.netBalance)}
+          </Text>
+          <Text style={[styles.summaryCellPct, styles.summaryFooterText, { color: savingsRateInfo(period.savingsRate).color }]}>
+            {period.savingsRate}%
+          </Text>
         </View>
-      )}
-    </View>
+      </View>
+    </ScrollView>
   )
 }
 
 // ── Main screen ────────────────────────────────────────────────────────────
 
 export default function ReportsScreen() {
-  const router  = useRouter()
-  const token   = useAuthStore((s) => s.token)
-  const [period, setPeriod]   = useState(6)
-  const [exporting, setExporting] = useState(false)
+  const router = useRouter()
+  const [period, setPeriod] = useState(6)
+  const [currentMonth, setCurrentMonth] = useState(new Date())
 
   const { data: me } = useQuery({
     queryKey: ['me'],
-    queryFn:  () => meApi.get().then(r => r.data),
+    queryFn:  () => meApi.get().then((r) => r.data),
   })
 
   const isPro = me?.plan === 'PRO'
 
+  const monthStr   = format(currentMonth, 'yyyy-MM')
+  const monthLabel = format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR })
+
   const { data, isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['reports', period],
-    queryFn:  () => reportsApi.get(period).then((r) => r.data),
+    queryKey: ['reports', period, monthStr],
+    queryFn:  () => reportsApi.get(period, monthStr).then((r) => r.data),
     enabled:  isPro,
   })
 
-  const latest = data?.monthly[data.monthly.length - 1]
+  const hasData = !!data && data.monthly.length > 0
+  const [exportingPDF, setExportingPDF] = useState(false)
 
-  async function handleExport() {
-    if (!token) return
-    setExporting(true)
+  async function handleExportCSV() {
+    if (!data) return
+    const csv = buildCSV(data.monthly, data.period)
     try {
-      const res  = await fetch(`${API_BASE_URL}/api/v1/export`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const json = await res.json()
-      await Share.share({
-        message: JSON.stringify(json.data, null, 2),
-        title:   'Rook Money — exportação de dados',
-      })
+      await Share.share({ message: csv, title: `rook-relatorio-${monthStr}.csv` })
     } catch {
-      // share sheet dismissed or error — ignore
+      // share sheet dismissed — ignore
+    }
+  }
+
+  async function handleExportPDF() {
+    if (!data) return
+    setExportingPDF(true)
+    try {
+      const label = hasData
+        ? `${capitalize(data.monthly[0].monthFull)} – ${capitalize(data.monthly[data.monthly.length - 1].monthFull)}`
+        : monthLabel
+      const html  = buildPDF(data.monthly, data.period, label)
+      const { uri } = await Print.printToFileAsync({ html, base64: false })
+      const canShare = await Sharing.isAvailableAsync()
+      if (canShare) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Compartilhar relatório PDF' })
+      } else {
+        Alert.alert('PDF gerado', `Salvo em: ${uri}`)
+      }
+    } catch (e: unknown) {
+      Alert.alert('Erro', (e as Error).message ?? 'Não foi possível gerar o PDF.')
     } finally {
-      setExporting(false)
+      setExportingPDF(false)
     }
   }
 
   return (
     <View style={styles.screen}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={COLORS.text} />
+          <Feather name="arrow-left" size={20} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Relatórios</Text>
-        <TouchableOpacity onPress={handleExport} style={styles.exportBtn} disabled={exporting}>
-          <Feather name={exporting ? 'loader' : 'download'} size={18} color={COLORS.brand} />
-        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>Relatórios</Text>
+          {hasData && (
+            <Text style={styles.subtitle}>
+              {capitalize(data!.monthly[0].monthFull)} – {capitalize(data!.monthly[data!.monthly.length - 1].monthFull)}
+            </Text>
+          )}
+        </View>
+      </View>
+      <Text style={styles.description}>
+        Visualize a evolução das suas finanças ao longo dos meses — receitas, despesas, saldo e gastos por categoria.
+      </Text>
+
+      {/* Month picker */}
+      <View style={styles.controlsRow}>
+        <View style={styles.monthPicker}>
+          <TouchableOpacity onPress={() => setCurrentMonth((m) => subMonths(m, 1))} hitSlop={8}>
+            <Feather name="chevron-left" size={18} color={COLORS.muted} />
+          </TouchableOpacity>
+          <View style={styles.monthPickerLabel}>
+            <Feather name="calendar" size={13} color={COLORS.muted} />
+            <Text style={styles.monthPickerText}>{monthLabel}</Text>
+          </View>
+          <TouchableOpacity onPress={() => setCurrentMonth((m) => addMonths(m, 1))} hitSlop={8}>
+            <Feather name="chevron-right" size={18} color={COLORS.muted} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Period selector */}
-      <View style={styles.periodRow}>
-        {PERIOD_OPTIONS.map((opt) => (
-          <TouchableOpacity
-            key={opt.value}
-            style={[styles.periodBtn, period === opt.value && styles.periodBtnActive]}
-            onPress={() => setPeriod(opt.value)}
-          >
-            <Text style={[styles.periodText, period === opt.value && styles.periodTextActive]}>
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      {/* Period selector + export */}
+      <View style={styles.filtersRow}>
+        <View style={styles.periodRow}>
+          {PERIOD_OPTIONS.map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.periodBtn, period === opt.value && styles.periodBtnActive]}
+              onPress={() => setPeriod(opt.value)}
+            >
+              <Text style={[styles.periodText, period === opt.value && styles.periodTextActive]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TouchableOpacity style={styles.exportBtn} onPress={handleExportCSV} disabled={!hasData}>
+          <Feather name="download" size={13} color={COLORS.brand} />
+          <Text style={styles.exportBtnText}>CSV</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.exportBtn, exportingPDF && { opacity: 0.6 }]}
+          onPress={handleExportPDF}
+          disabled={!hasData || exportingPDF}
+        >
+          <Feather name="file-text" size={13} color={COLORS.brand} />
+          <Text style={styles.exportBtnText}>{exportingPDF ? '...' : 'PDF'}</Text>
+        </TouchableOpacity>
       </View>
 
       {me && !isPro ? (
@@ -278,126 +606,89 @@ export default function ReportsScreen() {
         />
       ) : isLoading ? (
         <ActivityIndicator color={COLORS.brand} style={{ marginTop: 60 }} />
+      ) : !hasData ? (
+        <View style={styles.empty}>
+          <View style={styles.emptyIconWrap}>
+            <Feather name="bar-chart-2" size={26} color={COLORS.muted} />
+          </View>
+          <Text style={styles.emptyTitle}>Nenhum dado para exibir</Text>
+          <Text style={styles.emptyText}>Adicione transações para visualizar a evolução das suas finanças.</Text>
+        </View>
       ) : (
         <ScrollView
           contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={COLORS.brand} />}
         >
-          {/* Latest month stats */}
-          {latest && (
-            <View style={styles.statsRow}>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Receita</Text>
-                <Text style={[styles.statValue, { color: COLORS.success }]}>{fmt(latest.totalIncome)}</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Despesa</Text>
-                <Text style={[styles.statValue, { color: COLORS.danger }]}>{fmt(latest.totalExpense)}</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Saldo</Text>
-                <Text style={[styles.statValue, { color: latest.balance >= 0 ? COLORS.success : COLORS.danger }]}>
-                  {fmt(latest.balance)}
-                </Text>
-              </View>
+          {/* KPIs */}
+          <View style={styles.kpiGrid}>
+            <KpiCard
+              icon="trending-up" color={COLORS.success}
+              label="Receitas no período" value={fmt(data!.period.totalIncome)}
+              sub={`≈ ${fmt(data!.period.avgMonthlyIncome)}/mês`}
+            />
+            <KpiCard
+              icon="trending-down" color={COLORS.danger}
+              label="Despesas no período" value={fmt(data!.period.totalExpense)}
+              sub={`≈ ${fmt(data!.period.avgMonthlyExpense)}/mês`}
+            />
+            <KpiCard
+              icon="credit-card" color={COLORS.brand}
+              label="Saldo do período" value={fmt(data!.period.balance)}
+              sub={`${data!.period.positiveMonths}/${data!.period.totalMonths} meses positivos`}
+            />
+            <KpiCard
+              icon="piggy-bank-outline" iconLib="material" color={savingsRateInfo(data!.period.savingsRate).color}
+              label="Taxa de poupança"
+              value={`${data!.period.savingsRate > 0 ? '+' : ''}${data!.period.savingsRate}%`}
+              sub={savingsRateInfo(data!.period.savingsRate).message}
+            />
+          </View>
+
+          {/* Evolução mensal */}
+          <ReportCard
+            icon="bar-chart-2"
+            title="Evolução mensal"
+            sub={data!.period.bestMonth ? (
+              <>Melhor mês: <Text style={{ color: COLORS.success }}>{capitalize(data!.period.bestMonth)}</Text></>
+            ) : undefined}
+          >
+            <MonthlyChart data={data!.monthly} />
+            <View style={styles.chartLegend}>
+              <LegendItem color={COLORS.success} label="Receitas" />
+              <LegendItem color={COLORS.danger} label="Despesas" />
+              <LegendItem color={COLORS.brand} label="Saldo" variant="line" />
+              <LegendItem color={COLORS.warning} label="% Poupança" variant="dashed" />
             </View>
-          )}
+          </ReportCard>
 
-          {/* Insights */}
-          {data && data.monthly.length >= 2 && <Insights data={data} />}
+          {/* Gastos por categoria */}
+          <ReportCard icon="layers" title="Gastos por categoria" sub="variação vs mês anterior">
+            <CategoryBreakdown categories={data!.categoryTrend} totalExpense={data!.period.totalExpense} />
+          </ReportCard>
 
-          {/* Balance trend */}
-          {data && data.monthly.length > 1 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Tendência de saldo</Text>
-              <View style={styles.chartCard}>
-                <BalanceLine data={data.monthly} />
-              </View>
-            </View>
-          )}
+          {/* Maiores despesas */}
+          <ReportCard icon="trending-down" title="Maiores despesas" sub={`top ${data!.topExpenses.length} no período`}>
+            <TopExpensesList expenses={data!.topExpenses} periodExpense={data!.period.totalExpense} />
+          </ReportCard>
 
-          {/* Income vs Expense bar chart */}
-          {data && data.monthly.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Receitas × Despesas</Text>
-              <View style={styles.legend}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: COLORS.success }]} />
-                  <Text style={styles.legendText}>Receita</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: COLORS.danger }]} />
-                  <Text style={styles.legendText}>Despesa</Text>
-                </View>
-              </View>
-              <View style={styles.chartCard}>
-                <BarChart data={data.monthly} />
-              </View>
-            </View>
-          )}
+          {/* Padrão de gasto por dia */}
+          <ReportCard
+            icon="calendar" title="Padrão de gasto por dia" sub="acumulado no período"
+            caption="Dias em vermelho = maiores gastos acumulados. Útil para identificar datas de vencimentos."
+          >
+            <SpendingPatternChart data={data!.spendingByDay} />
+          </ReportCard>
 
-          {/* Category donut + list */}
-          {data && data.categoryTrend.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Despesas por categoria</Text>
-              <View style={styles.catSection}>
-                <DonutChart data={data.categoryTrend} />
-                <View style={styles.catList}>
-                  {data.categoryTrend.slice(0, 6).map((cat) => (
-                    <View key={cat.categoryId} style={styles.catItem}>
-                      <View style={[styles.catDot, { backgroundColor: cat.color || COLORS.brand }]} />
-                      <Text style={styles.catEmoji}>{cat.icon}</Text>
-                      <Text style={styles.catName} numberOfLines={1}>{cat.name}</Text>
-                      <Text style={styles.catPct}>{cat.pct}%</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
+          {/* Fontes de receita */}
+          <ReportCard icon="bar-chart-2" iconColor={COLORS.success} title="Fontes de receita">
+            <IncomeSourcesList sources={data!.incomeSources} totalIncome={data!.period.totalIncome} />
+          </ReportCard>
 
-              {/* Category bars */}
-              {data.categoryTrend.map((cat) => (
-                <View key={cat.categoryId} style={styles.catBar}>
-                  <View style={styles.catBarHeader}>
-                    <View style={styles.catBarLeft}>
-                      <Text style={styles.catBarEmoji}>{cat.icon}</Text>
-                      <Text style={styles.catBarName}>{cat.name}</Text>
-                    </View>
-                    <Text style={styles.catBarAmount}>{fmt(cat.total)}</Text>
-                  </View>
-                  <View style={styles.catBarTrack}>
-                    <View style={[styles.catBarFill, { width: `${cat.pct}%`, backgroundColor: cat.color || COLORS.brand }]} />
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Monthly history */}
-          {data && data.monthly.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Histórico mensal</Text>
-              <View style={styles.historyCard}>
-                <View style={[styles.historyRow, styles.historyHeader]}>
-                  <Text style={[styles.historyMonth, { color: COLORS.muted2 }]}>Mês</Text>
-                  <Text style={[styles.historyVal, { color: COLORS.muted2 }]}>Receita</Text>
-                  <Text style={[styles.historyVal, { color: COLORS.muted2 }]}>Despesa</Text>
-                  <Text style={[styles.historyVal, { color: COLORS.muted2 }]}>Saldo</Text>
-                </View>
-                {[...data.monthly].reverse().map((m, i) => (
-                  <View key={m.monthKey} style={[styles.historyRow, i % 2 === 0 && styles.historyRowAlt]}>
-                    <Text style={styles.historyMonth}>
-                      {format(new Date(m.monthKey + '-01'), "MMM 'yy", { locale: ptBR })}
-                    </Text>
-                    <Text style={[styles.historyVal, { color: COLORS.success }]}>{fmt(m.totalIncome)}</Text>
-                    <Text style={[styles.historyVal, { color: COLORS.danger }]}>{fmt(m.totalExpense)}</Text>
-                    <Text style={[styles.historyVal, { color: m.balance >= 0 ? COLORS.success : COLORS.danger }]}>
-                      {fmt(m.balance)}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
+          {/* Resumo por mês */}
+          <ReportCard icon="list" title="Resumo por mês">
+            <MonthlySummaryTable monthly={data!.monthly} period={data!.period} />
+          </ReportCard>
         </ScrollView>
       )}
     </View>
@@ -407,90 +698,153 @@ export default function ReportsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.bg },
   header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 20, paddingTop: 56,
   },
-  backBtn:   { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  exportBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  title:     { fontSize: 20, fontWeight: '700', color: COLORS.text },
+  backBtn:  { width: 36, height: 36, justifyContent: 'center', alignItems: 'center', marginLeft: -8 },
+  title:    { fontSize: 20, fontWeight: '700', color: COLORS.text },
+  subtitle: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  description: { fontSize: 11, color: COLORS.muted2, lineHeight: 15, paddingHorizontal: 20, marginTop: 8 },
 
-  periodRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, marginBottom: 16 },
+  controlsRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 20, paddingTop: 14,
+  },
+  monthPicker: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border,
+    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 9,
+  },
+  monthPickerLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  monthPickerText:  { fontSize: 13, fontWeight: '600', color: COLORS.text },
+
+  filtersRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+    paddingHorizontal: 20, paddingTop: 10, paddingBottom: 4,
+  },
+  periodRow: { flexDirection: 'row', gap: 8 },
   periodBtn: {
-    paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
     backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border,
   },
   periodBtnActive:  { backgroundColor: COLORS.brandDim, borderColor: COLORS.brand },
   periodText:       { fontSize: 13, color: COLORS.muted },
   periodTextActive: { color: COLORS.brand, fontWeight: '700' },
 
-  content: { paddingHorizontal: 20, paddingBottom: 40 },
-
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  statCard: {
-    flex: 1, backgroundColor: COLORS.card, borderRadius: 14, padding: 12,
-    alignItems: 'center', borderWidth: 1, borderColor: COLORS.border,
+  exportBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
+    backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border,
   },
-  statLabel: { fontSize: 11, color: COLORS.muted, marginBottom: 4 },
-  statValue: { fontSize: 13, fontWeight: '700' },
+  exportBtnText: { fontSize: 12, fontWeight: '700', color: COLORS.brand },
 
-  // Insights
-  insightsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  insightCard: {
-    flex: 1, minWidth: '44%', backgroundColor: COLORS.card, borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', gap: 4,
+  content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
+
+  empty: { alignItems: 'center', paddingTop: 64, paddingHorizontal: 20, gap: 8 },
+  emptyIconWrap: {
+    width: 48, height: 48, borderRadius: 14, backgroundColor: COLORS.card2,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 4,
   },
-  insightEmoji: { fontSize: 22 },
-  insightValue: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  insightLabel: { fontSize: 11, color: COLORS.muted, textAlign: 'center' },
+  emptyTitle: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  emptyText:  { fontSize: 12, color: COLORS.muted, textAlign: 'center', maxWidth: 260 },
 
-  section:      { marginBottom: 28 },
-  sectionTitle: { fontSize: 15, fontWeight: '600', color: COLORS.text, marginBottom: 12 },
-
-  chartCard: {
-    backgroundColor: COLORS.card, borderRadius: 16, padding: 16,
+  // KPIs
+  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+  kpiCard: {
+    flexBasis: '48%', flexGrow: 1, gap: 4,
+    backgroundColor: COLORS.card, borderRadius: 14, padding: 12,
     borderWidth: 1, borderColor: COLORS.border,
   },
+  kpiHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  kpiLabel:  { fontSize: 10, color: COLORS.muted, fontWeight: '600', flexShrink: 1 },
+  kpiValue:  { fontSize: 17, fontWeight: '700' },
+  kpiSub:    { fontSize: 10, color: COLORS.muted2 },
 
-  // Balance line labels
-  lineLabels:       { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  lineLabelVal:     { fontSize: 10, color: COLORS.muted },
-  lineLabelCurrent: { fontSize: 12, fontWeight: '700' },
-
-  legend: { flexDirection: 'row', gap: 20, marginBottom: 12 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot:  { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontSize: 12, color: COLORS.muted },
-
-  // Category donut section
-  catSection: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 20 },
-  catList:    { flex: 1, gap: 6 },
-  catItem:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  catDot:     { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
-  catEmoji:   { fontSize: 14 },
-  catName:    { flex: 1, fontSize: 12, color: COLORS.text },
-  catPct:     { fontSize: 12, color: COLORS.muted, fontWeight: '600', minWidth: 30, textAlign: 'right' },
-
-  // Category bars
-  catBar:       { marginBottom: 12 },
-  catBarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
-  catBarLeft:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  catBarEmoji:  { fontSize: 15 },
-  catBarName:   { fontSize: 13, fontWeight: '500', color: COLORS.text },
-  catBarAmount: { fontSize: 13, color: COLORS.text, fontWeight: '600' },
-  catBarTrack:  { height: 5, borderRadius: 3, backgroundColor: COLORS.border, overflow: 'hidden' },
-  catBarFill:   { height: 5, borderRadius: 3 },
-
-  // History table
-  historyCard: {
-    backgroundColor: COLORS.card, borderRadius: 14, overflow: 'hidden',
+  // Section / card
+  section: { marginBottom: 24 },
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 10, gap: 8,
+  },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionTitle: { fontSize: 15, fontWeight: '600', color: COLORS.text },
+  sectionSub:   { fontSize: 11, color: COLORS.muted, flexShrink: 1, textAlign: 'right' },
+  card: {
+    backgroundColor: COLORS.card, borderRadius: 16, padding: 14,
     borderWidth: 1, borderColor: COLORS.border,
   },
-  historyRow: {
+  caption: { fontSize: 11, color: COLORS.muted, lineHeight: 16, marginTop: 8 },
+
+  // Chart legend
+  chartLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, justifyContent: 'center', marginTop: 12 },
+  legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot:   { width: 10, height: 10, borderRadius: 5 },
+  legendLine:  { width: 14, height: 2, borderRadius: 1 },
+  legendText:  { fontSize: 11, color: COLORS.muted },
+
+  // Category breakdown
+  catRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  catRowIcon: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  catRowEmoji: { fontSize: 15 },
+  catRowInfo: { flex: 1, gap: 5 },
+  catRowTop:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  catRowName: { fontSize: 13, fontWeight: '500', color: COLORS.text, flexShrink: 1 },
+  catRowPct:  { fontSize: 11, color: COLORS.muted, fontWeight: '600' },
+  catRowTrack: { height: 5, borderRadius: 3, backgroundColor: COLORS.border, overflow: 'hidden' },
+  catRowFill:  { height: 5, borderRadius: 3 },
+  catRowRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
+  catRowAmount: { fontSize: 13, fontWeight: '700', color: COLORS.text },
+
+  changeBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  changeBadgeText: { fontSize: 10, fontWeight: '700' },
+
+  toggleBtn: { paddingVertical: 8, alignItems: 'center' },
+  toggleBtnText: { fontSize: 12, color: COLORS.brand, fontWeight: '600' },
+
+  cardFooter: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 10,
+    paddingTop: 12, marginTop: 4, borderTopWidth: 1, borderTopColor: COLORS.border,
   },
-  historyRowAlt:   { backgroundColor: COLORS.card2 },
-  historyHeader:   { borderBottomWidth: 1, borderBottomColor: COLORS.border, paddingVertical: 8 },
-  historyMonth:    { fontSize: 12, color: COLORS.muted, width: 48, textTransform: 'capitalize' },
-  historyVal:      { fontSize: 12, fontWeight: '600', flex: 1, textAlign: 'right' },
+  cardFooterLabel: { fontSize: 12, color: COLORS.muted },
+  cardFooterValue: { fontSize: 14, fontWeight: '700', color: COLORS.text },
+
+  // Top expenses
+  expRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  expRank: { fontSize: 12, fontWeight: '700', color: COLORS.muted, width: 14, textAlign: 'center' },
+  expIcon: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  expEmoji: { fontSize: 15 },
+  expInfo: { flex: 1, gap: 5 },
+  expDesc: { fontSize: 13, fontWeight: '500', color: COLORS.text },
+  expBarTrack: { height: 4, borderRadius: 2, backgroundColor: COLORS.border, overflow: 'hidden' },
+  expBarFill:  { height: 4, borderRadius: 2, backgroundColor: COLORS.danger + '99' },
+  expDate: { fontSize: 10, color: COLORS.muted },
+  expRight: { alignItems: 'flex-end', gap: 2, flexShrink: 0 },
+  expAmount: { fontSize: 13, fontWeight: '700', color: COLORS.text },
+  expPct: { fontSize: 10, color: COLORS.muted },
+
+  // Income sources
+  incRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  incInfo: { flex: 1, gap: 5 },
+  incTop:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  incName: { fontSize: 13, fontWeight: '500', color: COLORS.text, flexShrink: 1 },
+  incPct:  { fontSize: 11, color: COLORS.muted, fontWeight: '600' },
+  incTrack: { height: 5, borderRadius: 3, backgroundColor: COLORS.border, overflow: 'hidden' },
+  incFill:  { height: 5, borderRadius: 3, backgroundColor: COLORS.success + 'b3' },
+  incAmount: { fontSize: 13, fontWeight: '700', color: COLORS.success, flexShrink: 0 },
+
+  emptyCardText: { fontSize: 12, color: COLORS.muted, textAlign: 'center', paddingVertical: 12 },
+
+  // Monthly summary table
+  summaryRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 9, paddingHorizontal: 4, gap: 10,
+  },
+  summaryHeaderRow: { borderBottomWidth: 1, borderBottomColor: COLORS.border, paddingBottom: 8 },
+  summaryHeaderText: { color: COLORS.muted2, fontWeight: '700' },
+  summaryRowAlt: { backgroundColor: COLORS.card2, borderRadius: 8 },
+  summaryFooterRow: { borderTopWidth: 1, borderTopColor: COLORS.border, marginTop: 4, paddingTop: 10 },
+  summaryFooterText: { fontWeight: '800' },
+  summaryCellMonth: { fontSize: 12, color: COLORS.text, width: 92, textTransform: 'capitalize' },
+  summaryCell:    { fontSize: 12, fontWeight: '600', width: 84, textAlign: 'right' },
+  summaryCellPct: { fontSize: 12, fontWeight: '600', width: 56, textAlign: 'right', color: COLORS.text },
 })

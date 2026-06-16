@@ -442,7 +442,7 @@ export default function IncomeScreen() {
 
   const recurring       = sources.filter((s) =>  s.isRecurring)
   const nonRecurring    = sources.filter((s) => !s.isRecurring)
-  const eventualPending = nonRecurring.filter((s) => s.lastAutoPayMonth !== currentMonth)
+  const eventualPending = nonRecurring.filter((s) => s.lastAutoPayMonth === null)
 
   const totalRecorrente = recurring.reduce((s, r) => s + Number(r.amount), 0)
   const totalEventual   = nonRecurring.reduce((s, r) => s + Number(r.amount), 0)
@@ -463,7 +463,7 @@ export default function IncomeScreen() {
       .reduce((s, r) => s + Number(r.amount), 0)
 
     const evAmount = i === 0
-      ? nonRecurring.filter((s) => s.lastAutoPayMonth !== currentMonth).reduce((s, r) => s + Number(r.amount), 0)
+      ? nonRecurring.filter((s) => s.lastAutoPayMonth === null).reduce((s, r) => s + Number(r.amount), 0)
       : 0
 
     return { label, recAmount, evAmount, total: recAmount + evAmount, isCurrent: i === 0 }

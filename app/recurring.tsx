@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
 import { recurringApi, type Recurring } from '@/lib/api'
+import { hapticLight } from '@/lib/haptics'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
@@ -63,10 +64,19 @@ function RecurringItem({
             <Feather name="edit-2" size={12} color={COLORS.muted} />
           </TouchableOpacity>
         </View>
-        <View style={[styles.typeBadge, { backgroundColor: isIncome ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.10)' }]}>
-          <Text style={[styles.typeText, { color: isIncome ? COLORS.success : COLORS.danger }]}>
-            {isIncome ? 'Receita' : 'Despesa'}
-          </Text>
+        <View style={styles.rightBottom}>
+          <View style={[styles.typeBadge, { backgroundColor: isIncome ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.10)' }]}>
+            <Text style={[styles.typeText, { color: isIncome ? COLORS.success : COLORS.danger }]}>
+              {isIncome ? 'Receita' : 'Despesa'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.toggleBtn, item.isActive && styles.toggleBtnActive]}
+            onPress={onToggle}
+            hitSlop={8}
+          >
+            <Feather name="power" size={13} color={item.isActive ? COLORS.brand : COLORS.muted2} />
+          </TouchableOpacity>
         </View>
       </View>
     </TouchableOpacity>
@@ -85,7 +95,7 @@ export default function RecurringScreen() {
   const toggleMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       recurringApi.toggle(id, isActive),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['recurring'] }),
+    onSuccess: () => { hapticLight(); qc.invalidateQueries({ queryKey: ['recurring'] }) },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
@@ -186,12 +196,19 @@ const styles = StyleSheet.create({
   name:   { fontSize: 14, fontWeight: '600', color: COLORS.text },
   meta:   { fontSize: 12, color: COLORS.muted, marginTop: 2 },
   desc:   { fontSize: 11, color: COLORS.muted2, marginTop: 2, fontStyle: 'italic' },
-  right:    { alignItems: 'flex-end', gap: 4 },
-  rightTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  right:       { alignItems: 'flex-end', gap: 4 },
+  rightTop:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  rightBottom: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   amount:   { fontSize: 14, fontWeight: '700' },
   editBtn:  { width: 24, height: 24, borderRadius: 6, backgroundColor: COLORS.muted + '18', justifyContent: 'center', alignItems: 'center' },
   typeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   typeText:  { fontSize: 11, fontWeight: '600' },
+  toggleBtn: {
+    width: 24, height: 24, borderRadius: 6,
+    backgroundColor: COLORS.muted + '18',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  toggleBtnActive: { backgroundColor: COLORS.brand + '22' },
 
   empty:      { alignItems: 'center', paddingTop: 80, gap: 8 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: COLORS.text },

@@ -49,11 +49,12 @@ export default function EditBillScreen() {
       if (!dueDate.trim())        throw new Error('Data de vencimento é obrigatória')
 
       return billsApi.update(id!, {
-        name:       name.trim(),
-        amount:     amt,
-        dueDate:    dueDate.trim(),
-        categoryId: categoryId ?? undefined,
-        notes:      notes.trim() || null,
+        name:        name.trim(),
+        amount:      amt,
+        dueDate:     dueDate.trim(),
+        isRecurring: isRecurring,
+        categoryId:  categoryId ?? undefined,
+        notes:       notes.trim() || null,
       })
     },
     onSuccess: () => {
@@ -151,19 +152,26 @@ export default function EditBillScreen() {
           ))}
         </ScrollView>
 
-        <View style={styles.switchRow}>
-          <View>
-            <Text style={styles.switchLabel}>Conta recorrente</Text>
-            <Text style={styles.switchSub}>Se repete todo mês</Text>
+        {bill.recurringBillId ? (
+          <View style={styles.recurringNote}>
+            <Text style={styles.recurringNoteText}>
+              Esta conta é gerada automaticamente pela conta fixa configurada.
+            </Text>
           </View>
-          <Switch
-            value={isRecurring}
-            onValueChange={setRecurring}
-            trackColor={{ false: COLORS.muted2, true: COLORS.brand }}
-            thumbColor="#fff"
-            disabled
-          />
-        </View>
+        ) : (
+          <View style={styles.switchRow}>
+            <View>
+              <Text style={styles.switchLabel}>Conta recorrente</Text>
+              <Text style={styles.switchSub}>Se repete todo mês</Text>
+            </View>
+            <Switch
+              value={isRecurring}
+              onValueChange={setRecurring}
+              trackColor={{ false: COLORS.muted2, true: COLORS.brand }}
+              thumbColor="#fff"
+            />
+          </View>
+        )}
 
         {/* Observações */}
         <TouchableOpacity
@@ -239,6 +247,12 @@ const styles = StyleSheet.create({
   },
   switchLabel: { fontSize: 14, fontWeight: '500', color: COLORS.text },
   switchSub:   { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+
+  recurringNote: {
+    backgroundColor: COLORS.card, borderRadius: 12, padding: 14,
+    marginTop: 16, borderWidth: 1, borderColor: COLORS.border,
+  },
+  recurringNoteText: { fontSize: 12, color: COLORS.muted },
 
   notesToggle: {
     flexDirection: 'row', alignItems: 'center', gap: 6,

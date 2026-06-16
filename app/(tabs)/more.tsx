@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, StyleSheet, ScrollView, Dimensions, Alert } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, ScrollView, useWindowDimensions, Alert, Image } from 'react-native'
 import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { Feather } from '@expo/vector-icons'
@@ -14,32 +14,33 @@ interface GridItem {
   pro?:  boolean
 }
 
-const GRID_ITEMS: GridItem[] = [
+const MAIN_ITEMS: GridItem[] = [
   { label: 'Extratos',     icon: 'list',         route: '/transactions' },
   { label: 'Metas',        icon: 'target',       route: '/goals'      },
   { label: 'Orçamento',    icon: 'pie-chart',    route: '/budget',    pro: true },
   { label: 'Calendário',   icon: 'calendar',     route: '/calendar'   },
   { label: 'Relatórios',   icon: 'bar-chart-2',  route: '/reports',   pro: true },
-  { label: 'Recorrências', icon: 'repeat',       route: '/recurring'  },
+  { label: 'Importar',     icon: 'upload',       route: '/import',    pro: true },
   { label: 'Categorias',   icon: 'tag',          route: '/categories' },
   { label: 'Projeção',     icon: 'activity',     route: '/projection', pro: true },
+]
+
+const SECONDARY_ITEMS: GridItem[] = [
   { label: 'Planos',       icon: 'star',         route: '/billing'    },
   { label: 'Suporte',      icon: 'help-circle',  route: '/feedback'   },
   { label: 'Configurações',icon: 'settings',     route: '/settings'   },
 ]
 
-const SCREEN_W = Dimensions.get('window').width
-const COLS     = 3
-const GAP      = 10
-const H_PAD    = 20
-const ITEM_W   = (SCREEN_W - H_PAD * 2 - GAP * (COLS - 1)) / COLS
+const COLS  = 3
+const GAP   = 10
+const H_PAD = 20
 
-function GridCard({ item, isPro }: { item: GridItem; isPro: boolean }) {
+function GridCard({ item, isPro, itemW }: { item: GridItem; isPro: boolean; itemW: number }) {
   const router  = useRouter()
   const locked  = item.pro && !isPro
   return (
     <TouchableOpacity
-      style={[styles.card, locked && styles.cardLocked]}
+      style={[styles.card, { width: itemW }, locked && styles.cardLocked]}
       onPress={() => router.push(item.route as any)}
       activeOpacity={0.75}
     >
@@ -60,6 +61,8 @@ export default function MoreScreen() {
   const router    = useRouter()
   const user      = useAuthStore((s) => s.user)
   const clearAuth = useAuthStore((s) => s.clearAuth)
+  const { width: screenW } = useWindowDimensions()
+  const itemW = Math.floor((screenW - H_PAD * 2 - GAP * (COLS - 1)) / COLS)
 
   const isPro     = user?.plan === 'PRO'
   const initials  = (user?.name ?? 'U')
@@ -107,8 +110,25 @@ export default function MoreScreen() {
 
       {/* Grid */}
       <View style={styles.grid}>
-        {GRID_ITEMS.map((item) => (
-          <GridCard key={item.route} item={item} isPro={isPro} />
+        {MAIN_ITEMS.map((item) => (
+          <GridCard key={item.route} item={item} isPro={isPro} itemW={itemW} />
+        ))}
+      </View>
+
+      {/* Rookinho AI banner */}
+      <TouchableOpacity style={styles.aiCard} onPress={() => router.push('/ai-chat')} activeOpacity={0.85}>
+        <Image source={require('../../assets/rookinho.png')} style={styles.aiImage} />
+        <View style={styles.aiTextWrap}>
+          <Text style={styles.aiTitle}>Organize suas contas com o Rookinho</Text>
+          <Text style={styles.aiSubtitle}>Nosso agente de IA</Text>
+        </View>
+        <Feather name="chevron-right" size={20} color={COLORS.muted} />
+      </TouchableOpacity>
+
+      {/* Secondary items */}
+      <View style={[styles.grid, styles.secondaryGrid]}>
+        {SECONDARY_ITEMS.map((item) => (
+          <GridCard key={item.route} item={item} isPro={isPro} itemW={itemW} />
         ))}
       </View>
 
@@ -171,7 +191,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   card: {
-    width: ITEM_W,
     backgroundColor: COLORS.card,
     borderRadius: 16,
     borderWidth: 1,
@@ -193,6 +212,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(245,158,11,0.15)',
     borderRadius: 6, padding: 3,
   },
+
+  aiCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: COLORS.brandDim, borderRadius: 18, padding: 14,
+    borderWidth: 1, borderColor: 'rgba(59,130,246,0.3)',
+    marginBottom: 28,
+  },
+  aiImage:    { width: 56, height: 56, resizeMode: 'contain' },
+  aiTextWrap: { flex: 1 },
+  aiTitle:    { fontSize: 13, fontWeight: '700', color: COLORS.text, lineHeight: 18 },
+  aiSubtitle: { fontSize: 11, color: COLORS.brand, marginTop: 2, fontWeight: '600' },
+
+  secondaryGrid: { marginBottom: 28 },
 
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useMutation } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
 import { COLORS } from '@/lib/constants'
 import { feedbackApi } from '@/lib/api'
 
@@ -16,15 +17,64 @@ const TYPES: { value: 'bug' | 'suggestion' | 'ticket'; label: string; emoji: str
 export default function FeedbackScreen() {
   const router = useRouter()
 
-  const [type,  setType]  = useState<'bug' | 'suggestion' | 'ticket'>('ticket')
-  const [title, setTitle] = useState('')
-  const [body,  setBody]  = useState('')
+  const [type,      setType]      = useState<'bug' | 'suggestion' | 'ticket'>('ticket')
+  const [title,     setTitle]     = useState('')
+  const [body,      setBody]      = useState('')
+  const [imageUri,  setImageUri]  = useState<string | null>(null)
+  const [imageData, setImageData] = useState<string | null>(null)
+
+  async function pickImage() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (status !== 'granted') {
+      Alert.alert('Permissão necessária', 'Permita acesso à galeria para anexar uma imagem.')
+      return
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.5,
+      base64: true,
+    })
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0]
+      setImageUri(asset.uri)
+      setImageData(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : null)
+    }
+  }
+
+  async function takePhoto() {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync()
+    if (status !== 'granted') {
+      Alert.alert('Permissão necessária', 'Permita acesso à câmera para tirar uma foto.')
+      return
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      quality: 0.5,
+      base64: true,
+    })
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0]
+      setImageUri(asset.uri)
+      setImageData(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : null)
+    }
+  }
+
+  function removeImage() {
+    setImageUri(null)
+    setImageData(null)
+  }
 
   const mutation = useMutation({
     mutationFn: () => {
       if (!title.trim()) throw new Error('Título obrigatório.')
       if (!body.trim())  throw new Error('Descrição obrigatória.')
-      return feedbackApi.send({ type, title: title.trim(), body: body.trim() })
+      return feedbackApi.send({
+        type,
+        title: title.trim(),
+        body:  body.trim(),
+        imageData: imageData ?? undefined,
+      })
     },
     onSuccess: () => {
       Alert.alert(
@@ -101,6 +151,28 @@ export default function FeedbackScreen() {
         />
         <Text style={styles.charCount}>{body.length}/2000</Text>
 
+        {/* Screenshot */}
+        <Text style={styles.label}>Screenshot (opcional)</Text>
+        {imageUri ? (
+          <View style={styles.imagePreviewWrap}>
+            <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
+            <TouchableOpacity style={styles.removeImageBtn} onPress={removeImage} hitSlop={8}>
+              <Feather name="x" size={14} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.imagePickerRow}>
+            <TouchableOpacity style={styles.imagePickerBtn} onPress={takePhoto}>
+              <Feather name="camera" size={18} color={COLORS.brand} />
+              <Text style={styles.imagePickerText}>Câmera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
+              <Feather name="image" size={18} color={COLORS.brand} />
+              <Text style={styles.imagePickerText}>Galeria</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <TouchableOpacity
           style={[styles.sendBtn, mutation.isPending && { opacity: 0.6 }]}
           onPress={() => mutation.mutate()}
@@ -148,6 +220,23 @@ const styles = StyleSheet.create({
   },
   textarea:  { minHeight: 140, paddingTop: 12 },
   charCount: { fontSize: 11, color: COLORS.muted2, textAlign: 'right', marginTop: 4 },
+
+  imagePickerRow: { flexDirection: 'row', gap: 12 },
+  imagePickerBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: COLORS.card, borderRadius: 12, paddingVertical: 14,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  imagePickerText: { fontSize: 13, fontWeight: '600', color: COLORS.brand },
+
+  imagePreviewWrap: { position: 'relative', alignSelf: 'flex-start' },
+  imagePreview: { width: '100%', height: 180, borderRadius: 12 },
+  removeImageBtn: {
+    position: 'absolute', top: 8, right: 8,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center', alignItems: 'center',
+  },
 
   sendBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

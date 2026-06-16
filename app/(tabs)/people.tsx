@@ -352,20 +352,20 @@ const styles = StyleSheet.create({
 
   // Filtros + ordenação
   filterRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginHorizontal: 20, marginTop: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginHorizontal: 20, marginTop: 10, marginBottom: 14,
   },
   filterPill: {
     backgroundColor: COLORS.card, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border,
-    paddingHorizontal: 12, paddingVertical: 7, marginRight: 7,
+    paddingHorizontal: 14, paddingVertical: 8, marginRight: 8,
   },
   filterPillActive:     { backgroundColor: COLORS.brand, borderColor: COLORS.brand },
   filterPillText:       { fontSize: 12, color: COLORS.muted, fontWeight: '600' },
   filterPillTextActive: { color: '#fff' },
   sortBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: COLORS.card, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border,
-    paddingHorizontal: 10, paddingVertical: 7, flexShrink: 0,
+    paddingHorizontal: 12, paddingVertical: 8, flexShrink: 0,
   },
   sortBtnText: { fontSize: 11, color: COLORS.muted, fontWeight: '600' },
 

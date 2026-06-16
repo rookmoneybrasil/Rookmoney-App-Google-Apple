@@ -3,7 +3,7 @@
     "name": "Rook Money",
     "slug": "rook-money",
     "scheme": "rookmoney",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -19,7 +19,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.rookmoney.app",
-      "buildNumber": "1"
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
@@ -29,7 +29,7 @@
         "backgroundColor": "#080e1d"
       },
       "package": "com.rookmoney.app",
-      "versionCode": 1,
+      "versionCode": 2,
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.CAMERA",
@@ -39,7 +39,15 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-asset"
+      "expo-asset",
+      "expo-haptics",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite anexar capturas de tela ao feedback.",
+          "cameraPermission": "Permite tirar foto para anexar ao feedback."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

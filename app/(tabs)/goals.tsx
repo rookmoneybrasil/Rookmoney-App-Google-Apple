@@ -7,51 +7,46 @@ import { Feather } from '@expo/vector-icons'
 import Svg, { Circle } from 'react-native-svg'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { COLORS } from '@/lib/constants'
+import { COLORS, GOAL_COLORS } from '@/lib/constants'
 import { goalsApi, type Goal } from '@/lib/api'
+import { hapticSuccess, hapticLight } from '@/lib/haptics'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
 
-function CircularProgress({ pct, size = 56, color }: { pct: number; size?: number; color: string }) {
-  const r     = (size - 6) / 2
-  const circ  = 2 * Math.PI * r
-  const dash  = Math.min(pct / 100, 1) * circ
-  const cx    = size / 2
-  const cy    = size / 2
+function CircularProgress({ pct, size = 44, strokeWidth = 4, color }: { pct: number; size?: number; strokeWidth?: number; color: string }) {
+  const r    = (size - strokeWidth) / 2
+  const circ = 2 * Math.PI * r
+  const dash = (Math.min(Math.max(pct, 0), 100) / 100) * circ
+  const c    = size / 2
 
   return (
-    <Svg width={size} height={size}>
-      <Circle cx={cx} cy={cy} r={r} stroke={COLORS.border} strokeWidth={5} fill="none" />
-      <Circle
-        cx={cx} cy={cy} r={r}
-        stroke={color}
-        strokeWidth={5}
-        fill="none"
-        strokeDasharray={`${dash} ${circ - dash}`}
-        strokeDashoffset={circ / 4}
-        strokeLinecap="round"
-      />
-    </Svg>
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+        <Circle cx={c} cy={c} r={r} stroke={COLORS.border} strokeWidth={strokeWidth} fill="none" />
+        <Circle
+          cx={c} cy={c} r={r}
+          stroke={color}
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeDasharray={`${dash} ${circ - dash}`}
+          strokeDashoffset={circ / 4}
+          strokeLinecap="round"
+        />
+      </Svg>
+      <Text style={styles.pctText}>{Math.round(pct)}%</Text>
+    </View>
   )
 }
 
 function EditGoalSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
   const [name,        setName]        = useState(goal.name)
+  const [icon,        setIcon]        = useState(goal.icon ?? '')
   const [target,      setTarget]      = useState(String(goal.targetAmount))
   const [deadline,    setDeadline]    = useState(goal.deadline?.slice(0, 10) ?? '')
   const [description, setDescription] = useState(goal.description ?? '')
+  const [color,       setColor]       = useState(goal.color ?? GOAL_COLORS[0])
   const qc = useQueryClient()
-
-  const deleteMutation = useMutation({
-    mutationFn: () => goalsApi.delete(goal.id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['goals'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-      onClose()
-    },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
-  })
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -63,6 +58,8 @@ function EditGoalSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
         targetAmount: amt,
         deadline:    deadline.trim() || undefined,
         description: description.trim() || undefined,
+        icon:        icon.trim() || undefined,
+        color,
       })
     },
     onSuccess: () => {
@@ -75,48 +72,66 @@ function EditGoalSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
   return (
     <View style={styles.sheet}>
       <View style={styles.sheetHandle} />
-      <View style={styles.sheetHeaderRow}>
-        <Text style={styles.sheetTitle}>Editar meta</Text>
-        <TouchableOpacity
-          onPress={() =>
-            Alert.alert('Excluir meta', `Excluir "${goal.name}"?`, [
-              { text: 'Cancelar', style: 'cancel' },
-              { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate() },
-            ])
-          }
-          style={styles.sheetDeleteBtn}
-        >
-          <Feather name="trash-2" size={16} color={COLORS.danger} />
-        </TouchableOpacity>
+      <Text style={styles.sheetTitle}>Editar meta</Text>
+
+      <View style={styles.row}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>Nome *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: Viagem, Reserva..."
+            placeholderTextColor={COLORS.muted}
+            value={name}
+            onChangeText={setName}
+          />
+        </View>
+        <View style={{ width: 64 }}>
+          <Text style={styles.label}>Ícone</Text>
+          <TextInput
+            style={[styles.input, styles.iconInput]}
+            placeholder="🎯"
+            placeholderTextColor={COLORS.muted}
+            value={icon}
+            onChangeText={setIcon}
+            maxLength={2}
+          />
+        </View>
       </View>
 
-      <Text style={styles.label}>Nome *</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Ex: Viagem, Reserva..."
-        placeholderTextColor={COLORS.muted}
-        value={name}
-        onChangeText={setName}
-      />
+      <View style={styles.row}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>Valor alvo (R$) *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="0,00"
+            placeholderTextColor={COLORS.muted}
+            keyboardType="decimal-pad"
+            value={target}
+            onChangeText={setTarget}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>Prazo</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="AAAA-MM-DD"
+            placeholderTextColor={COLORS.muted}
+            value={deadline}
+            onChangeText={setDeadline}
+          />
+        </View>
+      </View>
 
-      <Text style={styles.label}>Valor alvo (R$) *</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="0,00"
-        placeholderTextColor={COLORS.muted}
-        keyboardType="decimal-pad"
-        value={target}
-        onChangeText={setTarget}
-      />
-
-      <Text style={styles.label}>Prazo (AAAA-MM-DD, opcional)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="2026-12-31"
-        placeholderTextColor={COLORS.muted}
-        value={deadline}
-        onChangeText={setDeadline}
-      />
+      <Text style={styles.label}>Cor</Text>
+      <View style={styles.colorRow}>
+        {GOAL_COLORS.map((c) => (
+          <TouchableOpacity
+            key={c}
+            onPress={() => setColor(c)}
+            style={[styles.colorSwatch, { backgroundColor: c }, color === c && styles.colorSwatchActive]}
+          />
+        ))}
+      </View>
 
       <Text style={styles.label}>Descrição (opcional)</Text>
       <TextInput
@@ -149,74 +164,138 @@ function GoalCard({
   goal,
   onContribute,
   onEdit,
+  onDelete,
 }: {
   goal: Goal
   onContribute: (goal: Goal) => void
   onEdit: (goal: Goal) => void
+  onDelete: (goal: Goal) => void
 }) {
-  const pct   = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0
-  const color = goal.isCompleted ? COLORS.success : (goal.color ?? COLORS.brand)
+  const target  = goal.targetAmount
+  const current = goal.currentAmount
+  const pct     = target > 0 ? (current / target) * 100 : 0
+  const contributions = goal.contributions ?? []
 
   return (
     <View style={styles.goalCard}>
       <View style={styles.goalTop}>
-        <View style={styles.goalIconWrap}>
+        <View style={[styles.goalIconWrap, { backgroundColor: (goal.color ?? '#3B82F6') + '20' }]}>
           <Text style={styles.goalIcon}>{goal.icon ?? '🎯'}</Text>
         </View>
         <View style={styles.goalInfo}>
           <Text style={styles.goalName} numberOfLines={1}>{goal.name}</Text>
-          <Text style={styles.goalSub}>
-            {fmt(goal.currentAmount)} / {fmt(goal.targetAmount)}
-          </Text>
-          {goal.deadline && (
-            <Text style={styles.goalDeadline}>
-              Prazo: {format(new Date(goal.deadline), "d MMM yyyy", { locale: ptBR })}
-            </Text>
+          {!!goal.description && (
+            <Text style={styles.goalDesc} numberOfLines={1}>{goal.description}</Text>
           )}
         </View>
-        <CircularProgress pct={pct} size={52} color={color} />
+        <CircularProgress pct={pct} color={COLORS.brand} />
       </View>
 
-      {/* Progress bar */}
       <View style={styles.progressBg}>
-        <View style={[styles.progressFill, { width: `${Math.min(pct, 100)}%`, backgroundColor: color }]} />
+        <View style={[styles.progressFill, { width: `${Math.min(pct, 100)}%`, backgroundColor: COLORS.brand }]} />
+      </View>
+      <View style={styles.amountsRow}>
+        <Text style={styles.amountCurrent}>{fmt(current)}</Text>
+        <Text style={styles.amountTarget}>meta: {fmt(target)}</Text>
       </View>
 
-      <View style={styles.goalBottom}>
-        <Text style={[styles.pctText, { color }]}>{pct.toFixed(0)}%</Text>
+      <View style={styles.goalFooter}>
+        {goal.deadline ? (
+          <View style={styles.deadlineRow}>
+            <Feather name="calendar" size={12} color={COLORS.muted2} />
+            <Text style={styles.deadlineText}>
+              {format(new Date(goal.deadline), 'MMM yyyy', { locale: ptBR })}
+            </Text>
+          </View>
+        ) : <View />}
+
         <View style={styles.goalActions}>
-          <TouchableOpacity style={styles.editGoalBtn} onPress={() => onEdit(goal)}>
-            <Feather name="edit-2" size={13} color={COLORS.muted} />
-          </TouchableOpacity>
           {!goal.isCompleted && (
-            <TouchableOpacity style={styles.contributeBtn} onPress={() => onContribute(goal)}>
-              <Feather name="plus" size={14} color={COLORS.brand} />
-              <Text style={styles.contributeBtnText}>Contribuir</Text>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => onContribute(goal)}>
+              <Feather name="plus" size={14} color={COLORS.muted} />
             </TouchableOpacity>
           )}
-          {goal.isCompleted && (
-            <View style={styles.completedBadge}>
-              <Feather name="check-circle" size={14} color={COLORS.success} />
-              <Text style={styles.completedText}>Concluída</Text>
-            </View>
-          )}
+          <TouchableOpacity style={styles.iconBtn} onPress={() => onEdit(goal)}>
+            <Feather name="edit-2" size={13} color={COLORS.muted} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => onDelete(goal)}>
+            <Feather name="trash-2" size={13} color={COLORS.danger} />
+          </TouchableOpacity>
         </View>
       </View>
+
+      {contributions.length > 0 && (
+        <View style={styles.contribSection}>
+          <View style={styles.contribHeader}>
+            <Feather name="trending-up" size={11} color={COLORS.muted2} />
+            <Text style={styles.contribHeaderText}>Movimentações</Text>
+          </View>
+          {contributions.map((c) => {
+            const isWithdrawal = c.amount < 0
+            return (
+              <View key={c.id} style={styles.contribRow}>
+                <Text style={styles.contribDate} numberOfLines={1}>
+                  {isWithdrawal ? '↓ ' : ''}
+                  {format(new Date(c.createdAt), "dd 'de' MMM, yyyy", { locale: ptBR })}
+                  {c.note && c.note !== 'Retirada' ? ` · ${c.note}` : ''}
+                </Text>
+                <Text style={[styles.contribAmount, { color: isWithdrawal ? COLORS.danger : COLORS.success }]}>
+                  {isWithdrawal ? '' : '+'}{fmt(Math.abs(c.amount))}
+                </Text>
+              </View>
+            )
+          })}
+        </View>
+      )}
     </View>
   )
 }
 
+function CompletedGoalRow({ goal }: { goal: Goal }) {
+  return (
+    <View style={styles.completedRow}>
+      <View style={[styles.completedIconWrap, { backgroundColor: (goal.color ?? '#22C55E') + '20' }]}>
+        <Text style={styles.completedIcon}>{goal.icon ?? '✓'}</Text>
+      </View>
+      <Text style={styles.completedName} numberOfLines={1}>{goal.name}</Text>
+      <View style={styles.completedBadge}>
+        <Feather name="check-circle" size={12} color={COLORS.success} />
+        <Text style={styles.completedBadgeText}>Concluída</Text>
+      </View>
+      <Text style={styles.completedAmount}>{fmt(goal.targetAmount)}</Text>
+    </View>
+  )
+}
+
+const CONTRIBUTE_SOURCES = [
+  { label: '💰 Salário',   value: 'Salário' },
+  { label: '💵 Extra',     value: 'Extra' },
+  { label: '💸 Economia',  value: 'Economia' },
+  { label: '🎁 Presente',  value: 'Presente' },
+  { label: '📈 Rendimento', value: 'Rendimento' },
+]
+
 function ContributeSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
-  const [amount, setAmount] = useState('')
-  const [note, setNote]     = useState('')
+  const [amount, setAmount]   = useState('')
+  const [note, setNote]       = useState('')
+  const [source, setSource]   = useState('')
+  const [mode, setMode]       = useState<'contribute' | 'withdraw'>('contribute')
   const qc = useQueryClient()
 
+  const remaining = Math.max(goal.targetAmount - goal.currentAmount, 0)
+
+  const finalNote = mode === 'contribute'
+    ? [source, note.trim()].filter(Boolean).join(' · ') || undefined
+    : undefined
+
   const mutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const val = parseFloat(amount.replace(',', '.'))
-      return goalsApi.contribute(goal.id, val, note || undefined)
+      if (mode === 'contribute') await goalsApi.contribute(goal.id, val, finalNote)
+      else                        await goalsApi.withdraw(goal.id, val)
     },
     onSuccess: () => {
+      hapticSuccess()
       qc.invalidateQueries({ queryKey: ['goals'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       onClose()
@@ -236,10 +315,29 @@ function ContributeSheet({ goal, onClose }: { goal: Goal; onClose: () => void })
   return (
     <View style={styles.sheet}>
       <View style={styles.sheetHandle} />
-      <Text style={styles.sheetTitle}>Contribuir para "{goal.name}"</Text>
-      <Text style={styles.sheetSub}>
-        Atual: {fmt(goal.currentAmount)} · Meta: {fmt(goal.targetAmount)}
+      <Text style={styles.sheetTitle}>
+        {mode === 'contribute' ? 'Contribuir para meta' : 'Retirar da meta'}
       </Text>
+      <Text style={styles.sheetSub}>
+        {goal.name} · {mode === 'contribute' ? `faltam ${fmt(remaining)}` : `disponível ${fmt(goal.currentAmount)}`}
+      </Text>
+
+      <View style={styles.modeToggle}>
+        <TouchableOpacity
+          style={[styles.modeBtn, mode === 'contribute' && styles.modeBtnActiveSuccess]}
+          onPress={() => setMode('contribute')}
+        >
+          <Feather name="plus" size={14} color={mode === 'contribute' ? COLORS.success : COLORS.muted} />
+          <Text style={[styles.modeBtnText, mode === 'contribute' && { color: COLORS.success }]}>Aportar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeBtn, mode === 'withdraw' && styles.modeBtnActiveDanger]}
+          onPress={() => setMode('withdraw')}
+        >
+          <Feather name="minus" size={14} color={mode === 'withdraw' ? COLORS.danger : COLORS.muted} />
+          <Text style={[styles.modeBtnText, mode === 'withdraw' && { color: COLORS.danger }]}>Retirar</Text>
+        </TouchableOpacity>
+      </View>
 
       <Text style={styles.label}>Valor (R$)</Text>
       <TextInput
@@ -251,26 +349,49 @@ function ContributeSheet({ goal, onClose }: { goal: Goal; onClose: () => void })
         onChangeText={setAmount}
       />
 
-      <Text style={styles.label}>Observação (opcional)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Ex: Poupei do salário"
-        placeholderTextColor={COLORS.muted}
-        value={note}
-        onChangeText={setNote}
-      />
+      {mode === 'contribute' && (
+        <>
+          <Text style={styles.label}>Origem do aporte</Text>
+          <View style={styles.sourceRow}>
+            {CONTRIBUTE_SOURCES.map((s) => (
+              <TouchableOpacity
+                key={s.value}
+                style={[styles.sourceChip, source === s.value && styles.sourceChipActive]}
+                onPress={() => setSource(source === s.value ? '' : s.value)}
+              >
+                <Text style={[styles.sourceChipText, source === s.value && styles.sourceChipTextActive]}>
+                  {s.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Observação (opcional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: bônus de dezembro"
+            placeholderTextColor={COLORS.muted}
+            value={note}
+            onChangeText={setNote}
+          />
+        </>
+      )}
+
+      {mode === 'withdraw' && (
+        <Text style={styles.hintText}>💡 A retirada cria uma receita revertendo a despesa do aporte original.</Text>
+      )}
 
       <View style={styles.sheetActions}>
         <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
           <Text style={styles.cancelBtnText}>Cancelar</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.saveBtn, mutation.isPending && { opacity: 0.6 }]}
+          style={[mode === 'withdraw' ? styles.saveBtnDanger : styles.saveBtn, mutation.isPending && { opacity: 0.6 }]}
           onPress={handleSave}
           disabled={mutation.isPending}
         >
           <Text style={styles.saveBtnText}>
-            {mutation.isPending ? 'Salvando...' : 'Confirmar'}
+            {mutation.isPending ? 'Salvando...' : mode === 'contribute' ? 'Adicionar aporte' : 'Confirmar retirada'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -280,14 +401,31 @@ function ContributeSheet({ goal, onClose }: { goal: Goal; onClose: () => void })
 
 export default function GoalsScreen() {
   const router  = useRouter()
+  const qc      = useQueryClient()
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
   const [editingGoal,  setEditingGoal]  = useState<Goal | null>(null)
   const [showCompleted, setShowCompleted] = useState(false)
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['goals'],
-    queryFn:  () => goalsApi.list().then((r) => r.data),
+    queryKey: ['goals', 'all'],
+    queryFn:  () => goalsApi.list(true).then((r) => r.data),
   })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => goalsApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['goals'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+    onError: (e: Error) => Alert.alert('Erro', e.message),
+  })
+
+  function handleDelete(goal: Goal) {
+    Alert.alert('Excluir meta', `Excluir "${goal.name}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate(goal.id) },
+    ])
+  }
 
   const active    = data?.filter((g) => !g.isCompleted) ?? []
   const completed = data?.filter((g) =>  g.isCompleted) ?? []
@@ -295,9 +433,18 @@ export default function GoalsScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.title}>Metas</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>Metas</Text>
+          <Text style={styles.subtitle}>
+            {active.length} ativa{active.length !== 1 ? 's' : ''} · {completed.length} concluída{completed.length !== 1 ? 's' : ''}
+          </Text>
+          <Text style={styles.description}>
+            Defina objetivos financeiros e acompanhe o progresso. Cada aporte registrado vira uma despesa e alimenta o saldo da meta.
+          </Text>
+        </View>
         <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/new-goal')}>
-          <Feather name="plus" size={22} color="#fff" />
+          <Feather name="plus" size={16} color="#fff" />
+          <Text style={styles.addBtnText}>Nova meta</Text>
         </TouchableOpacity>
       </View>
 
@@ -317,8 +464,15 @@ export default function GoalsScreen() {
           )}
 
           {active.map((g) => (
-            <GoalCard key={g.id} goal={g} onContribute={setSelectedGoal} onEdit={setEditingGoal} />
+            <GoalCard key={g.id} goal={g} onContribute={setSelectedGoal} onEdit={setEditingGoal} onDelete={handleDelete} />
           ))}
+
+          <TouchableOpacity style={styles.addCard} onPress={() => router.push('/new-goal')}>
+            <View style={styles.addCardIcon}>
+              <Feather name="plus" size={20} color={COLORS.muted} />
+            </View>
+            <Text style={styles.addCardText}>Nova meta</Text>
+          </TouchableOpacity>
 
           {completed.length > 0 && (
             <TouchableOpacity
@@ -332,9 +486,14 @@ export default function GoalsScreen() {
             </TouchableOpacity>
           )}
 
-          {showCompleted && completed.map((g) => (
-            <GoalCard key={g.id} goal={g} onContribute={setSelectedGoal} onEdit={setEditingGoal} />
-          ))}
+          {showCompleted && completed.length > 0 && (
+            <View style={styles.completedSection}>
+              <Text style={styles.completedSectionTitle}>Concluídas</Text>
+              {completed.map((g) => (
+                <CompletedGoalRow key={g.id} goal={g} />
+              ))}
+            </View>
+          )}
         </ScrollView>
       )}
 
@@ -358,68 +517,115 @@ export default function GoalsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.bg },
   header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12,
+    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
   },
-  title:  { fontSize: 22, fontWeight: '700', color: COLORS.text },
+  title:       { fontSize: 22, fontWeight: '700', color: COLORS.text },
+  subtitle:    { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  description: { fontSize: 11, color: COLORS.muted2, marginTop: 6, lineHeight: 15 },
   addBtn: {
-    width: 38, height: 38, borderRadius: 11, backgroundColor: COLORS.brand,
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: COLORS.brand, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: COLORS.brand, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 8, flexShrink: 0,
   },
+  addBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
   content: { paddingHorizontal: 20, paddingBottom: 32 },
 
+  // Goal card
   goalCard: {
     backgroundColor: COLORS.card, borderRadius: 16, padding: 16,
     marginBottom: 12, borderWidth: 1, borderColor: COLORS.border,
   },
-  goalTop:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  goalTop:      { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   goalIconWrap: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center',
+    width: 40, height: 40, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
   },
-  goalIcon:     { fontSize: 22 },
-  goalInfo:     { flex: 1 },
-  goalName:     { fontSize: 15, fontWeight: '600', color: COLORS.text },
-  goalSub:      { fontSize: 12, color: COLORS.muted, marginTop: 2 },
-  goalDeadline: { fontSize: 11, color: COLORS.muted2, marginTop: 2 },
+  goalIcon:     { fontSize: 20 },
+  goalInfo:     { flex: 1, justifyContent: 'center' },
+  goalName:     { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  goalDesc:     { fontSize: 11, color: COLORS.muted2, marginTop: 2 },
+  pctText:      { fontSize: 10, fontWeight: '700', color: COLORS.text },
 
   progressBg: {
-    height: 6, borderRadius: 3, backgroundColor: COLORS.border, marginBottom: 10, overflow: 'hidden',
+    height: 6, borderRadius: 3, backgroundColor: COLORS.border,
+    marginTop: 14, marginBottom: 6, overflow: 'hidden',
   },
   progressFill: { height: 6, borderRadius: 3 },
 
-  goalBottom:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pctText:     { fontSize: 13, fontWeight: '700' },
-  goalActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  amountsRow:    { flexDirection: 'row', justifyContent: 'space-between' },
+  amountCurrent: { fontSize: 11, color: COLORS.text },
+  amountTarget:  { fontSize: 11, color: COLORS.muted2 },
 
-  editGoalBtn: {
+  goalFooter: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: COLORS.border,
+  },
+  deadlineRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  deadlineText: { fontSize: 11, color: COLORS.muted2 },
+  goalActions:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  iconBtn: {
     width: 28, height: 28, borderRadius: 8,
-    backgroundColor: COLORS.muted + '18',
+    backgroundColor: COLORS.card2,
     justifyContent: 'center', alignItems: 'center',
   },
-  contributeBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
-    backgroundColor: COLORS.brandDim,
+
+  // Mini extrato
+  contribSection: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: COLORS.border },
+  contribHeader:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  contribHeaderText: {
+    fontSize: 10, fontWeight: '600', color: COLORS.muted2,
+    textTransform: 'uppercase', letterSpacing: 0.5,
   },
-  contributeBtnText: { fontSize: 13, color: COLORS.brand, fontWeight: '600' },
+  contribRow:    { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  contribDate:   { fontSize: 11, color: COLORS.muted2, flex: 1, marginRight: 8 },
+  contribAmount: { fontSize: 11, fontWeight: '600' },
 
-  completedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  completedText:  { fontSize: 13, color: COLORS.success, fontWeight: '600' },
+  // Add new goal card
+  addCard: {
+    alignItems: 'center', justifyContent: 'center', gap: 10,
+    borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: COLORS.border,
+    paddingVertical: 28, marginBottom: 12, minHeight: 120,
+  },
+  addCardIcon: {
+    width: 40, height: 40, borderRadius: 12,
+    borderWidth: 1, borderStyle: 'dashed', borderColor: COLORS.muted2,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  addCardText: { fontSize: 13, fontWeight: '600', color: COLORS.muted },
 
+  // Completed
   toggleSection: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     gap: 6, paddingVertical: 12, marginBottom: 4,
   },
   toggleText: { fontSize: 13, color: COLORS.muted },
+  completedSection: { gap: 8, marginTop: 4 },
+  completedSectionTitle: {
+    fontSize: 11, fontWeight: '700', color: COLORS.muted,
+    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2,
+  },
+  completedRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border,
+    paddingHorizontal: 12, paddingVertical: 10, opacity: 0.7,
+  },
+  completedIconWrap: {
+    width: 28, height: 28, borderRadius: 9,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  completedIcon: { fontSize: 14 },
+  completedName: { fontSize: 13, color: COLORS.text, flex: 1 },
+  completedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  completedBadgeText: { fontSize: 11, color: COLORS.success, fontWeight: '600' },
+  completedAmount: { fontSize: 13, fontWeight: '700', color: COLORS.success },
 
   empty:      { alignItems: 'center', paddingTop: 80, gap: 8 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: COLORS.text },
   emptyText:  { fontSize: 13, color: COLORS.muted },
 
-  // Contribute sheet
+  // Sheets
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end' },
   overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: {
@@ -430,16 +636,40 @@ const styles = StyleSheet.create({
     width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.muted2,
     alignSelf: 'center', marginBottom: 20,
   },
-  sheetHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  sheetTitle:     { fontSize: 17, fontWeight: '700', color: COLORS.text },
-  sheetDeleteBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(239,68,68,0.1)', justifyContent: 'center', alignItems: 'center' },
-  sheetSub:       { fontSize: 13, color: COLORS.muted, marginBottom: 20 },
+  sheetTitle: { fontSize: 17, fontWeight: '700', color: COLORS.text },
+  sheetSub:   { fontSize: 13, color: COLORS.muted, marginTop: 4 },
+
+  row: { flexDirection: 'row', gap: 12 },
 
   label: { fontSize: 12, color: COLORS.muted, marginBottom: 6, marginTop: 12 },
   input: {
     backgroundColor: COLORS.card2, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12,
     color: COLORS.text, fontSize: 15, borderWidth: 1, borderColor: COLORS.border,
   },
+  iconInput: { textAlign: 'center', fontSize: 18, paddingHorizontal: 8 },
+
+  colorRow: { flexDirection: 'row', gap: 10 },
+  colorSwatch: { width: 28, height: 28, borderRadius: 8, borderWidth: 2, borderColor: 'transparent' },
+  colorSwatchActive: { borderColor: 'rgba(255,255,255,0.5)' },
+
+  // Mode toggle (contribute/withdraw)
+  modeToggle: { flexDirection: 'row', gap: 8, backgroundColor: COLORS.card2, borderRadius: 12, padding: 4, marginTop: 16 },
+  modeBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 10, borderRadius: 9,
+  },
+  modeBtnActiveSuccess: { backgroundColor: 'rgba(34,197,94,0.15)' },
+  modeBtnActiveDanger:  { backgroundColor: 'rgba(239,68,68,0.15)' },
+  modeBtnText: { fontSize: 13, fontWeight: '600', color: COLORS.muted },
+  hintText: {
+    fontSize: 11, color: COLORS.muted, backgroundColor: COLORS.card2,
+    borderRadius: 10, padding: 10, marginTop: 12, lineHeight: 16,
+  },
+  sourceRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  sourceChip:         { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border },
+  sourceChipActive:   { backgroundColor: COLORS.success + '20', borderColor: COLORS.success + '60' },
+  sourceChipText:     { fontSize: 12, fontWeight: '600', color: COLORS.muted },
+  sourceChipTextActive: { color: COLORS.success },
 
   sheetActions: { flexDirection: 'row', gap: 12, marginTop: 24 },
   cancelBtn: {
@@ -451,6 +681,10 @@ const styles = StyleSheet.create({
   saveBtn: {
     flex: 1, paddingVertical: 14, borderRadius: 12,
     backgroundColor: COLORS.brand, alignItems: 'center',
+  },
+  saveBtnDanger: {
+    flex: 1, paddingVertical: 14, borderRadius: 12,
+    backgroundColor: COLORS.danger, alignItems: 'center',
   },
   saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 })

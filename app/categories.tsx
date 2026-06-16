@@ -1,65 +1,57 @@
-import { useState } from 'react'
-import { View, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal } from 'react-native'
-import { Text, TextInput } from '@/components/text'
+import { View, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert } from 'react-native'
+import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
 import { categoriesApi, type Category } from '@/lib/api'
 
-function CategoryItem({
-  item, onDelete, onEdit,
-}: {
+function CustomCategoryItem({ item, onEdit, onDelete }: {
   item: Category
-  onDelete?: () => void
-  onEdit?: () => void
+  onEdit: () => void
+  onDelete: () => void
 }) {
-  const isCustom = !item.isDefault
-
-  function handleLongPress() {
-    if (!isCustom) return
-    Alert.alert(item.name, undefined, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Renomear', onPress: onEdit },
-      { text: 'Excluir', style: 'destructive', onPress: onDelete },
-    ])
-  }
-
   return (
-    <TouchableOpacity
-      style={styles.item}
-      onLongPress={isCustom ? handleLongPress : undefined}
-      activeOpacity={isCustom ? 0.8 : 1}
-    >
-      <View style={[styles.icon, { backgroundColor: (item.color ?? COLORS.brand) + '22' }]}>
+    <View style={styles.item}>
+      <View style={[styles.icon, { backgroundColor: item.color + '22' }]}>
         <Text style={styles.emoji}>{item.icon}</Text>
       </View>
-      <Text style={styles.name}>{item.name}</Text>
-      <View style={[styles.colorDot, { backgroundColor: item.color ?? COLORS.brand }]} />
-      {isCustom && (
-        <TouchableOpacity onPress={onEdit} style={styles.editBtn}>
-          <Feather name="edit-2" size={14} color={COLORS.muted} />
-        </TouchableOpacity>
-      )}
-      {isCustom && onDelete && (
-        <TouchableOpacity onPress={onDelete} style={styles.deleteBtn}>
-          <Feather name="trash-2" size={14} color={COLORS.danger} />
-        </TouchableOpacity>
-      )}
-    </TouchableOpacity>
+      <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+      <View style={[styles.colorDot, { backgroundColor: item.color }]} />
+      <TouchableOpacity onPress={onEdit} style={styles.iconBtn} hitSlop={6}>
+        <Feather name="edit-2" size={14} color={COLORS.muted} />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onDelete} style={styles.iconBtn} hitSlop={6}>
+        <Feather name="trash-2" size={14} color={COLORS.danger} />
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+function DefaultCategoryItem({ item }: { item: Category }) {
+  return (
+    <View style={styles.item}>
+      <View style={[styles.icon, { backgroundColor: item.color + '22' }]}>
+        <Text style={styles.emoji}>{item.icon}</Text>
+      </View>
+      <Text style={styles.nameDefault} numberOfLines={1}>{item.name}</Text>
+      <View style={[styles.colorDot, { backgroundColor: item.color }]} />
+      <View style={styles.badge}>
+        <Feather name="lock" size={10} color={COLORS.muted} />
+        <Text style={styles.badgeText}>Padrão</Text>
+      </View>
+    </View>
   )
 }
 
 type ListItem =
   | { type: 'header'; key: string; title: string }
   | { type: 'item'; key: string; item: Category }
+  | { type: 'empty-custom'; key: string }
 
 export default function CategoriesScreen() {
   const router = useRouter()
   const qc     = useQueryClient()
-
-  const [editing,  setEditing]  = useState<Category | null>(null)
-  const [editName, setEditName] = useState('')
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['categories'],
@@ -72,21 +64,11 @@ export default function CategoriesScreen() {
     onError:    (e: Error) => Alert.alert('Erro', e.message),
   })
 
-  const renameMutation = useMutation({
-    mutationFn: () => {
-      if (!editName.trim()) throw new Error('Nome não pode ser vazio')
-      return categoriesApi.update(editing!.id, { name: editName.trim() })
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['categories'] })
-      setEditing(null)
-    },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
-  })
-
-  function openEdit(cat: Category) {
-    setEditName(cat.name)
-    setEditing(cat)
+  function confirmDelete(cat: Category) {
+    Alert.alert('Excluir categoria', `Excluir "${cat.name}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate(cat.id) },
+    ])
   }
 
   const custom   = data?.filter((c) => !c.isDefault) ?? []
@@ -96,6 +78,9 @@ export default function CategoriesScreen() {
     ...(custom.length > 0 ? [
       { type: 'header' as const, key: 'h-custom', title: 'PERSONALIZADAS' },
       ...custom.map((c) => ({ type: 'item' as const, key: c.id, item: c })),
+    ] : data ? [
+      { type: 'header' as const, key: 'h-custom', title: 'PERSONALIZADAS' },
+      { type: 'empty-custom' as const, key: 'empty-custom' },
     ] : []),
     { type: 'header' as const, key: 'h-default', title: 'PADRÃO' },
     ...defaults.map((c) => ({ type: 'item' as const, key: c.id, item: c })),
@@ -105,11 +90,23 @@ export default function CategoriesScreen() {
     <View style={styles.screen}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={COLORS.text} />
+          <Feather name="arrow-left" size={20} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Categorias</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/new-category')}>
-          <Feather name="plus" size={22} color="#fff" />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>Categorias</Text>
+          <Text style={styles.subtitle}>
+            {custom.length} personalizada{custom.length !== 1 ? 's' : ''} · {defaults.length} padrão
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.description}>
+        Crie categorias com nome, emoji e cor para organizar suas transações. As categorias padrão não podem ser removidas.
+      </Text>
+
+      <View style={styles.newBtnRow}>
+        <TouchableOpacity style={styles.newBtn} onPress={() => router.push('/new-category')} activeOpacity={0.85}>
+          <Feather name="plus" size={15} color="#fff" />
+          <Text style={styles.newBtnText}>Nova categoria</Text>
         </TouchableOpacity>
       </View>
 
@@ -125,64 +122,35 @@ export default function CategoriesScreen() {
             if (item.type === 'header') {
               return <Text style={styles.sectionLabel}>{item.title}</Text>
             }
-            return (
-              <CategoryItem
+            if (item.type === 'empty-custom') {
+              return (
+                <View style={styles.emptyCustom}>
+                  <View style={styles.emptyIconWrap}>
+                    <Feather name="tag" size={20} color={COLORS.muted} />
+                  </View>
+                  <Text style={styles.emptyTitle}>Nenhuma categoria personalizada</Text>
+                  <Text style={styles.emptyDesc}>
+                    Crie categorias com cor e emoji para organizar suas transações do seu jeito.
+                  </Text>
+                  <TouchableOpacity style={styles.newBtn} onPress={() => router.push('/new-category')} activeOpacity={0.85}>
+                    <Feather name="plus" size={15} color="#fff" />
+                    <Text style={styles.newBtnText}>Nova categoria</Text>
+                  </TouchableOpacity>
+                </View>
+              )
+            }
+            return item.item.isDefault ? (
+              <DefaultCategoryItem item={item.item} />
+            ) : (
+              <CustomCategoryItem
                 item={item.item}
-                onDelete={!item.item.isDefault ? () => deleteMutation.mutate(item.item.id) : undefined}
-                onEdit={!item.item.isDefault ? () => openEdit(item.item) : undefined}
+                onEdit={() => router.push({ pathname: '/edit-category', params: { id: item.item.id } })}
+                onDelete={() => confirmDelete(item.item)}
               />
             )
           }}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Feather name="tag" size={40} color={COLORS.muted} />
-              <Text style={styles.emptyText}>Nenhuma categoria encontrada.</Text>
-            </View>
-          }
         />
       )}
-
-      {/* Rename modal */}
-      <Modal
-        visible={!!editing}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEditing(null)}
-      >
-        <TouchableOpacity style={styles.modalBg} activeOpacity={1} onPress={() => setEditing(null)}>
-          <TouchableOpacity activeOpacity={1} style={styles.modalSheet} onPress={() => {}}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Renomear categoria</Text>
-            {editing && (
-              <View style={styles.modalIconRow}>
-                <View style={[styles.modalIcon, { backgroundColor: (editing.color ?? COLORS.brand) + '22' }]}>
-                  <Text style={styles.modalEmoji}>{editing.icon}</Text>
-                </View>
-                <Text style={styles.modalOldName}>{editing.name}</Text>
-              </View>
-            )}
-            <TextInput
-              style={styles.modalInput}
-              value={editName}
-              onChangeText={setEditName}
-              placeholder="Novo nome"
-              placeholderTextColor={COLORS.muted}
-              autoFocus
-              selectTextOnFocus
-              maxLength={40}
-            />
-            <TouchableOpacity
-              style={[styles.modalSaveBtn, renameMutation.isPending && { opacity: 0.6 }]}
-              onPress={() => renameMutation.mutate()}
-              disabled={renameMutation.isPending}
-            >
-              <Text style={styles.modalSaveBtnText}>
-                {renameMutation.isPending ? 'Salvando...' : 'Salvar'}
-              </Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
     </View>
   )
 }
@@ -190,18 +158,23 @@ export default function CategoriesScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.bg },
   header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 20, paddingTop: 56,
   },
-  backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  title:  { fontSize: 20, fontWeight: '700', color: COLORS.text },
-  addBtn: {
-    width: 38, height: 38, borderRadius: 11, backgroundColor: COLORS.brand,
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: COLORS.brand, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4,
-  },
+  backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center', marginLeft: -8 },
+  title:    { fontSize: 20, fontWeight: '700', color: COLORS.text },
+  subtitle: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  description: { fontSize: 11, color: COLORS.muted2, lineHeight: 15, paddingHorizontal: 20, marginTop: 8 },
 
-  list: { paddingHorizontal: 20, paddingBottom: 32 },
+  newBtnRow: { paddingHorizontal: 20, marginTop: 14 },
+  newBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: COLORS.brand, borderRadius: 12,
+    paddingVertical: 12, paddingHorizontal: 16,
+  },
+  newBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+
+  list: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
 
   sectionLabel: {
     fontSize: 11, fontWeight: '700', color: COLORS.muted,
@@ -213,40 +186,29 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card, borderRadius: 14, padding: 14,
     marginBottom: 6, borderWidth: 1, borderColor: COLORS.border,
   },
-  icon:      { width: 38, height: 38, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  emoji:     { fontSize: 18 },
-  name:      { flex: 1, fontSize: 14, fontWeight: '500', color: COLORS.text },
-  colorDot:  { width: 10, height: 10, borderRadius: 5 },
-  editBtn:   { padding: 5 },
-  deleteBtn: { padding: 5 },
+  icon:        { width: 38, height: 38, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  emoji:       { fontSize: 18 },
+  name:        { flex: 1, fontSize: 14, fontWeight: '600', color: COLORS.text },
+  nameDefault: { flex: 1, fontSize: 14, fontWeight: '500', color: COLORS.muted },
+  colorDot:    { width: 10, height: 10, borderRadius: 5 },
+  iconBtn:     { padding: 4 },
 
-  empty:     { alignItems: 'center', paddingTop: 80, gap: 8 },
-  emptyText: { color: COLORS.muted, fontSize: 14 },
+  badge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20,
+    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border,
+  },
+  badgeText: { fontSize: 10, fontWeight: '600', color: COLORS.muted },
 
-  // Modal
-  modalBg: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
+  emptyCustom: {
+    alignItems: 'center', gap: 10, padding: 28, marginBottom: 6,
+    backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 16,
+    borderWidth: 1, borderStyle: 'dashed', borderColor: COLORS.border,
   },
-  modalSheet: {
-    backgroundColor: COLORS.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, paddingBottom: 40,
+  emptyIconWrap: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center',
   },
-  modalHandle: {
-    width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border,
-    alignSelf: 'center', marginBottom: 20,
-  },
-  modalTitle:    { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 16 },
-  modalIconRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  modalIcon:     { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  modalEmoji:    { fontSize: 22 },
-  modalOldName:  { fontSize: 15, color: COLORS.muted },
-  modalInput: {
-    backgroundColor: COLORS.bg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-    color: COLORS.text, fontSize: 15, borderWidth: 1, borderColor: COLORS.border, marginBottom: 16,
-  },
-  modalSaveBtn: {
-    backgroundColor: COLORS.brand, borderRadius: 14, paddingVertical: 14, alignItems: 'center',
-  },
-  modalSaveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  emptyTitle: { fontSize: 13, fontWeight: '600', color: COLORS.text },
+  emptyDesc:  { fontSize: 11, color: COLORS.muted, textAlign: 'center', lineHeight: 16, maxWidth: 240 },
 })

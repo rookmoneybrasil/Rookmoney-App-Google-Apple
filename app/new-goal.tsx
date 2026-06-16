@@ -4,7 +4,7 @@ import { Text, TextInput } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
-import { COLORS } from '@/lib/constants'
+import { COLORS, GOAL_COLORS } from '@/lib/constants'
 import { goalsApi } from '@/lib/api'
 
 const EMOJI_OPTIONS = [
@@ -18,9 +18,11 @@ export default function NewGoalScreen() {
 
   const [name, setName]         = useState('')
   const [target, setTarget]     = useState('')
+  const [current, setCurrent]   = useState('')
   const [deadline, setDeadline] = useState('')
   const [description, setDesc]  = useState('')
   const [icon, setIcon]         = useState('🎯')
+  const [color, setColor]       = useState(GOAL_COLORS[0])
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -28,10 +30,14 @@ export default function NewGoalScreen() {
       if (!name.trim())                     throw new Error('Nome é obrigatório')
       if (isNaN(targetAmount) || targetAmount <= 0) throw new Error('Valor meta inválido')
 
+      const currentAmount = current.trim() ? parseFloat(current.replace(',', '.')) : undefined
+
       return goalsApi.create({
         name:        name.trim(),
         targetAmount,
+        currentAmount,
         icon,
+        color,
         description: description.trim() || undefined,
         deadline:    deadline.trim() || undefined,
       })
@@ -78,15 +84,30 @@ export default function NewGoalScreen() {
           onChangeText={setName}
         />
 
-        <Text style={styles.label}>Valor alvo (R$) *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="0,00"
-          placeholderTextColor={COLORS.muted}
-          keyboardType="decimal-pad"
-          value={target}
-          onChangeText={setTarget}
-        />
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>Valor alvo (R$) *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0,00"
+              placeholderTextColor={COLORS.muted}
+              keyboardType="decimal-pad"
+              value={target}
+              onChangeText={setTarget}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>Já tenho (R$)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0,00"
+              placeholderTextColor={COLORS.muted}
+              keyboardType="decimal-pad"
+              value={current}
+              onChangeText={setCurrent}
+            />
+          </View>
+        </View>
 
         <Text style={styles.label}>Prazo (AAAA-MM-DD, opcional)</Text>
         <TextInput
@@ -96,6 +117,17 @@ export default function NewGoalScreen() {
           value={deadline}
           onChangeText={setDeadline}
         />
+
+        <Text style={styles.label}>Cor</Text>
+        <View style={styles.colorRow}>
+          {GOAL_COLORS.map((c) => (
+            <TouchableOpacity
+              key={c}
+              onPress={() => setColor(c)}
+              style={[styles.colorSwatch, { backgroundColor: c }, color === c && styles.colorSwatchActive]}
+            />
+          ))}
+        </View>
 
         <Text style={styles.label}>Descrição (opcional)</Text>
         <TextInput
@@ -134,12 +166,18 @@ const styles = StyleSheet.create({
 
   content: { padding: 20, paddingBottom: 40 },
 
+  row: { flexDirection: 'row', gap: 12 },
+
   label: { fontSize: 12, color: COLORS.muted, marginBottom: 6, marginTop: 16 },
   input: {
     backgroundColor: COLORS.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
     color: COLORS.text, fontSize: 15, borderWidth: 1, borderColor: COLORS.border,
   },
   textArea: { height: 80, textAlignVertical: 'top' },
+
+  colorRow: { flexDirection: 'row', gap: 10 },
+  colorSwatch: { width: 32, height: 32, borderRadius: 9, borderWidth: 2, borderColor: 'transparent' },
+  colorSwatchActive: { borderColor: 'rgba(255,255,255,0.5)' },
 
   emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
   emojiBtn: {

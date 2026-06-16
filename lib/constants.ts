@@ -23,3 +23,5 @@ export const COLORS = {
   muted:    '#64748b',
   muted2:   '#334155',
 } as const
+
+export const GOAL_COLORS = ['#3B82F6', '#F59E0B', '#22C55E', '#8B5CF6', '#F43F5E', '#06B6D4']

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal, Pressable } from 'react-native'
 import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { Feather } from '@expo/vector-icons'
@@ -8,6 +8,7 @@ import { format, addMonths, differenceInCalendarDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { COLORS } from '@/lib/constants'
 import { billsApi, recurringBillsApi, peopleApi, type Bill, type RecurringBill } from '@/lib/api'
+import { hapticSuccess, hapticLight } from '@/lib/haptics'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
@@ -234,9 +235,103 @@ function InstallmentGroupCard({ group, onPay }: {
   )
 }
 
+type ProjectionItem = {
+  label: string
+  amount: number
+  breakdown: { fixed: number; avulso: number; installment: number }
+  items: { fixed: Bill[]; fixedIsRec: boolean; avulso: Bill[]; installments: Bill[] }
+}
+
+function ProjectionModal({
+  month,
+  onClose,
+}: {
+  month: ProjectionItem | null
+  onClose: () => void
+}) {
+  if (!month) return null
+  const { items, breakdown } = month
+  const hasContent = breakdown.fixed > 0 || breakdown.avulso > 0 || breakdown.installment > 0
+
+  return (
+    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <Pressable style={styles.modalBackdrop} onPress={onClose} />
+      <View style={styles.modalSheet}>
+        <View style={styles.modalHandle} />
+        <View style={styles.modalHeader}>
+          <View>
+            <Text style={styles.modalTitle}>{month.label}</Text>
+            <Text style={styles.modalSubtitle}>Detalhamento de gastos</Text>
+          </View>
+          <TouchableOpacity onPress={onClose} hitSlop={12}>
+            <Feather name="x" size={20} color={COLORS.muted} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.modalTotalRow}>
+          <Text style={styles.modalTotalLabel}>Total previsto</Text>
+          <Text style={styles.modalTotalValue}>-{fmt(month.amount)}</Text>
+        </View>
+
+        {!hasContent && (
+          <Text style={styles.modalEmpty}>Nenhuma conta prevista para este mês.</Text>
+        )}
+
+        {breakdown.fixed > 0 && (
+          <View style={styles.modalSection}>
+            <Text style={styles.modalSectionTitle}>🔁 FIXAS</Text>
+            {items.fixedIsRec ? (
+              <View style={styles.modalItem}>
+                <Text style={styles.modalItemName} numberOfLines={1}>Contas fixas mensais</Text>
+                <Text style={[styles.modalItemAmount, { color: COLORS.danger }]}>{fmt(breakdown.fixed)}</Text>
+              </View>
+            ) : (
+              items.fixed.map((b) => (
+                <View key={b.id} style={styles.modalItem}>
+                  <Text style={styles.modalItemName} numberOfLines={1}>{b.name}</Text>
+                  <Text style={[styles.modalItemAmount, { color: COLORS.danger }]}>{fmt(Number(b.amount))}</Text>
+                </View>
+              ))
+            )}
+          </View>
+        )}
+
+        {breakdown.avulso > 0 && (
+          <View style={styles.modalSection}>
+            <Text style={styles.modalSectionTitle}>💸 AVULSO</Text>
+            {items.avulso.map((b) => (
+              <View key={b.id} style={styles.modalItem}>
+                <Text style={styles.modalItemName} numberOfLines={1}>{b.name}</Text>
+                <Text style={[styles.modalItemAmount, { color: COLORS.muted }]}>{fmt(Number(b.amount))}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {breakdown.installment > 0 && (
+          <View style={styles.modalSection}>
+            <Text style={styles.modalSectionTitle}>📅 PARCELAS</Text>
+            {items.installments.map((b) => (
+              <View key={b.id} style={styles.modalItem}>
+                <Text style={styles.modalItemName} numberOfLines={1}>
+                  {b.name}{b.installmentCurrent != null && b.installmentTotal != null
+                    ? ` (${b.installmentCurrent}/${b.installmentTotal})`
+                    : ''}
+                </Text>
+                <Text style={[styles.modalItemAmount, { color: COLORS.brand }]}>{fmt(Number(b.amount))}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </Modal>
+  )
+}
+
 export default function BillsScreen() {
   const router = useRouter()
   const qc     = useQueryClient()
+  const [projectionIdx, setProjectionIdx] = useState<number | null>(null)
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['bills'],
@@ -254,6 +349,7 @@ export default function BillsScreen() {
   const payMutation = useMutation({
     mutationFn: (id: string) => billsApi.pay(id),
     onSuccess: () => {
+      hapticSuccess()
       qc.invalidateQueries({ queryKey: ['bills'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
@@ -277,7 +373,7 @@ export default function BillsScreen() {
   })
   const toggleRecurringMutation = useMutation({
     mutationFn: (item: RecurringBill) => recurringBillsApi.update(item.id, { isActive: !item.isActive }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['recurringBills'] }),
+    onSuccess: () => { hapticLight(); qc.invalidateQueries({ queryKey: ['recurringBills'] }) },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
   const deleteRecurringMutation = useMutation({
@@ -353,27 +449,24 @@ export default function BillsScreen() {
   const iOweTotal  = iOwePeople.reduce((s, p) => s + (p.iOweThem ?? 0), 0)
 
   const projection = Array.from({ length: 3 }, (_, i) => {
-    const d   = addMonths(now, i)
+    const d     = addMonths(now, i)
     const label = format(d, 'MMM/yy', { locale: ptBR })
 
-    const avulsoAmount = pending
-      .filter((b) => !b.recurringBillId && inSameMonth(b.dueDate, d))
-      .reduce((s, b) => s + Number(b.amount), 0)
+    const avulsoBills    = pending.filter((b) => !b.recurringBillId && inSameMonth(b.dueDate, d))
+    const avulsoAmount   = avulsoBills.reduce((s, b) => s + Number(b.amount), 0)
 
-    const installmentAmount = activeGroups
-      .flatMap((g) => g.items)
-      .filter((inst) => !inst.isPaid && inSameMonth(inst.dueDate, d))
-      .reduce((s, inst) => s + Number(inst.amount), 0)
+    const installmentBills  = activeGroups.flatMap((g) => g.items).filter((inst) => !inst.isPaid && inSameMonth(inst.dueDate, d))
+    const installmentAmount = installmentBills.reduce((s, inst) => s + Number(inst.amount), 0)
 
-    const fixedAmount = i === 0
-      ? pending.filter((b) => !!b.recurringBillId && inSameMonth(b.dueDate, d)).reduce((s, b) => s + Number(b.amount), 0)
-      : monthlyFixed
+    const fixedBills  = i === 0 ? pending.filter((b) => !!b.recurringBillId && inSameMonth(b.dueDate, d)) : []
+    const fixedAmount = i === 0 ? fixedBills.reduce((s, b) => s + Number(b.amount), 0) : monthlyFixed
 
     return {
       label,
       amount: fixedAmount + avulsoAmount + installmentAmount,
       isCurrent: i === 0,
       breakdown: { fixed: fixedAmount, avulso: avulsoAmount, installment: installmentAmount },
+      items: { fixed: fixedBills, fixedIsRec: i > 0, avulso: avulsoBills, installments: installmentBills },
     }
   })
 
@@ -470,8 +563,13 @@ export default function BillsScreen() {
                     <Text style={styles.projectionTitle}>Projeção de gastos</Text>
                   </View>
                   <View style={styles.projectionRow}>
-                    {projection.map((m) => (
-                      <View key={m.label} style={[styles.projectionMonth, m.isCurrent && styles.projectionMonthCurrent]}>
+                    {projection.map((m, idx) => (
+                      <TouchableOpacity
+                        key={m.label}
+                        style={[styles.projectionMonth, m.isCurrent && styles.projectionMonthCurrent]}
+                        onPress={() => setProjectionIdx(idx)}
+                        activeOpacity={0.75}
+                      >
                         <View style={styles.projectionMonthLabelRow}>
                           {m.isCurrent && <View style={styles.projectionDot} />}
                           <Text style={styles.projectionMonthLabel}>{m.label}</Text>
@@ -480,10 +578,13 @@ export default function BillsScreen() {
                         {m.breakdown.fixed > 0 && <Text style={styles.projectionDetail}>🔁 {fmt(m.breakdown.fixed)} fixas</Text>}
                         {m.breakdown.avulso > 0 && <Text style={styles.projectionDetail}>💸 {fmt(m.breakdown.avulso)} avulso</Text>}
                         {m.breakdown.installment > 0 && <Text style={styles.projectionDetail}>📅 {fmt(m.breakdown.installment)} parcelas</Text>}
-                      </View>
+                        <View style={styles.projectionTapHint}>
+                          <Feather name="chevron-right" size={10} color={COLORS.muted2} />
+                        </View>
+                      </TouchableOpacity>
                     ))}
                   </View>
-                  <Text style={styles.projectionFooter}>Fixas + avulsos agendados + parcelas vencendo em cada mês.</Text>
+                  <Text style={styles.projectionFooter}>Toque em um mês para ver o detalhamento.</Text>
                 </View>
               )}
 
@@ -636,6 +737,10 @@ export default function BillsScreen() {
           )}
         </ScrollView>
       )}
+      <ProjectionModal
+        month={projectionIdx !== null ? projection[projectionIdx] ?? null : null}
+        onClose={() => setProjectionIdx(null)}
+      />
     </View>
   )
 }
@@ -707,6 +812,42 @@ const styles = StyleSheet.create({
   projectionTotal:      { fontSize: 12, fontWeight: '700', color: COLORS.danger, marginBottom: 2 },
   projectionDetail:     { fontSize: 9, color: COLORS.muted2 },
   projectionFooter:     { fontSize: 10, color: COLORS.muted2, marginTop: 8 },
+  projectionTapHint:    { alignSelf: 'flex-end', marginTop: 2 },
+
+  // Projection modal
+  modalBackdrop:  { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
+  modalSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: COLORS.card, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingBottom: 36, paddingHorizontal: 20,
+  },
+  modalHandle: {
+    width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border,
+    alignSelf: 'center', marginTop: 10, marginBottom: 16,
+  },
+  modalHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 },
+  modalTitle:    { fontSize: 17, fontWeight: '700', color: COLORS.text, textTransform: 'capitalize' },
+  modalSubtitle: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  modalTotalRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: COLORS.danger + '10', borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16,
+    borderWidth: 1, borderColor: COLORS.danger + '28',
+  },
+  modalTotalLabel: { fontSize: 12, fontWeight: '600', color: COLORS.muted },
+  modalTotalValue: { fontSize: 18, fontWeight: '800', color: COLORS.danger },
+  modalEmpty:    { fontSize: 13, color: COLORS.muted, textAlign: 'center', paddingVertical: 24 },
+  modalSection:  { marginBottom: 14 },
+  modalSectionTitle: {
+    fontSize: 10, fontWeight: '700', color: COLORS.muted2, letterSpacing: 1,
+    marginBottom: 8, textTransform: 'uppercase',
+  },
+  modalItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.border,
+  },
+  modalItemName:   { flex: 1, fontSize: 13, color: COLORS.text, marginRight: 12 },
+  modalItemAmount: { fontSize: 13, fontWeight: '700' },
 
   divider: { height: 1, backgroundColor: COLORS.border, marginHorizontal: 20, marginVertical: 20 },
 

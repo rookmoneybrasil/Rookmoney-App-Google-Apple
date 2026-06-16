@@ -96,9 +96,16 @@ function ItemGroup({ title, items, color }: {
   )
 }
 
+const MONTH_OPTIONS = [
+  { label: '3M', value: 3 },
+  { label: '6M', value: 6 },
+  { label: '12M', value: 12 },
+]
+
 export default function ProjectionScreen() {
   const router = useRouter()
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [months,   setMonths]   = useState(6)
 
   const { data: me } = useQuery({
     queryKey: ['me'],
@@ -108,10 +115,16 @@ export default function ProjectionScreen() {
   const isPro = me?.plan === 'PRO'
 
   const { data, isLoading } = useQuery({
-    queryKey: ['projection'],
-    queryFn:  () => projectionApi.get(6).then(r => r.data),
+    queryKey: ['projection', months],
+    queryFn:  () => projectionApi.get(months).then(r => r.data),
     enabled:  isPro,
   })
+
+  const periodSummary = data ? {
+    totalIncome:  data.reduce((s, m) => s + m.totalIncome,  0),
+    totalExpense: data.reduce((s, m) => s + m.totalExpense, 0),
+    finalBalance: data[data.length - 1]?.cumulativeBalance ?? 0,
+  } : null
 
   return (
     <View style={styles.screen}>
@@ -132,7 +145,23 @@ export default function ProjectionScreen() {
         <ActivityIndicator color={COLORS.brand} style={{ marginTop: 60 }} />
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-          <Text style={styles.subtitle}>Próximos 6 meses</Text>
+
+          {/* Month selector */}
+          <View style={styles.monthSelector}>
+            {MONTH_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[styles.monthOpt, months === opt.value && styles.monthOptActive]}
+                onPress={() => setMonths(opt.value)}
+              >
+                <Text style={[styles.monthOptText, months === opt.value && styles.monthOptTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.subtitle}>Próximos {months} meses</Text>
 
           {/* Cumulative balance bar */}
           {data && data.length > 0 && (
@@ -147,6 +176,38 @@ export default function ProjectionScreen() {
               onToggle={() => setExpanded(expanded === month.month ? null : month.month)}
             />
           ))}
+
+          {/* Period summary */}
+          {periodSummary && (
+            <View style={styles.summary}>
+              <Text style={styles.summaryTitle}>RESUMO DO PERÍODO</Text>
+              <View style={styles.summaryRow}>
+                <View style={[styles.summaryCard, { borderColor: COLORS.success + '40' }]}>
+                  <Text style={styles.summaryCardLabel}>Total Entradas</Text>
+                  <Text style={[styles.summaryCardValue, { color: COLORS.success }]}>
+                    +{fmt(periodSummary.totalIncome)}
+                  </Text>
+                </View>
+                <View style={[styles.summaryCard, { borderColor: COLORS.danger + '40' }]}>
+                  <Text style={styles.summaryCardLabel}>Total Saídas</Text>
+                  <Text style={[styles.summaryCardValue, { color: COLORS.danger }]}>
+                    -{fmt(periodSummary.totalExpense)}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.summaryCardFull, {
+                borderColor: (periodSummary.finalBalance >= 0 ? COLORS.success : COLORS.danger) + '40',
+              }]}>
+                <Text style={styles.summaryCardLabel}>Saldo Acumulado Final</Text>
+                <Text style={[styles.summaryCardValue, {
+                  color: periodSummary.finalBalance >= 0 ? COLORS.success : COLORS.danger,
+                  fontSize: 18,
+                }]}>
+                  {periodSummary.finalBalance >= 0 ? '+' : ''}{fmt(periodSummary.finalBalance)}
+                </Text>
+              </View>
+            </View>
+          )}
 
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -192,8 +253,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
-  content:     { padding: 16 },
-  subtitle:    { fontSize: 13, color: COLORS.muted, marginBottom: 16 },
+  content:  { padding: 16 },
+
+  monthSelector: {
+    flexDirection: 'row', backgroundColor: COLORS.card,
+    borderRadius: 12, padding: 4, gap: 4,
+    borderWidth: 1, borderColor: COLORS.border, marginBottom: 16,
+  },
+  monthOpt: {
+    flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: 'center',
+  },
+  monthOptActive:   { backgroundColor: COLORS.brand },
+  monthOptText:     { fontSize: 13, fontWeight: '600', color: COLORS.muted },
+  monthOptTextActive: { color: '#fff' },
+
+  subtitle: { fontSize: 13, color: COLORS.muted, marginBottom: 16 },
+
+  summary: { marginTop: 8 },
+  summaryTitle: {
+    fontSize: 10, fontWeight: '700', color: COLORS.muted2,
+    letterSpacing: 1, marginBottom: 10,
+  },
+  summaryRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  summaryCard: {
+    flex: 1, backgroundColor: COLORS.card, borderRadius: 14,
+    padding: 14, borderWidth: 1,
+  },
+  summaryCardFull: {
+    backgroundColor: COLORS.card, borderRadius: 14,
+    padding: 14, borderWidth: 1, alignItems: 'center',
+  },
+  summaryCardLabel: { fontSize: 11, color: COLORS.muted, marginBottom: 6 },
+  summaryCardValue: { fontSize: 15, fontWeight: '800' },
 
   chart: {
     backgroundColor: COLORS.card, borderRadius: 16,

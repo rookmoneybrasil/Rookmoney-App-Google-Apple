@@ -143,6 +143,32 @@ export const transactionsApi = {
     }),
   delete: (id: string) =>
     request<{ success: boolean }>(`/api/v1/transactions/${id}`, { method: 'DELETE' }),
+  import: (rows: { date: string; description: string; amount: number; type: 'INCOME' | 'EXPENSE'; categoryId: string }[]) =>
+    request<{ data: { success: number; skipped: number } }>('/api/v1/transactions/import', {
+      method: 'POST',
+      body: JSON.stringify({ rows }),
+    }),
+}
+
+// ── Receipt scanner (IA) ──────────────────────────────────────────────
+
+export interface ExtractedData {
+  amount:       number
+  type:         'INCOME' | 'EXPENSE'
+  description:  string
+  date:         string
+  categoryName: string
+  notes:        string | null
+  confidence:   'high' | 'medium' | 'low'
+  error?:       string
+}
+
+export const receiptApi = {
+  scan: (imageBase64: string, mediaType: string) =>
+    request<ExtractedData>('/api/v1/scan-receipt', {
+      method: 'POST',
+      body: JSON.stringify({ imageBase64, mediaType }),
+    }),
 }
 
 // ── Categories ────────────────────────────────────────────────────────
@@ -252,6 +278,13 @@ export const recurringBillsApi = {
 
 // ── Goals ─────────────────────────────────────────────────────────────
 
+export interface GoalContribution {
+  id:        string
+  amount:    number
+  note?:     string | null
+  createdAt: string
+}
+
 export interface Goal {
   id:            string
   name:          string
@@ -262,11 +295,13 @@ export interface Goal {
   icon?:         string | null
   color?:        string | null
   isCompleted:   boolean
+  contributions?: GoalContribution[]
 }
 
 export const goalsApi = {
-  list: () => request<{ data: Goal[] }>('/api/v1/goals'),
-  create: (body: { name: string; targetAmount: number; deadline?: string; description?: string; icon?: string; color?: string }) =>
+  list: (includeCompleted = false) =>
+    request<{ data: Goal[] }>(`/api/v1/goals${includeCompleted ? '?completed=true' : ''}`),
+  create: (body: { name: string; targetAmount: number; currentAmount?: number; deadline?: string; description?: string; icon?: string; color?: string }) =>
     request<{ data: Goal }>('/api/v1/goals', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -276,10 +311,15 @@ export const goalsApi = {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
-  contribute: (id: string, amount: number, note?: string) =>
+  contribute: (id: string, amount: number, note?: string, categoryId?: string) =>
     request<{ data: { id: string; currentAmount: number; isCompleted: boolean } }>(`/api/v1/goals/${id}?action=contribute`, {
       method: 'POST',
-      body: JSON.stringify({ amount, note }),
+      body: JSON.stringify({ amount, note, categoryId }),
+    }),
+  withdraw: (id: string, amount: number, categoryId?: string) =>
+    request<{ data: { withdrawn: number; newAmount: number } }>(`/api/v1/goals/${id}?action=withdraw`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, categoryId }),
     }),
   delete: (id: string) =>
     request<{ success: boolean }>(`/api/v1/goals/${id}`, { method: 'DELETE' }),
@@ -455,9 +495,12 @@ export interface ReportsData {
 }
 
 export const reportsApi = {
-  get: (months?: number) => {
-    const qs = months ? `?months=${months}` : ''
-    return request<{ data: ReportsData }>(`/api/v1/reports${qs}`)
+  get: (months?: number, month?: string) => {
+    const params = new URLSearchParams()
+    if (months) params.set('months', String(months))
+    if (month)  params.set('month', month)
+    const qs = params.toString()
+    return request<{ data: ReportsData }>(`/api/v1/reports${qs ? `?${qs}` : ''}`)
   },
 }
 
@@ -508,14 +551,37 @@ export interface SettingsPrefs {
   notifMonthlyEmail:  boolean
 }
 
+export interface SettingsData {
+  id:                   string
+  name:                 string
+  email:                string
+  plan:                 string
+  hasOnboarded:         boolean
+  whatsappPhone:        string | null
+  createdAt:            string
+  profileImage:         string | null
+  bio:                   string | null
+  city:                 string | null
+  occupation:           string | null
+  birthdate:            string | null
+  notifBillReminder:    boolean
+  notifCategoryLimit:   boolean
+  notifMonthlyEmail:    boolean
+  currency:             string
+  dateFormat:           string
+  stripeCustomerId:     string | null
+  stripeSubscriptionId: string | null
+  hasGoogle:            boolean
+}
+
 export const settingsApi = {
-  update: (body: { name?: string; bio?: string; city?: string; occupation?: string; hasOnboarded?: boolean }) =>
+  update: (body: { name?: string; whatsappPhone?: string; profileImage?: string; bio?: string; city?: string; occupation?: string; birthdate?: string; hasOnboarded?: boolean }) =>
     request<{ data: MeData }>('/api/v1/settings', {
       method: 'PATCH',
       body:   JSON.stringify(body),
     }),
   getPrefs: () =>
-    request<{ data: SettingsPrefs & { name: string; email: string } }>('/api/v1/settings'),
+    request<{ data: SettingsData }>('/api/v1/settings'),
   changePassword: (currentPassword: string, newPassword: string) =>
     request<{ data: { message: string } }>('/api/v1/settings?action=password', {
       method: 'PATCH',
@@ -525,6 +591,16 @@ export const settingsApi = {
     request<{ data: { message: string } }>('/api/v1/settings?action=notifications', {
       method: 'PATCH',
       body:   JSON.stringify(body),
+    }),
+  updatePreferences: (body: { currency?: string; dateFormat?: string }) =>
+    request<{ data: { message: string } }>('/api/v1/settings?action=preferences', {
+      method: 'PATCH',
+      body:   JSON.stringify(body),
+    }),
+  disconnectGoogle: () =>
+    request<{ data: { message: string } }>('/api/v1/settings?action=disconnect-google', {
+      method: 'PATCH',
+      body:   JSON.stringify({}),
     }),
   delete: () =>
     request<{ data: { message: string } }>('/api/v1/settings', { method: 'DELETE' }),
@@ -731,10 +807,30 @@ export const exportApi = {
 // ── Feedback ──────────────────────────────────────────────────────────
 
 export const feedbackApi = {
-  send: (body: { type: 'bug' | 'suggestion' | 'ticket'; title: string; body: string }) =>
+  send: (body: { type: 'bug' | 'suggestion' | 'ticket'; title: string; body: string; imageData?: string }) =>
     request<{ data: { id: string } }>('/api/v1/feedback', {
       method: 'POST',
       body:   JSON.stringify(body),
+    }),
+}
+
+// ── AI Chat ───────────────────────────────────────────────────────────
+
+export interface ChatMessage {
+  role:    'user' | 'assistant'
+  content: string
+}
+
+export interface ChatResponse {
+  message:  string
+  navigate: { path: string; reason: string } | null
+}
+
+export const chatApi = {
+  send: (messages: ChatMessage[]) =>
+    request<ChatResponse>('/api/v1/chat', {
+      method: 'POST',
+      body:   JSON.stringify({ messages }),
     }),
 }
 

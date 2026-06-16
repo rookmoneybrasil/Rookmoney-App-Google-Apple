@@ -3,64 +3,71 @@ import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Aler
 import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
-import { Feather } from '@expo/vector-icons'
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
-import { meApi, billingApi } from '@/lib/api'
+import { meApi, settingsApi, billingApi } from '@/lib/api'
+import { UsageBar } from '@/components/usage-bar'
 
-const PRO_FEATURES = [
-  { icon: 'trending-up', label: 'Projeção financeira (6 meses)' },
-  { icon: 'bar-chart-2', label: 'Relatórios detalhados' },
-  { icon: 'pie-chart',   label: 'Orçamentos por categoria' },
-  { icon: 'users',       label: 'Pessoas ilimitadas' },
-  { icon: 'refresh-cw',  label: 'Recorrências ilimitadas' },
-  { icon: 'target',      label: 'Metas ilimitadas' },
-  { icon: 'file-text',   label: 'Contas ilimitadas' },
-  { icon: 'activity',    label: 'Transações ilimitadas' },
-  { icon: 'upload',      label: 'Importação de extratos' },
+const PRO_FEATURES: { lib: 'feather' | 'mci'; icon: string; label: string }[] = [
+  { lib: 'mci',     icon: 'infinity',       label: 'Transações, metas e contas ilimitadas' },
+  { lib: 'feather', icon: 'bar-chart-2',    label: 'Relatórios avançados e projeção financeira' },
+  { lib: 'feather', icon: 'message-circle', label: 'Chat com IA — Rookinho responde tudo' },
+  { lib: 'feather', icon: 'upload',         label: 'Importação de extratos CSV' },
+  { lib: 'feather', icon: 'star',           label: 'Orçamento por categoria' },
+  { lib: 'feather', icon: 'shield',         label: 'Suporte prioritário' },
 ]
 
-const FREE_LIMITS = [
-  '50 transações/mês',
-  '5 contas',
-  '2 metas',
-  '2 pessoas',
-  '3 categorias personalizadas',
-  '2 recorrências',
+const FAQ = [
+  { q: 'Posso cancelar quando quiser?', a: 'Sim, sem multa. Você mantém o acesso PRO até o fim do período pago.' },
+  { q: 'Quais formas de pagamento?',    a: 'Cartão de crédito/débito e Pix (via Stripe).' },
+  { q: 'O que acontece se eu cancelar?', a: 'Sua conta migra para o plano Free automaticamente, com os limites do plano gratuito.' },
 ]
 
 export default function BillingScreen() {
   const router      = useRouter()
-  const [annual, setAnnual]   = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [annual,      setAnnual]      = useState(false)
+  const [loadingUp,   setLoadingUp]   = useState(false)
+  const [loadingPort, setLoadingPort] = useState(false)
+  const [openFaq,     setOpenFaq]     = useState<number | null>(null)
 
   const { data: me } = useQuery({
     queryKey: ['me'],
     queryFn:  () => meApi.get().then(r => r.data),
   })
 
-  const isPro = me?.plan === 'PRO'
+  const { data: settings } = useQuery({
+    queryKey: ['settings-prefs'],
+    queryFn:  () => settingsApi.getPrefs().then(r => r.data),
+  })
+
+  const isPro                 = me?.plan === 'PRO'
+  const hasStripeSubscription = !!settings?.stripeCustomerId
+
+  const monthlyPrice = 19.90
+  const annualPrice  = 15.90
+  const price        = annual ? annualPrice : monthlyPrice
 
   async function handleCheckout() {
-    setLoading(true)
+    setLoadingUp(true)
     try {
       const res = await billingApi.checkout(annual)
       await Linking.openURL(res.data.url)
     } catch (e: any) {
       Alert.alert('Erro', e.message ?? 'Não foi possível iniciar o checkout.')
     } finally {
-      setLoading(false)
+      setLoadingUp(false)
     }
   }
 
   async function handlePortal() {
-    setLoading(true)
+    setLoadingPort(true)
     try {
       const res = await billingApi.portal()
       await Linking.openURL(res.data.url)
     } catch (e: any) {
       Alert.alert('Erro', e.message ?? 'Não foi possível abrir o portal de assinatura.')
     } finally {
-      setLoading(false)
+      setLoadingPort(false)
     }
   }
 
@@ -75,29 +82,63 @@ export default function BillingScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <Text style={styles.pageSubtitle}>Gerencie seu plano e acompanhe seu uso</Text>
 
-        {/* Current plan badge */}
-        {me && (
-          <View style={[styles.currentPlan, isPro && styles.currentPlanPro]}>
-            <Feather name={isPro ? 'zap' : 'user'} size={16} color={isPro ? COLORS.warning : COLORS.muted} />
-            <Text style={[styles.currentPlanText, isPro && { color: COLORS.warning }]}>
-              {isPro ? 'Você está no plano PRO' : 'Você está no plano Free'}
+        {/* Current plan status */}
+        <View style={[styles.statusCard, isPro && styles.statusCardPro]}>
+          <View style={[styles.statusIcon, isPro && styles.statusIconPro]}>
+            {isPro
+              ? <MaterialCommunityIcons name="crown" size={26} color={COLORS.warning} />
+              : <Feather name="zap" size={24} color={COLORS.brand} />}
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={styles.statusTitleRow}>
+              <Text style={styles.statusTitle}>Plano {isPro ? 'PRO' : 'Gratuito'}</Text>
+              {isPro && (
+                <View style={styles.activeBadge}>
+                  <Text style={styles.activeBadgeText}>ATIVO</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.statusDesc}>
+              {isPro
+                ? 'Você tem acesso a todos os recursos sem limitações.'
+                : 'Upgrade para PRO e desbloqueie tudo.'}
             </Text>
+          </View>
+          {isPro && hasStripeSubscription && (
+            <TouchableOpacity style={styles.manageHeaderBtn} onPress={handlePortal} disabled={loadingPort}>
+              {loadingPort
+                ? <ActivityIndicator size="small" color={COLORS.muted} />
+                : <Text style={styles.manageHeaderBtnText}>Gerenciar</Text>}
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Usage (Free only) */}
+        {!isPro && me?.usage && me?.limits && (
+          <View style={styles.usageCard}>
+            <Text style={styles.usageTitle}>Uso do plano gratuito</Text>
+            <View style={{ gap: 10 }}>
+              <UsageBar used={me.usage.transactionsThisMonth} limit={me.limits.transactionsPerMonth} label="Transações" />
+              <UsageBar used={me.usage.bills}                 limit={me.limits.bills}                label="Contas" />
+              <UsageBar used={me.usage.goals}                 limit={me.limits.goals}                label="Metas" />
+              <UsageBar used={me.usage.people}                limit={me.limits.people}               label="Pessoas" />
+              <UsageBar used={me.usage.recurring}             limit={me.limits.recurring}            label="Recorrentes" />
+            </View>
           </View>
         )}
 
-        {!isPro ? (
-          <>
-            {/* PRO card */}
-            <View style={styles.proCard}>
+        {/* Upgrade section (Free only) */}
+        {!isPro && (
+          <View style={styles.proCard}>
+            <View style={styles.proHeaderRow}>
               <View style={styles.proBadgeRow}>
-                <View style={styles.proBadge}>
-                  <Text style={styles.proBadgeText}>⚡ PRO</Text>
-                </View>
-                <Text style={styles.proTagline}>Tudo ilimitado</Text>
+                <MaterialCommunityIcons name="crown" size={16} color={COLORS.warning} />
+                <Text style={styles.proBadgeText}>PRO</Text>
               </View>
 
-              {/* Price toggle */}
+              {/* Toggle */}
               <View style={styles.priceToggle}>
                 <TouchableOpacity
                   style={[styles.toggleOption, !annual && styles.toggleOptionActive]}
@@ -115,80 +156,132 @@ export default function BillingScreen() {
                   </View>
                 </TouchableOpacity>
               </View>
-
-              <View style={styles.priceRow}>
-                <Text style={styles.priceValue}>
-                  {annual ? 'R$ 15,90' : 'R$ 19,90'}
-                </Text>
-                <Text style={styles.pricePeriod}>/mês</Text>
-              </View>
-              {annual && (
-                <Text style={styles.annualNote}>Cobrado anualmente · R$ 190,80/ano</Text>
-              )}
-
-              <TouchableOpacity
-                style={styles.upgradeBtn}
-                onPress={handleCheckout}
-                disabled={loading}
-                activeOpacity={0.85}
-              >
-                {loading
-                  ? <ActivityIndicator color="#fff" />
-                  : <Text style={styles.upgradeBtnText}>Assinar PRO →</Text>
-                }
-              </TouchableOpacity>
-
-              <Text style={styles.cancelNote}>Cancele quando quiser</Text>
             </View>
 
-            {/* Feature list */}
-            <View style={styles.featureSection}>
-              <Text style={styles.featureTitle}>Tudo do Free +</Text>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceValue}>
+                R$ {price.toFixed(2).replace('.', ',')}
+              </Text>
+              <Text style={styles.pricePeriod}>/mês</Text>
+            </View>
+            {annual && (
+              <Text style={styles.annualNote}>
+                🎉 Você economiza R${((monthlyPrice - annualPrice) * 12).toFixed(0)} por ano — cobrado R$190,80/ano
+              </Text>
+            )}
+
+            {/* Features */}
+            <View style={styles.featureList}>
               {PRO_FEATURES.map(f => (
                 <View key={f.label} style={styles.featureRow}>
                   <View style={styles.featureIcon}>
-                    <Feather name={f.icon as any} size={14} color={COLORS.brand} />
+                    {f.lib === 'mci'
+                      ? <MaterialCommunityIcons name={f.icon as any} size={14} color={COLORS.brand} />
+                      : <Feather name={f.icon as any} size={14} color={COLORS.brand} />}
                   </View>
                   <Text style={styles.featureLabel}>{f.label}</Text>
                 </View>
               ))}
             </View>
 
-            {/* Free plan limits */}
-            <View style={styles.freeSection}>
-              <Text style={styles.freeSectionTitle}>Plano Free (atual)</Text>
-              {FREE_LIMITS.map(l => (
-                <View key={l} style={styles.featureRow}>
-                  <Feather name="minus" size={14} color={COLORS.muted} />
-                  <Text style={styles.freeLimitText}>{l}</Text>
-                </View>
-              ))}
-            </View>
-          </>
-        ) : (
-          /* PRO user — manage subscription */
-          <View style={styles.proManage}>
-            <View style={styles.proManageIcon}>
-              <Feather name="zap" size={32} color={COLORS.warning} />
-            </View>
-            <Text style={styles.proManageTitle}>Assinatura ativa</Text>
-            <Text style={styles.proManageDesc}>
-              Você tem acesso a todos os recursos PRO do Rook Money.
-            </Text>
             <TouchableOpacity
-              style={styles.portalBtn}
-              onPress={handlePortal}
-              disabled={loading}
+              style={styles.upgradeBtn}
+              onPress={handleCheckout}
+              disabled={loadingUp}
               activeOpacity={0.85}
             >
-              {loading
-                ? <ActivityIndicator color={COLORS.brand} />
-                : <Text style={styles.portalBtnText}>Gerenciar assinatura</Text>
+              {loadingUp
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.upgradeBtnText}>
+                    {annual ? '⚡ Assinar anual — 2 meses grátis' : '⚡ Assinar PRO — R$19,90/mês'}
+                  </Text>
               }
             </TouchableOpacity>
-            <Text style={styles.portalNote}>Abre no navegador via Stripe</Text>
+
+            <Text style={styles.cancelNote}>Cancele quando quiser · Sem multa · Cartão ou Pix</Text>
           </View>
         )}
+
+        {/* PRO — manage subscription */}
+        {isPro && (
+          <View style={styles.manageCard}>
+            <View style={styles.manageHeaderText}>
+              <Text style={styles.manageTitle}>Gerenciar assinatura</Text>
+              <Text style={styles.manageSubtitle}>
+                {hasStripeSubscription
+                  ? 'Tudo é gerenciado de forma segura via Stripe'
+                  : 'Plano ativado manualmente pelo administrador'}
+              </Text>
+            </View>
+
+            {hasStripeSubscription ? (
+              <>
+                <TouchableOpacity style={styles.manageRow} onPress={handlePortal} disabled={loadingPort} activeOpacity={0.7}>
+                  <View style={[styles.manageRowIcon, { backgroundColor: COLORS.brandDim }]}>
+                    <Feather name="credit-card" size={16} color={COLORS.brand} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.manageRowTitle}>Atualizar forma de pagamento</Text>
+                    <Text style={styles.manageRowDesc}>Trocar cartão ou adicionar novo</Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={COLORS.muted2} />
+                </TouchableOpacity>
+
+                <View style={styles.manageDivider} />
+
+                <TouchableOpacity style={styles.manageRow} onPress={handlePortal} disabled={loadingPort} activeOpacity={0.7}>
+                  <View style={[styles.manageRowIcon, { backgroundColor: COLORS.card2 }]}>
+                    <Feather name="file-text" size={16} color={COLORS.muted} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.manageRowTitle}>Histórico de cobranças</Text>
+                    <Text style={styles.manageRowDesc}>Ver faturas e comprovantes</Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={COLORS.muted2} />
+                </TouchableOpacity>
+
+                <View style={styles.manageDivider} />
+
+                <TouchableOpacity style={styles.manageRow} onPress={handlePortal} disabled={loadingPort} activeOpacity={0.7}>
+                  <View style={[styles.manageRowIcon, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
+                    <Feather name="x-circle" size={16} color={COLORS.danger} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.manageRowTitle, { color: COLORS.danger }]}>Cancelar assinatura</Text>
+                    <Text style={styles.manageRowDesc}>Você mantém o PRO até o fim do período pago</Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={COLORS.muted2} />
+                </TouchableOpacity>
+
+                {loadingPort && (
+                  <View style={styles.portalLoading}>
+                    <Text style={styles.portalLoadingText}>Abrindo portal seguro...</Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <View style={styles.manageStatic}>
+                <Text style={styles.manageStaticText}>Seu plano PRO foi ativado pela equipe Rook Money.</Text>
+                <Text style={styles.manageStaticSub}>Para gerenciar cobranças, entre em contato pelo Suporte.</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* FAQ */}
+        <View style={styles.faqCard}>
+          <Text style={styles.faqTitle}>Dúvidas frequentes</Text>
+          {FAQ.map((item, i) => (
+            <View key={item.q}>
+              {i > 0 && <View style={styles.faqDivider} />}
+              <TouchableOpacity style={styles.faqRow} onPress={() => setOpenFaq(openFaq === i ? null : i)} activeOpacity={0.7}>
+                <Text style={styles.faqQuestion}>{item.q}</Text>
+                <Feather name={openFaq === i ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.muted2} />
+              </TouchableOpacity>
+              {openFaq === i && <Text style={styles.faqAnswer}>{item.a}</Text>}
+            </View>
+          ))}
+        </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -202,41 +295,66 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
   },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
-  content:     { padding: 16 },
+  headerTitle:  { fontSize: 18, fontWeight: '700', color: COLORS.text },
+  content:      { padding: 16 },
+  pageSubtitle: { fontSize: 13, color: COLORS.muted, marginBottom: 16, marginTop: -8 },
 
-  currentPlan: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: COLORS.card, borderRadius: 12,
+  // Status card
+  statusCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: COLORS.card, borderRadius: 16,
     borderWidth: 1, borderColor: COLORS.border,
-    paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16,
+    padding: 16, marginBottom: 16,
   },
-  currentPlanPro:  { borderColor: 'rgba(245,158,11,0.3)', backgroundColor: 'rgba(245,158,11,0.06)' },
-  currentPlanText: { fontSize: 14, fontWeight: '500', color: COLORS.muted },
+  statusCardPro: { borderColor: 'rgba(245,158,11,0.25)', backgroundColor: 'rgba(245,158,11,0.05)' },
+  statusIcon: {
+    width: 48, height: 48, borderRadius: 12,
+    backgroundColor: COLORS.brandDim,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  statusIconPro: { backgroundColor: 'rgba(245,158,11,0.15)' },
+  statusTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusTitle:    { fontSize: 15, fontWeight: '700', color: COLORS.text },
+  activeBadge: {
+    borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2,
+    backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)',
+  },
+  activeBadgeText: { fontSize: 10, fontWeight: '800', color: COLORS.warning, letterSpacing: 0.5 },
+  statusDesc: { fontSize: 13, color: COLORS.muted, marginTop: 3 },
+  manageHeaderBtn: {
+    borderWidth: 1, borderColor: COLORS.border, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 8,
+  },
+  manageHeaderBtnText: { fontSize: 13, color: COLORS.muted, fontWeight: '600' },
 
+  // Usage card
+  usageCard: {
+    backgroundColor: COLORS.card, borderRadius: 16,
+    borderWidth: 1, borderColor: COLORS.border,
+    padding: 16, marginBottom: 16, gap: 12,
+  },
+  usageTitle: { fontSize: 13, fontWeight: '600', color: COLORS.text },
+
+  // PRO upgrade card
   proCard: {
     backgroundColor: COLORS.card, borderRadius: 20,
-    borderWidth: 1.5, borderColor: COLORS.brand,
+    borderWidth: 1, borderColor: COLORS.border,
     padding: 20, marginBottom: 16,
   },
-  proBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  proBadge: {
-    backgroundColor: 'rgba(245,158,11,0.12)', borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 4,
-  },
-  proBadgeText: { fontSize: 13, fontWeight: '700', color: COLORS.warning },
-  proTagline:   { fontSize: 14, color: COLORS.muted },
+  proHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 },
+  proBadgeRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  proBadgeText: { fontSize: 13, fontWeight: '800', color: COLORS.warning, textTransform: 'uppercase', letterSpacing: 1 },
 
   priceToggle: {
     flexDirection: 'row', backgroundColor: COLORS.card2,
-    borderRadius: 12, padding: 4, marginBottom: 16,
+    borderRadius: 12, padding: 4,
   },
   toggleOption: {
-    flex: 1, paddingVertical: 8, borderRadius: 10,
+    paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
   toggleOptionActive: { backgroundColor: COLORS.brand },
-  toggleText:         { fontSize: 14, fontWeight: '600', color: COLORS.muted },
+  toggleText:         { fontSize: 13, fontWeight: '600', color: COLORS.muted },
   toggleTextActive:   { color: '#fff' },
   saveBadge: {
     backgroundColor: COLORS.success + '33', borderRadius: 4,
@@ -244,46 +362,56 @@ const styles = StyleSheet.create({
   },
   saveBadgeText: { fontSize: 10, color: COLORS.success, fontWeight: '700' },
 
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginBottom: 4 },
-  priceValue:  { fontSize: 36, fontWeight: '800', color: COLORS.text },
-  pricePeriod: { fontSize: 16, color: COLORS.muted },
-  annualNote:  { fontSize: 12, color: COLORS.muted, marginBottom: 16 },
+  priceRow:    { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginBottom: 4 },
+  priceValue:  { fontSize: 32, fontWeight: '800', color: COLORS.text },
+  pricePeriod: { fontSize: 15, color: COLORS.muted },
+  annualNote:  { fontSize: 12, color: COLORS.success, marginBottom: 12 },
+
+  featureList: { gap: 4, marginTop: 12, marginBottom: 16 },
+  featureRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+  featureIcon:  { width: 26, height: 26, borderRadius: 8, backgroundColor: COLORS.brandDim, justifyContent: 'center', alignItems: 'center' },
+  featureLabel: { fontSize: 13, color: COLORS.text, flex: 1 },
 
   upgradeBtn: {
     backgroundColor: COLORS.brand, borderRadius: 14,
-    paddingVertical: 15, alignItems: 'center', marginTop: 16, marginBottom: 8,
+    paddingVertical: 15, alignItems: 'center', marginBottom: 8,
   },
-  upgradeBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  upgradeBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   cancelNote: { fontSize: 12, color: COLORS.muted, textAlign: 'center' },
 
-  featureSection: {
+  // PRO manage card
+  manageCard: {
     backgroundColor: COLORS.card, borderRadius: 16,
-    borderWidth: 1, borderColor: COLORS.border, padding: 16, marginBottom: 16,
+    borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden', marginBottom: 16,
   },
-  featureTitle: { fontSize: 13, fontWeight: '700', color: COLORS.text, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
-  featureRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
-  featureIcon:  { width: 26, height: 26, borderRadius: 8, backgroundColor: COLORS.brandDim, justifyContent: 'center', alignItems: 'center' },
-  featureLabel: { fontSize: 14, color: COLORS.text, flex: 1 },
+  manageHeaderText: { padding: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  manageTitle:    { fontSize: 14, fontWeight: '700', color: COLORS.text },
+  manageSubtitle: { fontSize: 12, color: COLORS.muted2, marginTop: 2 },
 
-  freeSection: {
+  manageRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
+  manageRowIcon: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  manageRowTitle: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  manageRowDesc:  { fontSize: 12, color: COLORS.muted, marginTop: 1 },
+  manageDivider:  { height: 1, backgroundColor: COLORS.border, marginLeft: 16 },
+  portalLoading:  { padding: 12, borderTopWidth: 1, borderTopColor: COLORS.border },
+  portalLoadingText: { fontSize: 12, color: COLORS.muted, textAlign: 'center' },
+
+  manageStatic: { padding: 24, alignItems: 'center', gap: 4 },
+  manageStaticText: { fontSize: 13, color: COLORS.text, textAlign: 'center' },
+  manageStaticSub:  { fontSize: 12, color: COLORS.muted2, textAlign: 'center' },
+
+  // FAQ
+  faqCard: {
     backgroundColor: COLORS.card, borderRadius: 16,
-    borderWidth: 1, borderColor: COLORS.border, padding: 16,
+    borderWidth: 1, borderColor: COLORS.border,
+    padding: 16,
   },
-  freeSectionTitle: { fontSize: 13, fontWeight: '700', color: COLORS.muted, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
-  freeLimitText:    { fontSize: 13, color: COLORS.muted, flex: 1 },
-
-  proManage: { alignItems: 'center', paddingTop: 40, paddingHorizontal: 16 },
-  proManageIcon: {
-    width: 80, height: 80, borderRadius: 24, marginBottom: 20,
-    backgroundColor: 'rgba(245,158,11,0.12)',
-    justifyContent: 'center', alignItems: 'center',
+  faqTitle:    { fontSize: 13, fontWeight: '600', color: COLORS.text, marginBottom: 4 },
+  faqDivider:  { height: 1, backgroundColor: COLORS.border },
+  faqRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 12, gap: 10,
   },
-  proManageTitle: { fontSize: 22, fontWeight: '800', color: COLORS.text, marginBottom: 8 },
-  proManageDesc: { fontSize: 14, color: COLORS.muted, textAlign: 'center', lineHeight: 21, marginBottom: 32 },
-  portalBtn: {
-    borderWidth: 1.5, borderColor: COLORS.brand, borderRadius: 14,
-    paddingVertical: 14, paddingHorizontal: 32, marginBottom: 8,
-  },
-  portalBtnText: { fontSize: 15, fontWeight: '600', color: COLORS.brand },
-  portalNote:    { fontSize: 12, color: COLORS.muted },
+  faqQuestion: { fontSize: 13, color: COLORS.muted, flex: 1 },
+  faqAnswer:   { fontSize: 12, color: COLORS.muted2, lineHeight: 18, paddingBottom: 12 },
 })

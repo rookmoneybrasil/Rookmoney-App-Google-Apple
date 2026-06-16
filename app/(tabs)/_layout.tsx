@@ -19,8 +19,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="more"    options={{ title: 'Mais'   }} />
 
       {/* Hidden tabs — stack screens only */}
-      <Tabs.Screen name="goals"    options={{ href: null }} />
-      <Tabs.Screen name="settings" options={{ href: null }} />
+      <Tabs.Screen name="goals" options={{ href: null }} />
     </Tabs>
   )
 }
