@@ -19,6 +19,7 @@ import Constants from 'expo-constants'
 import { useAuthStore } from '@/lib/auth'
 import { COLORS } from '@/lib/constants'
 import { AnimatedSplash } from '@/components/animated-splash'
+import { UpsellModal } from '@/components/upsell-modal'
 import { loadHapticsPreference } from '@/lib/haptics'
 import { pushTokenApi } from '@/lib/api'
 
@@ -218,6 +219,7 @@ export default function RootLayout() {
           <Stack.Screen name="new-person"        options={{ presentation: 'modal', headerShown: false }} />
         </Stack>
 
+        <UpsellModal />
         {showSplash && <AnimatedSplash onFinish={() => setShowSplash(false)} />}
       </ThemeProvider>
     </QueryClientProvider>
