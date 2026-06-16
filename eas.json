@@ -35,11 +35,6 @@
       "android": {
         "serviceAccountKeyPath": "./google-services-key.json",
         "track": "internal"
-      },
-      "ios": {
-        "appleId": "viniguilherme013@gmail.com",
-        "ascAppId": "",
-        "appleTeamId": ""
       }
     }
   }
