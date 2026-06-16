@@ -6,8 +6,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather, MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
 import { meApi, settingsApi, exportApi, pushTokenApi, type MeData, type SettingsData } from '@/lib/api'
-import * as Notifications from 'expo-notifications'
+import type * as NotificationsType from 'expo-notifications'
+import Constants from 'expo-constants'
 import { useAuthStore } from '@/lib/auth'
+
+const isExpoGo = Constants.appOwnership === 'expo'
+const Notifications: typeof NotificationsType | null = isExpoGo
+  ? null
+  : (require('expo-notifications') as typeof NotificationsType)
 import { isHapticsEnabled, setHapticsEnabled } from '@/lib/haptics'
 
 const SANDBOX_NUMBER = '+1 415 523 8886'
@@ -297,7 +303,7 @@ export default function SettingsScreen() {
 
   // Load push permission state on mount
   useState(() => {
-    Notifications.getPermissionsAsync().then(({ status }) => setPushEnabled(status === 'granted'))
+    Notifications?.getPermissionsAsync().then(({ status }) => setPushEnabled(status === 'granted'))
   })
 
   const { data, isLoading } = useQuery({
@@ -374,6 +380,11 @@ export default function SettingsScreen() {
   async function togglePush(val: boolean) {
     setPushEnabled(val)
     if (val) {
+      if (!Notifications) {
+        Alert.alert('Indisponível', 'Notificações push não estão disponíveis neste ambiente.')
+        setPushEnabled(false)
+        return
+      }
       const { status } = await Notifications.requestPermissionsAsync()
       if (status !== 'granted') {
         setPushEnabled(false)

@@ -115,6 +115,13 @@ export default function MoreScreen() {
         ))}
       </View>
 
+      {/* DEV: preview onboarding */}
+      {__DEV__ && (
+        <TouchableOpacity style={styles.devBtn} onPress={() => router.push('/onboarding')}>
+          <Text style={styles.devBtnText}>🧪 Preview Onboarding</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Rookinho AI banner */}
       <TouchableOpacity style={styles.aiCard} onPress={() => router.push('/ai-chat')} activeOpacity={0.85}>
         <Image source={require('../../assets/rookinho.png')} style={styles.aiImage} />
@@ -233,4 +240,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.danger + '0D',
   },
   logoutText: { fontSize: 14, fontWeight: '600', color: COLORS.danger },
+
+  devBtn: {
+    paddingVertical: 10, borderRadius: 12, marginBottom: 12,
+    borderWidth: 1, borderColor: '#444', backgroundColor: '#1a1a2e',
+    alignItems: 'center',
+  },
+  devBtnText: { fontSize: 13, color: '#888' },
 })

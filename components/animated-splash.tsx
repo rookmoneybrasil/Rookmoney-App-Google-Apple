@@ -7,9 +7,9 @@ import Confused    from '@/assets/svg/estado-confuso.svg'
 import Angry       from '@/assets/svg/estado-bravo.svg'
 import Sad         from '@/assets/svg/estado-triste.svg'
 import Happy       from '@/assets/svg/estado-feliz.svg'
-import Comemorando from '@/assets/svg/comemorando.svg'
+import Determined  from '@/assets/svg/estado-determinado.svg'
 
-const MOODS   = [Euphoric, Confused, Angry, Sad, Happy, Comemorando]
+const MOODS   = [Euphoric, Confused, Angry, Sad, Happy, Determined]
 const STEP_MS = 190
 
 interface Props {

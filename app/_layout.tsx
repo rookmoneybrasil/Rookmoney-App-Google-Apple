@@ -14,7 +14,8 @@ import {
   Poppins_700Bold,
   Poppins_800ExtraBold,
 } from '@expo-google-fonts/poppins'
-import * as Notifications from 'expo-notifications'
+import type * as NotificationsType from 'expo-notifications'
+import Constants from 'expo-constants'
 import { useAuthStore } from '@/lib/auth'
 import { COLORS } from '@/lib/constants'
 import { AnimatedSplash } from '@/components/animated-splash'
@@ -24,16 +25,25 @@ import { pushTokenApi } from '@/lib/api'
 SplashScreen.preventAutoHideAsync()
 loadHapticsPreference()
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList:   true,
-    shouldPlaySound:  true,
-    shouldSetBadge:   false,
-  }),
-})
+// expo-notifications removed push support from Expo Go in SDK 53 — crash on import
+const isExpoGo = Constants.appOwnership === 'expo'
+const Notifications: typeof NotificationsType | null = isExpoGo
+  ? null
+  : (require('expo-notifications') as typeof NotificationsType)
+
+if (Notifications) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList:   true,
+      shouldPlaySound:  true,
+      shouldSetBadge:   false,
+    }),
+  })
+}
 
 async function registerPushToken() {
+  if (!Notifications) return
   const { status } = await Notifications.getPermissionsAsync()
   const granted    = status === 'granted'
     ? true
@@ -98,15 +108,17 @@ function AuthGate() {
     // App was already open, URL arrives as an event
     const sub = Linking.addEventListener('url', ({ url }) => handleURL(url))
 
-    // Navigate when user taps a push notification
-    const notifSub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const screen = response.notification.request.content.data?.screen as string | undefined
-      if (screen === 'bills')   router.push('/(tabs)/bills')
-      if (screen === 'reports') router.push('/reports')
-      if (screen === 'goals')   router.push('/(tabs)')
-    })
+    // Navigate when user taps a push notification (not available in Expo Go)
+    const notifSub = Notifications
+      ? Notifications.addNotificationResponseReceivedListener((response) => {
+          const screen = response.notification.request.content.data?.screen as string | undefined
+          if (screen === 'bills')   router.push('/(tabs)/bills')
+          if (screen === 'reports') router.push('/reports')
+          if (screen === 'goals')   router.push('/(tabs)')
+        })
+      : null
 
-    return () => { sub.remove(); notifSub.remove() }
+    return () => { sub.remove(); notifSub?.remove() }
   }, [])
 
   useEffect(() => {
