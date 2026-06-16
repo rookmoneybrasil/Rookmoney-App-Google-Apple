@@ -297,6 +297,22 @@ function SourceHistoryRow({ source, entries }: { source: IncomeSource; entries: 
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
+  const deleteTxMutation = useMutation({
+    mutationFn: (txId: string) => transactionsApi.delete(txId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['income-history'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+    onError: (e: Error) => Alert.alert('Erro', e.message),
+  })
+
+  function confirmDeleteEntry(txId: string) {
+    Alert.alert('Excluir recebimento', 'Este registro será removido do histórico e do dashboard.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Excluir', style: 'destructive', onPress: () => deleteTxMutation.mutate(txId) },
+    ])
+  }
+
   return (
     <View>
       <TouchableOpacity style={styles.historyRow} onPress={() => setOpen((v) => !v)} activeOpacity={0.8}>
@@ -356,6 +372,13 @@ function SourceHistoryRow({ source, entries }: { source: IncomeSource; entries: 
                 <View style={styles.historyEntryRight}>
                   {changed && <Text style={styles.historyEraBadge}>era {fmt(prev!.amount)}</Text>}
                   <Text style={styles.historyEntryAmount}>{fmt(entry.amount)}</Text>
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteEntry(entry.id)}
+                    disabled={deleteTxMutation.isPending}
+                    hitSlop={8}
+                  >
+                    <Feather name="trash-2" size={13} color={COLORS.muted2} />
+                  </TouchableOpacity>
                 </View>
               </View>
             )
