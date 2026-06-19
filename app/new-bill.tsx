@@ -64,9 +64,10 @@ export default function NewBillScreen() {
   })
 
   const numInst  = parseInt(installments) || 1
-  const numPaid  = parseInt(alreadyPaid) || 0
-  const perInst  = numInst > 1 && amount
-    ? (parseFloat(amount.replace(',', '.')) / (numInst - numPaid)).toFixed(2)
+  const numPaid  = Math.min(parseInt(alreadyPaid) || 0, numInst - 1)
+  const remaining = numInst - numPaid
+  const perInst  = numInst > 1 && amount && remaining > 0
+    ? (parseFloat(amount.replace(',', '.')) / remaining).toFixed(2)
     : null
 
   return (

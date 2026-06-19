@@ -48,6 +48,7 @@ export default function NewIncomeScreen() {
       if (day !== undefined && (isNaN(day) || day < 1 || day > 31)) {
         throw new Error('Dia inválido (1-31)')
       }
+      if (isRecurring && !categoryId) throw new Error('Selecione uma categoria para rendas recorrentes')
 
       return incomeSourcesApi.create({
         name:        name.trim(),

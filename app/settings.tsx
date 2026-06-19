@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Switch, Image, Share, Linking } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import { useRouter } from 'expo-router'
@@ -302,9 +302,9 @@ export default function SettingsScreen() {
   const [hapticsOn,          setHapticsOn]          = useState(isHapticsEnabled())
 
   // Load push permission state on mount
-  useState(() => {
+  useEffect(() => {
     Notifications?.getPermissionsAsync().then((p) => setPushEnabled((p as { status: string }).status === 'granted'))
-  })
+  }, [])
 
   const { data, isLoading } = useQuery({
     queryKey: ['me'],

@@ -41,7 +41,7 @@ export default function EditRecurringScreen() {
       setType(found.type)
       setAmount(String(found.amount))
       setFrequency(found.frequency)
-      setCategoryId(found.category.id)
+      setCategoryId(found.category?.id ?? '')
       setDay(found.dayOfMonth ? String(found.dayOfMonth) : '')
       setDesc(found.description ?? '')
     }
