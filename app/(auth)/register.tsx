@@ -3,6 +3,7 @@ import { View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Scr
 import { Text, TextInput } from '@/components/text'
 import Svg, { Path } from 'react-native-svg'
 import { Link, useRouter } from 'expo-router'
+import * as ExpoLinking from 'expo-linking'
 import { COLORS, API_BASE_URL } from '@/lib/constants'
 import { authApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
@@ -45,7 +46,9 @@ export default function RegisterScreen() {
   }
 
   function handleGoogleLogin() {
-    Linking.openURL('https://rookmoney.com/api/auth/google?mobile=1')
+    const redirect = ExpoLinking.createURL('auth/callback')
+    const url = `https://rookmoney.com/api/auth/google?mobile=1&redirect=${encodeURIComponent(redirect)}`
+    Linking.openURL(url)
   }
 
   return (

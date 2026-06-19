@@ -46,7 +46,6 @@ export default function LoginScreen() {
 
   function handleGoogleLogin() {
     const redirect = ExpoLinking.createURL('auth/callback')
-    console.log('[Google] redirect URL:', redirect)
     const url = `https://rookmoney.com/api/auth/google?mobile=1&redirect=${encodeURIComponent(redirect)}`
     Linking.openURL(url)
   }

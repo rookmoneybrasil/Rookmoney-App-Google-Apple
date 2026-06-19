@@ -3,6 +3,7 @@ import {
   View, StyleSheet, TouchableOpacity, ScrollView,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ImageBackground, Switch,
 } from 'react-native'
+import { type ImageSourcePropType } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Text, TextInput } from '@/components/text'
 import { useRouter } from 'expo-router'
@@ -12,7 +13,7 @@ import { COLORS } from '@/lib/constants'
 import { settingsApi, incomeSourcesApi, billsApi, goalsApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
 
-const BG_IMAGES: Record<number, ReturnType<typeof require>> = {
+const BG_IMAGES: Record<number, ImageSourcePropType> = {
   0: require('../assets/onboarding/bg-usando-app.png'),
   1: require('../assets/onboarding/bg-organizando-contas.png'),
   2: require('../assets/onboarding/bg-fugindo-contas.png'),

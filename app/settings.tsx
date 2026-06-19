@@ -303,7 +303,7 @@ export default function SettingsScreen() {
 
   // Load push permission state on mount
   useState(() => {
-    Notifications?.getPermissionsAsync().then(({ status }) => setPushEnabled(status === 'granted'))
+    Notifications?.getPermissionsAsync().then((p) => setPushEnabled((p as { status: string }).status === 'granted'))
   })
 
   const { data, isLoading } = useQuery({
@@ -385,7 +385,7 @@ export default function SettingsScreen() {
         setPushEnabled(false)
         return
       }
-      const { status } = await Notifications.requestPermissionsAsync()
+      const { status } = await Notifications.requestPermissionsAsync() as { status: string }
       if (status !== 'granted') {
         setPushEnabled(false)
         Alert.alert(

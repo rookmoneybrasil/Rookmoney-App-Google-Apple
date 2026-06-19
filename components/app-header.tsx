@@ -15,7 +15,7 @@ export function AppHeader({ bellBadge = 0 }: { bellBadge?: number }) {
   return (
     <View style={styles.container}>
       {/* Logo */}
-      <TouchableOpacity onPress={() => router.push('/(tabs)/')}>
+      <TouchableOpacity onPress={() => router.push('/(tabs)' as any)}>
         <RookMoneyLogo width={130} />
       </TouchableOpacity>
 

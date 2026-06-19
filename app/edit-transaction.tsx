@@ -53,7 +53,7 @@ export default function EditTransactionScreen() {
         amount: num,
         type,
         description: description.trim() || undefined,
-        date: new Date(date).toISOString(),
+        date,
         categoryId,
       })
     },

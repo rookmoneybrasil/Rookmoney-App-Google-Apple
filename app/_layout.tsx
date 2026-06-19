@@ -45,10 +45,10 @@ if (Notifications) {
 
 async function registerPushToken() {
   if (!Notifications) return
-  const { status } = await Notifications.getPermissionsAsync()
-  const granted    = status === 'granted'
+  const perms = await Notifications.getPermissionsAsync() as { status: string }
+  const granted    = perms.status === 'granted'
     ? true
-    : (await Notifications.requestPermissionsAsync()).status === 'granted'
+    : ((await Notifications.requestPermissionsAsync()) as { status: string }).status === 'granted'
   if (!granted) return
   try {
     const token = (await Notifications.getExpoPushTokenAsync({
@@ -141,7 +141,7 @@ function AuthGate() {
       }
     } else if (token && !inAuth && !inOnboarding) {
       const u = useAuthStore.getState().user
-      if (u && !u.hasOnboarded && segments[0] !== 'onboarding') {
+      if (u && !u.hasOnboarded && (segments[0] as string) !== 'onboarding') {
         router.replace('/onboarding')
       }
     }
