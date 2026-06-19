@@ -419,7 +419,7 @@ export const incomeSourcesApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  update: (id: string, body: { name?: string; type?: string; amount?: number; isRecurring?: boolean; dayOfMonth?: number; startDate?: string | null; notes?: string | null; lastAutoPayMonth?: string | null }) =>
+  update: (id: string, body: { name?: string; type?: string; amount?: number; isRecurring?: boolean; dayOfMonth?: number; startDate?: string | null; notes?: string | null; categoryId?: string | null; lastAutoPayMonth?: string | null }) =>
     request<{ data: IncomeSource }>(`/api/v1/income-sources/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),

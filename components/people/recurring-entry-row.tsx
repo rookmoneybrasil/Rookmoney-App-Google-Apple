@@ -31,7 +31,7 @@ export function RecurringEntryRow({ item, personId, monthEntryId, paidThisMonth,
       } else if (monthEntryId) {
         await peopleApi.settleEntry(monthEntryId)
       } else {
-        const entry = await peopleApi.addEntry(item.personId, {
+        const entry = await peopleApi.addEntry(personId, {
           type:        item.type,
           description: item.description,
           amount:      item.amount,

@@ -58,6 +58,7 @@ export default function EditIncomeScreen() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['income-sources'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -67,6 +68,7 @@ export default function EditIncomeScreen() {
     mutationFn: () => incomeSourcesApi.delete(id!),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['income-sources'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

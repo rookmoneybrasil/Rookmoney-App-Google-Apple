@@ -38,7 +38,8 @@ export default function FeedbackScreen() {
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0]
       setImageUri(asset.uri)
-      setImageData(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : null)
+      const mime = asset.mimeType ?? 'image/jpeg'
+      setImageData(asset.base64 ? `data:${mime};base64,${asset.base64}` : null)
     }
   }
 
@@ -56,7 +57,8 @@ export default function FeedbackScreen() {
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0]
       setImageUri(asset.uri)
-      setImageData(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : null)
+      const mime = asset.mimeType ?? 'image/jpeg'
+      setImageData(asset.base64 ? `data:${mime};base64,${asset.base64}` : null)
     }
   }
 
