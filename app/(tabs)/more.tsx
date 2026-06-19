@@ -17,6 +17,7 @@ interface GridItem {
 const MAIN_ITEMS: GridItem[] = [
   { label: 'Extratos',     icon: 'list',         route: '/transactions' },
   { label: 'Metas',        icon: 'target',       route: '/goals'      },
+  { label: 'Conquistas',   icon: 'award',        route: '/achievements' },
   { label: 'Orçamento',    icon: 'pie-chart',    route: '/budget',    pro: true },
   { label: 'Calendário',   icon: 'calendar',     route: '/calendar'   },
   { label: 'Relatórios',   icon: 'bar-chart-2',  route: '/reports',   pro: true },

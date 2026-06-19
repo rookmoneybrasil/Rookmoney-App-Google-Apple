@@ -857,3 +857,39 @@ export const billingApi = {
   portal: () =>
     request<{ data: { url: string } }>('/api/v1/billing/portal', { method: 'POST' }),
 }
+
+// ── Achievements ─────────────────────────────────────────────────────
+
+export type AchievementCategory = 'onboarding' | 'organization' | 'payments' | 'goals' | 'volume' | 'financial'
+
+export interface AchievementItem {
+  slug:       string
+  category:   AchievementCategory
+  icon:       string
+  unlocked:   boolean
+  unlockedAt: string | null
+  seen:       boolean
+}
+
+export interface AchievementsResponse {
+  achievements: AchievementItem[]
+  total:        number
+  done:         number
+  unseen:       number
+}
+
+export interface AchievementCheckResponse {
+  newlyUnlocked: { slug: string; icon: string }[]
+}
+
+export const achievementsApi = {
+  list: () =>
+    request<{ data: AchievementsResponse }>('/api/v1/achievements'),
+  check: (trigger: string, ctx?: Record<string, unknown>) =>
+    request<{ data: AchievementCheckResponse }>('/api/v1/achievements', {
+      method: 'POST',
+      body:   JSON.stringify({ trigger, ctx }),
+    }),
+  markSeen: () =>
+    request<{ data: { marked: boolean } }>('/api/v1/achievements/seen', { method: 'POST' }),
+}

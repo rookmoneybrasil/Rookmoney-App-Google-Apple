@@ -22,6 +22,7 @@ import { AnimatedSplash } from '@/components/animated-splash'
 import { UpsellModal } from '@/components/upsell-modal'
 import { loadHapticsPreference } from '@/lib/haptics'
 import { pushTokenApi } from '@/lib/api'
+import { AchievementToastProvider } from '@/components/achievement-toast'
 
 SplashScreen.preventAutoHideAsync()
 loadHapticsPreference()
@@ -193,6 +194,7 @@ export default function RootLayout() {
           <Stack.Screen name="people"        options={{ headerShown: false }} />
           <Stack.Screen name="person-detail" options={{ headerShown: false }} />
           <Stack.Screen name="billing"       options={{ headerShown: false }} />
+          <Stack.Screen name="achievements"  options={{ headerShown: false }} />
           <Stack.Screen name="ai-chat"       options={{ headerShown: false }} />
 
           {/* Google OAuth callback */}
@@ -219,6 +221,7 @@ export default function RootLayout() {
           <Stack.Screen name="new-person"        options={{ presentation: 'modal', headerShown: false }} />
         </Stack>
 
+        <AchievementToastProvider />
         <UpsellModal />
         {showSplash && <AnimatedSplash onFinish={() => setShowSplash(false)} />}
       </ThemeProvider>
