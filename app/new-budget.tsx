@@ -68,6 +68,7 @@ export default function NewBudgetScreen() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['budgets'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

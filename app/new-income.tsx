@@ -63,6 +63,7 @@ export default function NewIncomeScreen() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['income-sources'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

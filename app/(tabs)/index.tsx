@@ -28,7 +28,7 @@ const fmtShort = (n: number) => {
   return fmt(n)
 }
 
-const currentMonth = format(new Date(), 'yyyy-MM')
+function getCurrentMonth() { return format(new Date(), 'yyyy-MM') }
 
 function greeting() {
   const h = new Date().getHours()
@@ -253,8 +253,8 @@ export default function DashboardScreen() {
   })
 
   const { data: budgets } = useQuery({
-    queryKey: ['budgets', currentMonth],
-    queryFn:  () => budgetsApi.list(currentMonth).then((r) => r.data),
+    queryKey: ['budgets', getCurrentMonth()],
+    queryFn:  () => budgetsApi.list(getCurrentMonth()).then((r) => r.data),
   })
 
   const firstName   = user?.name.split(' ')[0] ?? 'você'

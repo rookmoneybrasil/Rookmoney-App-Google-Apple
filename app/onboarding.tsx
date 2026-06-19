@@ -79,6 +79,7 @@ export default function OnboardingScreen() {
       if (!incomeName.trim())     throw new Error('Nome é obrigatório')
       if (isNaN(amt) || amt <= 0) throw new Error('Valor inválido')
       const day = incomeDay ? parseInt(incomeDay, 10) : undefined
+      if (incomeStartDate.trim() && !incomeStartDate.match(/^\d{4}-\d{2}-\d{2}$/)) throw new Error('Data inválida (AAAA-MM-DD)')
       return incomeSourcesApi.create({
         name:        incomeName.trim(),
         type:        incomeType,

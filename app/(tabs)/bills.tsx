@@ -432,7 +432,8 @@ export default function BillsScreen() {
     const total      = items[0].installmentTotal ?? items.length
     const nextDue    = sorted.find((b) => !b.isPaid) ?? sorted[sorted.length - 1]
     const amount     = Number(items[0].amount)
-    return { items: sorted, paidCount, total, nextDue, name: items[0].name, amount, groupId, grandTotal: total * amount }
+    const grandTotal = items.reduce((s, b) => s + Number(b.amount), 0)
+    return { items: sorted, paidCount, total, nextDue, name: items[0].name, amount, groupId, grandTotal }
   })
   const activeGroups = allGroups
     .filter((g) => g.paidCount < g.total)
