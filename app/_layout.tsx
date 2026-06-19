@@ -195,6 +195,7 @@ export default function RootLayout() {
           <Stack.Screen name="person-detail" options={{ headerShown: false }} />
           <Stack.Screen name="billing"       options={{ headerShown: false }} />
           <Stack.Screen name="achievements"  options={{ headerShown: false }} />
+          <Stack.Screen name="changelog"     options={{ headerShown: false }} />
           <Stack.Screen name="ai-chat"       options={{ headerShown: false }} />
 
           {/* Google OAuth callback */}
