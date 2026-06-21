@@ -373,6 +373,7 @@ export default function BillsScreen() {
   const unpayMutation = useMutation({
     mutationFn: (id: string) => billsApi.unpay(id),
     onSuccess: () => {
+      hapticLight()
       qc.invalidateQueries({ queryKey: ['bills'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
@@ -381,6 +382,7 @@ export default function BillsScreen() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => billsApi.delete(id),
     onSuccess: () => {
+      hapticLight()
       qc.invalidateQueries({ queryKey: ['bills'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
@@ -399,6 +401,7 @@ export default function BillsScreen() {
   const deleteRecurringMutation = useMutation({
     mutationFn: (id: string) => recurringBillsApi.delete(id),
     onSuccess: () => {
+      hapticLight()
       qc.invalidateQueries({ queryKey: ['recurringBills'] })
       qc.invalidateQueries({ queryKey: ['bills'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })

@@ -130,7 +130,7 @@ export default function NewBillScreen() {
               onPress={() => setCategoryId(c.id)}
             >
               <Text style={styles.catEmoji}>{c.icon}</Text>
-              <Text style={[styles.catPillText, categoryId === c.id && styles.catPillTextActive]}>{c.name}</Text>
+              <Text style={[styles.catPillText, categoryId === c.id && styles.catPillTextActive]} numberOfLines={1}>{c.name}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
