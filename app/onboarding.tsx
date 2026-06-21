@@ -125,10 +125,11 @@ export default function OnboardingScreen() {
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
-  const numInst = parseInt(billInstallments) || 1
-  const numPaid = parseInt(billAlreadyPaid)  || 0
-  const perInst = numInst > 1 && billAmount
-    ? (parseFloat(billAmount.replace(',', '.')) / (numInst - numPaid)).toFixed(2)
+  const numInst  = parseInt(billInstallments) || 1
+  const numPaid  = parseInt(billAlreadyPaid)  || 0
+  const remaining = numInst - numPaid
+  const perInst  = numInst > 1 && remaining > 0 && billAmount
+    ? (parseFloat(billAmount.replace(',', '.')) / remaining).toFixed(2)
     : null
 
   // ── Welcome ──────────────────────────────────────────────────────────────

@@ -139,7 +139,10 @@ export default function BudgetScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => budgetsApi.delete(id),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['budgets'] }),
+    onSuccess:  () => {
+      qc.invalidateQueries({ queryKey: ['budgets'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
     onError:    (e: Error) => Alert.alert('Erro', e.message),
   })
 

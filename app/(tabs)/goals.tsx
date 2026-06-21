@@ -64,6 +64,7 @@ function EditGoalSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['goals'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
       onClose()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

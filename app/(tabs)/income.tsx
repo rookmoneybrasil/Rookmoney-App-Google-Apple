@@ -302,6 +302,7 @@ function SourceHistoryRow({ source, entries }: { source: IncomeSource; entries: 
     mutationFn: (txId: string) => transactionsApi.delete(txId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['income-history'] })
+      qc.invalidateQueries({ queryKey: ['transactions'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

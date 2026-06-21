@@ -95,13 +95,22 @@ export default function RecurringScreen() {
   const toggleMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       recurringApi.toggle(id, isActive),
-    onSuccess: () => { hapticLight(); qc.invalidateQueries({ queryKey: ['recurring'] }) },
+    onSuccess: () => {
+      hapticLight()
+      qc.invalidateQueries({ queryKey: ['recurring'] })
+      qc.invalidateQueries({ queryKey: ['transactions'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => recurringApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['recurring'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recurring'] })
+      qc.invalidateQueries({ queryKey: ['transactions'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 

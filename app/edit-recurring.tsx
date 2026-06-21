@@ -66,6 +66,8 @@ export default function EditRecurringScreen() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recurring'] })
+      qc.invalidateQueries({ queryKey: ['transactions'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -75,6 +77,8 @@ export default function EditRecurringScreen() {
     mutationFn: () => recurringApi.delete(id!),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recurring'] })
+      qc.invalidateQueries({ queryKey: ['transactions'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -148,17 +152,18 @@ export default function EditRecurringScreen() {
         <Text style={styles.label}>Frequência</Text>
         <View style={styles.freqRow}>
           {FREQUENCIES.map((f) => (
-            <View
+            <TouchableOpacity
               key={f.value}
               style={[
                 styles.freqBtn,
                 frequency === f.value && styles.freqBtnActive,
               ]}
+              onPress={() => setFrequency(f.value)}
             >
               <Text style={[styles.freqLabel, frequency === f.value && { color: COLORS.brand }]}>
                 {f.label}
               </Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
 
