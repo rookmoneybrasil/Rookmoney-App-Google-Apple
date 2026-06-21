@@ -7,6 +7,7 @@ import { Feather } from '@expo/vector-icons'
 import { format } from 'date-fns'
 import { COLORS } from '@/lib/constants'
 import { billsApi, categoriesApi } from '@/lib/api'
+import { QUICK_BILL_SERVICES, getServiceBrand } from '@/lib/service-brands'
 
 export default function NewBillScreen() {
   const router  = useRouter()
@@ -28,6 +29,8 @@ export default function NewBillScreen() {
   const [notes, setNotes]             = useState('')
   const [showInstallments, setShowInstallments] = useState(false)
   const [showNotes, setShowNotes]     = useState(false)
+  const [showServices, setShowServices] = useState(false)
+  const detectedBrand = getServiceBrand(name)
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
@@ -81,15 +84,53 @@ export default function NewBillScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {/* Serviço rápido */}
+        <TouchableOpacity
+          style={styles.serviceToggle}
+          onPress={() => setShowServices(v => !v)}
+          activeOpacity={0.7}
+        >
+          <Feather name="zap" size={14} color={COLORS.brand} />
+          <Text style={styles.serviceToggleText}>Selecionar serviço rápido</Text>
+          <Feather name={showServices ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.muted} />
+        </TouchableOpacity>
+
+        {showServices && (
+          <View style={styles.serviceGrid}>
+            {QUICK_BILL_SERVICES.map(({ key, label, brand }) => {
+              const active = name.toLowerCase() === label.toLowerCase()
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.servicePill, { borderColor: active ? brand.color : brand.color + '40', backgroundColor: active ? brand.color : brand.color + '18' }]}
+                  onPress={() => { setName(active ? '' : label); setShowServices(false) }}
+                >
+                  <View style={[styles.serviceBadge, { backgroundColor: brand.color }]}>
+                    <Text style={[styles.serviceBadgeText, { color: brand.text }]}>{brand.short}</Text>
+                  </View>
+                  <Text style={[styles.servicePillText, { color: active ? brand.text : brand.color }]} numberOfLines={1}>{label}</Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+        )}
+
         {/* Nome */}
         <Text style={styles.label}>Nome *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ex: Netflix, Aluguel, Água..."
-          placeholderTextColor={COLORS.muted}
-          value={name}
-          onChangeText={setName}
-        />
+        <View>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: Netflix, Aluguel, Água..."
+            placeholderTextColor={COLORS.muted}
+            value={name}
+            onChangeText={setName}
+          />
+          {detectedBrand && (
+            <View style={[styles.brandBadgeInline, { backgroundColor: detectedBrand.color }]}>
+              <Text style={[styles.brandBadgeText, { color: detectedBrand.text }]}>{detectedBrand.short}</Text>
+            </View>
+          )}
+        </View>
 
         {/* Valor */}
         <Text style={styles.label}>Valor total (R$) *</Text>
@@ -259,6 +300,32 @@ const styles = StyleSheet.create({
   title:    { fontSize: 18, fontWeight: '700', color: COLORS.text },
 
   content: { padding: 20, paddingBottom: 60 },
+
+  serviceToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: COLORS.brand + '12', borderWidth: 1, borderColor: COLORS.brand + '33',
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 4,
+  },
+  serviceToggleText: { flex: 1, fontSize: 13, fontWeight: '600', color: COLORS.brand },
+  serviceGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 6,
+    backgroundColor: COLORS.card2, borderRadius: 12, padding: 10,
+    borderWidth: 1, borderColor: COLORS.border, marginBottom: 4, maxHeight: 160,
+  },
+  servicePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8,
+    borderWidth: 1,
+  },
+  serviceBadge: { width: 18, height: 18, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
+  serviceBadgeText: { fontSize: 8, fontWeight: '800' },
+  servicePillText: { fontSize: 11, fontWeight: '600', maxWidth: 80 },
+  brandBadgeInline: {
+    position: 'absolute' as const, right: 12, top: 10,
+    width: 22, height: 22, borderRadius: 6,
+    justifyContent: 'center' as const, alignItems: 'center' as const,
+  },
+  brandBadgeText: { fontSize: 9, fontWeight: '800' as const },
 
   label: { fontSize: 12, color: COLORS.muted, marginBottom: 6, marginTop: 16 },
   hint:  { fontSize: 11, color: COLORS.muted2, marginTop: 4 },

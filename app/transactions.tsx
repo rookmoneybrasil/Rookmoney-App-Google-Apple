@@ -58,11 +58,11 @@ export default function TransactionsScreen() {
   const qc      = useQueryClient()
   const [typeFilter,    setTypeFilter]    = useState<string | undefined>(undefined)
   const [catFilter,     setCatFilter]     = useState<string | undefined>(undefined)
-  const [currentMonth,  setCurrentMonth]  = useState(new Date())
+  const [currentMonth,  setCurrentMonth]  = useState<Date | null>(new Date())
   const [search,        setSearch]        = useState('')
 
-  const monthStr   = format(currentMonth, 'yyyy-MM')
-  const monthLabel = format(currentMonth, "MMMM 'yy", { locale: ptBR })
+  const monthStr   = currentMonth ? format(currentMonth, 'yyyy-MM') : undefined
+  const monthLabel = currentMonth ? format(currentMonth, "MMMM 'yy", { locale: ptBR }) : 'Todos'
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['transactions', monthStr, typeFilter, catFilter],
@@ -144,11 +144,13 @@ export default function TransactionsScreen() {
 
       {/* Month picker */}
       <View style={styles.monthPicker}>
-        <TouchableOpacity onPress={() => setCurrentMonth((m) => subMonths(m, 1))}>
+        <TouchableOpacity onPress={() => setCurrentMonth((m) => m ? subMonths(m, 1) : new Date())}>
           <Feather name="chevron-left" size={22} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.monthLabel}>{monthLabel}</Text>
-        <TouchableOpacity onPress={() => setCurrentMonth((m) => addMonths(m, 1))}>
+        <TouchableOpacity onPress={() => setCurrentMonth(currentMonth ? null : new Date())}>
+          <Text style={[styles.monthLabel, !currentMonth && { color: COLORS.brand }]}>{monthLabel}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setCurrentMonth((m) => m ? addMonths(m, 1) : new Date())}>
           <Feather name="chevron-right" size={22} color={COLORS.text} />
         </TouchableOpacity>
       </View>
