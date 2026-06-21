@@ -401,6 +401,7 @@ export interface IncomeSource {
   dayOfMonth:       number | null
   startDate:        string | null
   lastAutoPayMonth: string | null
+  categoryId:       string | null
   notes:            string | null
 }
 

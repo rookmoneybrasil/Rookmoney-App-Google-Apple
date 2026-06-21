@@ -5,7 +5,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
-import { incomeSourcesApi, type IncomeSource } from '@/lib/api'
+import { incomeSourcesApi, categoriesApi, type IncomeSource, type Category } from '@/lib/api'
+import { useQuery } from '@tanstack/react-query'
 
 const TYPES = [
   { value: 'EMPLOYMENT', label: 'CLT / Emprego', emoji: '💼' },
@@ -26,8 +27,14 @@ export default function EditIncomeScreen() {
   const [isRecurring, setRecurring] = useState(true)
   const [dayOfMonth, setDay]        = useState('')
   const [startDate,  setStartDate]  = useState('')
+  const [categoryId, setCategoryId] = useState('')
   const [notes,      setNotes]      = useState('')
   const [showNotes,  setShowNotes]  = useState(false)
+
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn:  () => categoriesApi.list().then((r) => r.data),
+  })
 
   useEffect(() => {
     const list = qc.getQueryData<IncomeSource[]>(['income-sources'])
@@ -40,6 +47,7 @@ export default function EditIncomeScreen() {
       setRecurring(found.isRecurring)
       setDay(found.dayOfMonth ? String(found.dayOfMonth) : '')
       setStartDate(found.startDate ? new Date(found.startDate).toISOString().slice(0, 10) : '')
+      setCategoryId(found.categoryId ?? '')
       setNotes(found.notes ?? '')
       setShowNotes(!!(found.notes))
     }
@@ -54,7 +62,7 @@ export default function EditIncomeScreen() {
       if (day !== undefined && (isNaN(day) || day < 1 || day > 31)) {
         throw new Error('Dia inválido (1-31)')
       }
-      return incomeSourcesApi.update(id!, { name: name.trim(), type, amount: amt, isRecurring, dayOfMonth: day, startDate: startDate.trim() || null, notes: notes.trim() || null })
+      return incomeSourcesApi.update(id!, { name: name.trim(), type, amount: amt, isRecurring, dayOfMonth: day, startDate: startDate.trim() || null, notes: notes.trim() || null, categoryId: categoryId || null })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['income-sources'] })
@@ -175,6 +183,22 @@ export default function EditIncomeScreen() {
           </>
         )}
 
+        <Text style={styles.label}>Categoria</Text>
+        <View style={styles.cats}>
+          {(categories ?? []).map((cat: Category) => (
+            <TouchableOpacity
+              key={cat.id}
+              style={[styles.cat, categoryId === cat.id && styles.catActive]}
+              onPress={() => setCategoryId(categoryId === cat.id ? '' : cat.id)}
+            >
+              <Text style={styles.catIcon}>{cat.icon}</Text>
+              <Text style={[styles.catName, categoryId === cat.id && styles.catNameActive]} numberOfLines={1}>
+                {cat.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <TouchableOpacity style={styles.notesToggle} onPress={() => setShowNotes(v => !v)} activeOpacity={0.8}>
           <Feather name={showNotes ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.muted} />
           <Text style={styles.notesToggleText}>{showNotes ? 'Esconder observações' : 'Observações'}</Text>
@@ -233,6 +257,17 @@ const styles = StyleSheet.create({
   typeBtnActive: { borderColor: COLORS.brand, backgroundColor: COLORS.brandDim },
   typeEmoji:     { fontSize: 18 },
   typeLabel:     { fontSize: 13, color: COLORS.text, fontWeight: '500', flexShrink: 1 },
+
+  cats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  cat: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10,
+    backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border,
+  },
+  catActive:     { borderColor: COLORS.brand, backgroundColor: COLORS.brandDim },
+  catIcon:       { fontSize: 16 },
+  catName:       { fontSize: 12, color: COLORS.muted, maxWidth: 90 },
+  catNameActive: { color: COLORS.brand },
 
   switchRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
