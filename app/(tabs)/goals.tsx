@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
   },
   addBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
-  content: { paddingHorizontal: 20, paddingBottom: 32 },
+  content: { paddingHorizontal: 20, paddingBottom: 100 },
 
   // Goal card
   goalCard: {

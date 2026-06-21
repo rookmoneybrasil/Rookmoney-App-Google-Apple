@@ -214,7 +214,7 @@ export interface Bill {
 export const billsApi = {
   list: () => request<{ data: Bill[] }>('/api/v1/bills'),
   create: (body: { name: string; amount: number; dueDate: string; isRecurring?: boolean; categoryId?: string; installments?: number; alreadyPaid?: number; notes?: string }) =>
-    request<{ data: Bill }>('/api/v1/bills', {
+    request<{ data: Bill | { installmentGroupId: string; count: number } }>('/api/v1/bills', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -312,7 +312,7 @@ export const goalsApi = {
       body: JSON.stringify(body),
     }),
   contribute: (id: string, amount: number, note?: string, categoryId?: string) =>
-    request<{ data: { id: string; currentAmount: number; isCompleted: boolean } }>(`/api/v1/goals/${id}?action=contribute`, {
+    request<{ data: GoalContribution }>(`/api/v1/goals/${id}?action=contribute`, {
       method: 'POST',
       body: JSON.stringify({ amount, note, categoryId }),
     }),

@@ -46,7 +46,7 @@ export default function EditIncomeScreen() {
       setAmount(String(found.amount))
       setRecurring(found.isRecurring)
       setDay(found.dayOfMonth ? String(found.dayOfMonth) : '')
-      setStartDate(found.startDate ? new Date(found.startDate).toISOString().slice(0, 10) : '')
+      setStartDate(found.startDate ? String(found.startDate).slice(0, 10) : '')
       setCategoryId(found.categoryId ?? '')
       setNotes(found.notes ?? '')
       setShowNotes(!!(found.notes))
