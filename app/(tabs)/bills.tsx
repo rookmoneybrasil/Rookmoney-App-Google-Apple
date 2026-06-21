@@ -388,7 +388,12 @@ export default function BillsScreen() {
   })
   const toggleRecurringMutation = useMutation({
     mutationFn: (item: RecurringBill) => recurringBillsApi.update(item.id, { isActive: !item.isActive }),
-    onSuccess: () => { hapticLight(); qc.invalidateQueries({ queryKey: ['recurringBills'] }) },
+    onSuccess: () => {
+      hapticLight()
+      qc.invalidateQueries({ queryKey: ['recurringBills'] })
+      qc.invalidateQueries({ queryKey: ['bills'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
   const deleteRecurringMutation = useMutation({

@@ -293,6 +293,7 @@ function SourceHistoryRow({ source, entries }: { source: IncomeSource; entries: 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['income-sources'] })
       qc.invalidateQueries({ queryKey: ['income-history'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
@@ -440,7 +441,10 @@ export default function IncomeScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => incomeSourcesApi.delete(id),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['income-sources'] }),
+    onSuccess:  () => {
+      qc.invalidateQueries({ queryKey: ['income-sources'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
     onError:    (e: Error) => Alert.alert('Erro', e.message),
   })
 
