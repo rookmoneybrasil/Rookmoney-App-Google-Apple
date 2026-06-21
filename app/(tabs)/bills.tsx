@@ -426,15 +426,18 @@ export default function BillsScreen() {
     }
   }
 
-  const allGroups: InstallmentGroup[] = Array.from(grouped.entries()).map(([groupId, items]) => {
-    const sorted     = [...items].sort((a, b) => (a.installmentCurrent ?? 0) - (b.installmentCurrent ?? 0))
-    const paidCount  = items.filter((b) => b.isPaid).length
-    const total      = items[0].installmentTotal ?? items.length
-    const nextDue    = sorted.find((b) => !b.isPaid) ?? sorted[sorted.length - 1]
-    const amount     = Number(items[0].amount)
-    const grandTotal = items.reduce((s, b) => s + Number(b.amount), 0)
-    return { items: sorted, paidCount, total, nextDue, name: items[0].name, amount, groupId, grandTotal }
-  })
+  const allGroups: InstallmentGroup[] = Array.from(grouped.entries())
+    .filter(([, items]) => items.length > 0)
+    .map(([groupId, items]) => {
+      const sorted     = [...items].sort((a, b) => (a.installmentCurrent ?? 0) - (b.installmentCurrent ?? 0))
+      const paidCount  = items.filter((b) => b.isPaid).length
+      const first      = items[0]
+      const total      = first.installmentTotal ?? items.length
+      const nextDue    = sorted.find((b) => !b.isPaid) ?? sorted[sorted.length - 1]
+      const amount     = Number(first.amount)
+      const grandTotal = items.reduce((s, b) => s + Number(b.amount), 0)
+      return { items: sorted, paidCount, total, nextDue, name: first.name, amount, groupId, grandTotal }
+    })
   const activeGroups = allGroups
     .filter((g) => g.paidCount < g.total)
     .sort((a, b) => new Date(a.nextDue.dueDate).getTime() - new Date(b.nextDue.dueDate).getTime())

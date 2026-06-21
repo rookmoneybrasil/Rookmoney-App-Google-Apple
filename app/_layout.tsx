@@ -57,7 +57,7 @@ async function registerPushToken() {
     })).data
     await pushTokenApi.register(token)
   } catch (e) {
-    console.warn('[push] token registration failed:', e)
+    // silent — push token registration is best-effort
   }
 }
 
