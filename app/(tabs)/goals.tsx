@@ -8,7 +8,7 @@ import Svg, { Circle } from 'react-native-svg'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { COLORS, GOAL_COLORS } from '@/lib/constants'
-import { goalsApi, type Goal } from '@/lib/api'
+import { goalsApi, categoriesApi, type Goal, type Category } from '@/lib/api'
 import { hapticSuccess, hapticLight } from '@/lib/haptics'
 
 const fmt = (n: number) =>
@@ -277,11 +277,17 @@ const CONTRIBUTE_SOURCES = [
 ]
 
 function ContributeSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
-  const [amount, setAmount]   = useState('')
-  const [note, setNote]       = useState('')
-  const [source, setSource]   = useState('')
-  const [mode, setMode]       = useState<'contribute' | 'withdraw'>('contribute')
+  const [amount, setAmount]       = useState('')
+  const [note, setNote]           = useState('')
+  const [source, setSource]       = useState('')
+  const [categoryId, setCategoryId] = useState<string | undefined>(undefined)
+  const [mode, setMode]           = useState<'contribute' | 'withdraw'>('contribute')
   const qc = useQueryClient()
+
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn:  () => categoriesApi.list().then(r => r.data),
+  })
 
   const remaining = Math.max(goal.targetAmount - goal.currentAmount, 0)
 
@@ -292,7 +298,7 @@ function ContributeSheet({ goal, onClose }: { goal: Goal; onClose: () => void })
   const mutation = useMutation({
     mutationFn: async () => {
       const val = parseFloat(amount.replace(',', '.'))
-      if (mode === 'contribute') await goalsApi.contribute(goal.id, val, finalNote)
+      if (mode === 'contribute') await goalsApi.contribute(goal.id, val, finalNote, categoryId)
       else                        await goalsApi.withdraw(goal.id, val)
     },
     onSuccess: () => {
@@ -366,6 +372,23 @@ function ContributeSheet({ goal, onClose }: { goal: Goal; onClose: () => void })
               </TouchableOpacity>
             ))}
           </View>
+
+          <Text style={styles.label}>Categoria da transação</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+            <View style={styles.sourceRow}>
+              {(categories ?? []).slice(0, 8).map((c: Category) => (
+                <TouchableOpacity
+                  key={c.id}
+                  style={[styles.sourceChip, categoryId === c.id && styles.sourceChipActive]}
+                  onPress={() => setCategoryId(categoryId === c.id ? undefined : c.id)}
+                >
+                  <Text style={[styles.sourceChipText, categoryId === c.id && styles.sourceChipTextActive]}>
+                    {c.icon} {c.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
 
           <Text style={styles.label}>Observação (opcional)</Text>
           <TextInput

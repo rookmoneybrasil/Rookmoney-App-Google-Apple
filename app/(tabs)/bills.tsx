@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal, Pressable } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal, Pressable, Switch } from 'react-native'
 import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { Feather } from '@expo/vector-icons'
@@ -82,6 +82,13 @@ function RecurringRow({ item, onToggle, onEdit, onDelete }: {
           {item.category ? ` · ${item.category.icon} ${item.category.name}` : ''}
         </Text>
       </View>
+      <Switch
+        value={item.isActive}
+        onValueChange={onToggle}
+        trackColor={{ false: COLORS.muted2, true: COLORS.brand }}
+        thumbColor="#fff"
+        style={{ transform: [{ scale: 0.8 }] }}
+      />
     </TouchableOpacity>
   )
 }
