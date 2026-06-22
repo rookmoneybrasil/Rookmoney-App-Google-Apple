@@ -67,7 +67,7 @@ export function EntryModal({ visible, personId, personName, onClose }: Props) {
       if (!date.match(/^\d{4}-\d{2}-\d{2}$/))    throw new Error('Data inválida (use AAAA-MM-DD)')
 
       if (mode === 'recorrente') {
-        const day = Math.min(28, Math.max(1, parseInt(dayOfMonth) || 1))
+        const day = Math.min(31, Math.max(1, parseInt(dayOfMonth) || 1))
         return personRecurringApi.create({
           personId,
           type:        entryType,
@@ -107,7 +107,7 @@ export function EntryModal({ visible, personId, personName, onClose }: Props) {
   const numInst    = Math.max(2, parseInt(installments) || 2)
   const numPaid    = Math.min(Math.max(0, parseInt(alreadyPaid) || 0), numInst - 1)
   const remaining  = numInst - numPaid
-  const day        = Math.min(28, Math.max(1, parseInt(dayOfMonth) || 1))
+  const day        = Math.min(31, Math.max(1, parseInt(dayOfMonth) || 1))
 
   const submitLabel = mutation.isPending
     ? 'Salvando...'

@@ -29,7 +29,7 @@ export default function NewRecurringBillScreen() {
       const day = parseInt(dayOfMonth)
       if (!name.trim())                      throw new Error('Nome é obrigatório')
       if (isNaN(amt) || amt <= 0)            throw new Error('Valor inválido')
-      if (isNaN(day) || day < 1 || day > 28) throw new Error('Dia do mês deve ser entre 1 e 28')
+      if (isNaN(day) || day < 1 || day > 31) throw new Error('Dia do mês deve ser entre 1 e 31')
 
       return recurringBillsApi.create({
         name:        name.trim(),
@@ -93,7 +93,7 @@ export default function NewRecurringBillScreen() {
             <Text style={styles.label}>Todo dia *</Text>
             <TextInput
               style={styles.input}
-              placeholder="1-28"
+              placeholder="1-31"
               placeholderTextColor={COLORS.muted}
               keyboardType="number-pad"
               value={dayOfMonth}

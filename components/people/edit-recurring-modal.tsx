@@ -43,7 +43,7 @@ export function EditRecurringModal({ visible, item, personId, onClose }: Props) 
       if (!description.trim())    throw new Error('Descrição é obrigatória')
       if (isNaN(amt) || amt <= 0) throw new Error('Valor inválido')
 
-      const day = Math.min(28, Math.max(1, parseInt(dayOfMonth) || item.dayOfMonth))
+      const day = Math.min(31, Math.max(1, parseInt(dayOfMonth) || item.dayOfMonth))
 
       return personRecurringApi.update(item.id, {
         description: description.trim(),
