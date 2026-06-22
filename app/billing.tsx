@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native'
+import { useState, useCallback } from 'react'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking, AppState } from 'react-native'
 import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useFocusEffect } from '@react-navigation/native'
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
 import { meApi, settingsApi, billingApi } from '@/lib/api'
@@ -25,10 +26,16 @@ const FAQ = [
 
 export default function BillingScreen() {
   const router      = useRouter()
+  const queryClient = useQueryClient()
   const [annual,      setAnnual]      = useState(false)
   const [loadingUp,   setLoadingUp]   = useState(false)
   const [loadingPort, setLoadingPort] = useState(false)
   const [openFaq,     setOpenFaq]     = useState<number | null>(null)
+
+  useFocusEffect(useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['settings-prefs'] })
+    queryClient.invalidateQueries({ queryKey: ['me'] })
+  }, [queryClient]))
 
   const { data: me } = useQuery({
     queryKey: ['me'],
