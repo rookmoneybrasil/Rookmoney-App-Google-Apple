@@ -185,10 +185,11 @@ function PaidRow({ item, onUnpay, onEdit, onDelete }: {
   )
 }
 
-function InstallmentGroupCard({ group, onPay, onDeleteGroup }: {
+function InstallmentGroupCard({ group, onPay, onDeleteGroup, onEdit }: {
   group: InstallmentGroup
   onPay: (id: string) => void
   onDeleteGroup: () => void
+  onEdit: () => void
 }) {
   const [open, setOpen] = useState(true)
   const pct = Math.round((group.paidCount / group.total) * 100)
@@ -199,14 +200,11 @@ function InstallmentGroupCard({ group, onPay, onDeleteGroup }: {
         style={styles.groupHeader}
         onPress={() => setOpen((v) => !v)}
         onLongPress={() =>
-          Alert.alert(
-            'Excluir parcelamento',
-            `Excluir todas as ${group.total} parcelas de "${group.name}"?`,
-            [
-              { text: 'Cancelar', style: 'cancel' },
-              { text: 'Excluir tudo', style: 'destructive', onPress: onDeleteGroup },
-            ],
-          )
+          Alert.alert('Opções', group.name, [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Editar', onPress: onEdit },
+            { text: 'Excluir tudo', style: 'destructive', onPress: onDeleteGroup },
+          ])
         }
         activeOpacity={0.8}
       >
@@ -221,6 +219,9 @@ function InstallmentGroupCard({ group, onPay, onDeleteGroup }: {
         </View>
         <View style={styles.groupHeaderRight}>
           <Text style={styles.groupCountText}>{group.paidCount}/{group.total}</Text>
+          <TouchableOpacity onPress={onEdit} hitSlop={8} style={styles.groupEditBtn}>
+            <Feather name="edit-2" size={13} color={COLORS.brand} />
+          </TouchableOpacity>
           <Feather name={open ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.muted} />
         </View>
       </TouchableOpacity>
@@ -718,6 +719,18 @@ export default function BillsScreen() {
                         group={group}
                         onPay={(id) => payMutation.mutate(id)}
                         onDeleteGroup={() => deleteGroupMutation.mutate(group)}
+                        onEdit={() => router.push({
+                          pathname: '/edit-installment-group',
+                          params: {
+                            groupId: group.groupId,
+                            name: group.name,
+                            amount: String(group.amount),
+                            categoryId: group.items[0]?.category?.id ?? '',
+                            notes: group.items[0]?.notes ?? '',
+                            total: String(group.total),
+                            paidCount: String(group.paidCount),
+                          },
+                        })}
                       />
                     ))}
                   </View>
@@ -959,7 +972,8 @@ const styles = StyleSheet.create({
     marginBottom: 8, overflow: 'hidden',
   },
   groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
-  groupHeaderRight: { alignItems: 'flex-end', gap: 4 },
+  groupHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  groupEditBtn: { width: 28, height: 28, borderRadius: 8, backgroundColor: COLORS.brand + '15', justifyContent: 'center', alignItems: 'center' },
   groupCountText: { fontSize: 12, fontWeight: '700', color: COLORS.brand },
   groupBody: { paddingHorizontal: 12, paddingBottom: 12, gap: 8 },
   progressBar: { height: 6, borderRadius: 3, backgroundColor: COLORS.muted2, overflow: 'hidden' },
