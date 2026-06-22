@@ -570,9 +570,11 @@ export interface SettingsData {
   notifMonthlyEmail:    boolean
   currency:             string
   dateFormat:           string
-  stripeCustomerId:     string | null
-  stripeSubscriptionId: string | null
-  hasGoogle:            boolean
+  stripeCustomerId:          string | null
+  stripeSubscriptionId:      string | null
+  stripeCancelAtPeriodEnd?:  boolean
+  stripeCurrentPeriodEnd?:   string | null
+  hasGoogle:                 boolean
 }
 
 export const settingsApi = {

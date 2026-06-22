@@ -42,6 +42,8 @@ export default function BillingScreen() {
 
   const isPro                 = me?.plan === 'PRO'
   const hasStripeSubscription = !!settings?.stripeCustomerId
+  const cancelAtPeriodEnd     = settings?.stripeCancelAtPeriodEnd ?? false
+  const currentPeriodEnd      = settings?.stripeCurrentPeriodEnd ?? null
 
   const monthlyPrice = 19.90
   const annualPrice  = 15.90
@@ -95,8 +97,10 @@ export default function BillingScreen() {
             <View style={styles.statusTitleRow}>
               <Text style={styles.statusTitle}>Plano {isPro ? 'PRO' : 'Gratuito'}</Text>
               {isPro && (
-                <View style={styles.activeBadge}>
-                  <Text style={styles.activeBadgeText}>ATIVO</Text>
+                <View style={[styles.activeBadge, cancelAtPeriodEnd && styles.cancelingBadge]}>
+                  <Text style={[styles.activeBadgeText, cancelAtPeriodEnd && styles.cancelingBadgeText]}>
+                    {cancelAtPeriodEnd ? 'CANCELANDO' : 'ATIVO'}
+                  </Text>
                 </View>
               )}
             </View>
@@ -114,6 +118,30 @@ export default function BillingScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Cancellation pending banner */}
+        {isPro && cancelAtPeriodEnd && currentPeriodEnd && (
+          <View style={styles.cancelBanner}>
+            <View style={styles.cancelBannerIcon}>
+              <Feather name="alert-triangle" size={20} color={COLORS.warning} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cancelBannerTitle}>Cancelamento agendado</Text>
+              <Text style={styles.cancelBannerDesc}>
+                Seu plano PRO será cancelado em{' '}
+                <Text style={styles.cancelBannerDate}>
+                  {new Date(currentPeriodEnd).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                </Text>
+                . Até lá, você mantém acesso a todos os recursos.
+              </Text>
+              <TouchableOpacity onPress={handlePortal} disabled={loadingPort} activeOpacity={0.7} style={styles.reactivateBtn}>
+                {loadingPort
+                  ? <ActivityIndicator size="small" color={COLORS.warning} />
+                  : <Text style={styles.reactivateBtnText}>Reativar assinatura →</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Usage (Free only) */}
         {!isPro && me?.usage && me?.limits && (
@@ -320,6 +348,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)',
   },
   activeBadgeText: { fontSize: 10, fontWeight: '800', color: COLORS.warning, letterSpacing: 0.5 },
+  cancelingBadge:     { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.3)' },
+  cancelingBadgeText: { color: '#f59e0b' },
+
+  cancelBanner: {
+    flexDirection: 'row', gap: 14, padding: 16, marginBottom: 16,
+    backgroundColor: 'rgba(245,158,11,0.05)', borderRadius: 16,
+    borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)',
+  },
+  cancelBannerIcon: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: 'rgba(245,158,11,0.15)',
+    justifyContent: 'center', alignItems: 'center', marginTop: 2,
+  },
+  cancelBannerTitle: { fontSize: 14, fontWeight: '700', color: '#fbbf24' },
+  cancelBannerDesc:  { fontSize: 13, color: COLORS.muted, marginTop: 4, lineHeight: 19 },
+  cancelBannerDate:  { fontWeight: '700', color: COLORS.text },
+  reactivateBtn:     { marginTop: 10 },
+  reactivateBtnText: { fontSize: 13, fontWeight: '600', color: '#f59e0b' },
   statusDesc: { fontSize: 13, color: COLORS.muted, marginTop: 3 },
   manageHeaderBtn: {
     borderWidth: 1, borderColor: COLORS.border, borderRadius: 10,
