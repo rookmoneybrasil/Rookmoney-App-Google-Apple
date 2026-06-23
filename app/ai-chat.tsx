@@ -202,15 +202,13 @@ export default function AiChatScreen() {
           </View>
         </View>
         <View style={styles.headerActions}>
+          <TouchableOpacity onPress={() => { setMessages([WELCOME]); AsyncStorage.removeItem(STORAGE_KEY).catch(() => {}) }} hitSlop={8}>
+            <Feather name="plus" size={18} color={COLORS.brand} />
+          </TouchableOpacity>
           {hasUserMessage && (
-            <>
-              <TouchableOpacity onPress={() => { setMessages([WELCOME]); AsyncStorage.removeItem(STORAGE_KEY).catch(() => {}) }} hitSlop={8}>
-                <Feather name="plus" size={18} color={COLORS.brand} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={clearHistory} hitSlop={8}>
-                <Feather name="trash-2" size={18} color={COLORS.muted} />
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity onPress={clearHistory} hitSlop={8}>
+              <Feather name="trash-2" size={18} color={COLORS.muted} />
+            </TouchableOpacity>
           )}
         </View>
       </View>
