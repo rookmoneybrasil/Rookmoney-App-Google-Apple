@@ -72,13 +72,15 @@ export default function AiChatScreen() {
 
   // Load history from AsyncStorage
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then(raw => {
-      if (!raw) return
-      try {
-        const saved = JSON.parse(raw) as DisplayMessage[]
-        if (saved.length > 0) setMessages(saved)
-      } catch {}
-    })
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then(raw => {
+        if (!raw) return
+        try {
+          const saved = JSON.parse(raw) as DisplayMessage[]
+          if (Array.isArray(saved) && saved.length > 0) setMessages(saved)
+        } catch { /* corrupt data — ignore */ }
+      })
+      .catch(() => { /* AsyncStorage unavailable — ignore */ })
   }, [])
 
   // Save history
@@ -201,9 +203,14 @@ export default function AiChatScreen() {
         </View>
         <View style={styles.headerActions}>
           {hasUserMessage && (
-            <TouchableOpacity onPress={clearHistory} hitSlop={8}>
-              <Feather name="trash-2" size={18} color={COLORS.muted} />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity onPress={() => { setMessages([WELCOME]); AsyncStorage.removeItem(STORAGE_KEY).catch(() => {}) }} hitSlop={8}>
+                <Feather name="plus" size={18} color={COLORS.brand} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={clearHistory} hitSlop={8}>
+                <Feather name="trash-2" size={18} color={COLORS.muted} />
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </View>
@@ -322,7 +329,7 @@ const styles = StyleSheet.create({
   headerAvatar:   { width: 36, height: 36, resizeMode: 'contain' },
   headerTitle:    { fontSize: 15, fontWeight: '700', color: COLORS.text },
   headerSubtitle: { fontSize: 11, color: COLORS.muted, marginTop: 1 },
-  headerActions:  { width: 36, alignItems: 'flex-end' },
+  headerActions:  { flexDirection: 'row', alignItems: 'center', gap: 14 },
 
   messages:        { flex: 1 },
   messagesContent: { padding: 16, gap: 10 },
