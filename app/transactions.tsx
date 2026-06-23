@@ -53,6 +53,8 @@ function TxItem({ item, onEdit, onDelete }: { item: Transaction; onEdit: () => v
   )
 }
 
+const PAGE_SIZE = 30
+
 export default function TransactionsScreen() {
   const router  = useRouter()
   const qc      = useQueryClient()
@@ -60,31 +62,67 @@ export default function TransactionsScreen() {
   const [catFilter,     setCatFilter]     = useState<string | undefined>(undefined)
   const [currentMonth,  setCurrentMonth]  = useState<Date | null>(new Date())
   const [search,        setSearch]        = useState('')
+  const [allItems,      setAllItems]      = useState<Transaction[]>([])
+  const [page,          setPage]          = useState(1)
+  const [totalCount,    setTotalCount]    = useState(0)
+  const [totalPages,    setTotalPages]    = useState(1)
+  const [loadingMore,   setLoadingMore]   = useState(false)
 
   const monthStr   = currentMonth ? format(currentMonth, 'yyyy-MM') : undefined
   const monthLabel = currentMonth ? format(currentMonth, "MMMM 'yy", { locale: ptBR }) : 'Todos'
 
-  const { data, isLoading, refetch, isRefetching } = useQuery({
+  const { isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['transactions', monthStr, typeFilter, catFilter],
     queryFn:  () =>
       transactionsApi.list({
         month:      monthStr,
         type:       typeFilter,
         categoryId: catFilter,
-        pageSize:   200,
-      }).then((r) => r.data?.items ?? []),
+        pageSize:   PAGE_SIZE,
+        page:       1,
+      }).then((r) => {
+        const d = r.data
+        setAllItems(d?.items ?? [])
+        setTotalCount(d?.total ?? 0)
+        setTotalPages(d?.totalPages ?? 1)
+        setPage(1)
+        return d
+      }),
   })
 
+  async function loadMore() {
+    if (loadingMore || page >= totalPages) return
+    setLoadingMore(true)
+    try {
+      const nextPage = page + 1
+      const r = await transactionsApi.list({
+        month:      monthStr,
+        type:       typeFilter,
+        categoryId: catFilter,
+        pageSize:   PAGE_SIZE,
+        page:       nextPage,
+      })
+      const d = r.data
+      setAllItems(prev => [...prev, ...(d?.items ?? [])])
+      setTotalCount(d?.total ?? totalCount)
+      setTotalPages(d?.totalPages ?? totalPages)
+      setPage(nextPage)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return data ?? []
+    if (!search.trim()) return allItems
     const q = search.toLowerCase()
-    return (data ?? []).filter((t) =>
+    return allItems.filter((t) =>
       (t.description ?? '').toLowerCase().includes(q) ||
       t.category.name.toLowerCase().includes(q),
     )
-  }, [data, search])
+  }, [allItems, search])
 
   const hasActiveFilters = !!typeFilter || !!catFilter || !!search.trim()
+  const hasMore = page < totalPages
 
   function clearFilters() {
     setTypeFilter(undefined)
@@ -230,6 +268,26 @@ export default function TransactionsScreen() {
           )}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={COLORS.brand} />}
+          onEndReached={() => { if (hasMore && !loadingMore) loadMore() }}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={
+            <View style={styles.listFooter}>
+              {totalCount > 0 && (
+                <Text style={styles.footerCount}>
+                  Mostrando {allItems.length} de {totalCount} transações
+                </Text>
+              )}
+              {hasMore && (
+                <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore} disabled={loadingMore}>
+                  {loadingMore ? (
+                    <ActivityIndicator size="small" color={COLORS.brand} />
+                  ) : (
+                    <Text style={styles.loadMoreText}>Carregar mais</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          }
           ListEmptyComponent={
             <View style={styles.empty}>
               <Feather name="repeat" size={36} color={COLORS.muted} />
@@ -323,4 +381,12 @@ const styles = StyleSheet.create({
 
   empty:     { paddingTop: 60, alignItems: 'center', gap: 8 },
   emptyText: { color: COLORS.muted, fontSize: 14 },
+
+  listFooter:   { paddingVertical: 16, alignItems: 'center', gap: 10 },
+  footerCount:  { fontSize: 12, color: COLORS.muted },
+  loadMoreBtn:  {
+    paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12,
+    backgroundColor: COLORS.brand + '18', borderWidth: 1, borderColor: COLORS.brand + '40',
+  },
+  loadMoreText: { fontSize: 13, fontWeight: '600', color: COLORS.brand },
 })

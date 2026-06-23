@@ -121,7 +121,7 @@ export interface Transaction {
 }
 
 export const transactionsApi = {
-  list: (params?: { month?: string; type?: string; categoryId?: string; pageSize?: number }) => {
+  list: (params?: { month?: string; type?: string; categoryId?: string; pageSize?: number; page?: number }) => {
     // Strip undefined/null so they're not serialized as the string "undefined"
     const clean = params
       ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null))

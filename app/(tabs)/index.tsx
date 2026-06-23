@@ -429,6 +429,50 @@ export default function DashboardScreen() {
             </View>
           </View>
 
+          {/* ── HISTORICO MENSAL ─────────────────────────────────────── */}
+          {(data?.monthlyHistory?.length ?? 0) > 0 && (() => {
+            const history = (data!.monthlyHistory ?? []).slice(-6)
+            const maxVal = Math.max(...history.flatMap(h => [h.income, h.expense]), 1)
+            return (
+              <>
+                <SectionLabel>HISTORICO MENSAL</SectionLabel>
+                <View style={styles.card}>
+                  {history.map((h) => {
+                    const monthDate = new Date(h.month + '-15')
+                    const label = format(monthDate, 'MMM', { locale: ptBR })
+                    const incomePct = Math.max((h.income / maxVal) * 100, 2)
+                    const expensePct = Math.max((h.expense / maxVal) * 100, 2)
+                    return (
+                      <View key={h.month} style={styles.historyRow}>
+                        <Text style={styles.historyLabel}>{label}</Text>
+                        <View style={styles.historyBars}>
+                          <View style={styles.historyBarPair}>
+                            <View style={[styles.historyBarIncome, { width: `${incomePct}%` as `${number}%` }]} />
+                            <Text style={styles.historyBarValue}>{fmtShort(h.income)}</Text>
+                          </View>
+                          <View style={styles.historyBarPair}>
+                            <View style={[styles.historyBarExpense, { width: `${expensePct}%` as `${number}%` }]} />
+                            <Text style={styles.historyBarValue}>{fmtShort(h.expense)}</Text>
+                          </View>
+                        </View>
+                      </View>
+                    )
+                  })}
+                  <View style={styles.historyLegend}>
+                    <View style={styles.historyLegendItem}>
+                      <View style={[styles.historyLegendDot, { backgroundColor: COLORS.success }]} />
+                      <Text style={styles.historyLegendText}>Receita</Text>
+                    </View>
+                    <View style={styles.historyLegendItem}>
+                      <View style={[styles.historyLegendDot, { backgroundColor: COLORS.danger }]} />
+                      <Text style={styles.historyLegendText}>Despesa</Text>
+                    </View>
+                  </View>
+                </View>
+              </>
+            )
+          })()}
+
           {/* ── ATENÇÃO ──────────────────────────────────────────────── */}
           {(!!data?.insight || !!nextBill) && (
             <>
@@ -779,4 +823,17 @@ const styles = StyleSheet.create({
   emptyText:  { color: COLORS.muted, fontSize: 13, textAlign: 'center' },
   emptyBtn:   { marginTop: 4, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: COLORS.brand + '22', borderRadius: 10 },
   emptyBtnText: { color: COLORS.brand, fontSize: 13, fontWeight: '600' },
+
+  // Monthly History
+  historyRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  historyLabel:     { fontSize: 11, fontWeight: '600', color: COLORS.muted, width: 32, textTransform: 'capitalize' },
+  historyBars:      { flex: 1, gap: 3 },
+  historyBarPair:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  historyBarIncome: { height: 6, borderRadius: 3, backgroundColor: COLORS.success },
+  historyBarExpense:{ height: 6, borderRadius: 3, backgroundColor: COLORS.danger },
+  historyBarValue:  { fontSize: 9, color: COLORS.muted },
+  historyLegend:    { flexDirection: 'row', gap: 16, marginTop: 4, justifyContent: 'center' },
+  historyLegendItem:{ flexDirection: 'row', alignItems: 'center', gap: 5 },
+  historyLegendDot: { width: 8, height: 8, borderRadius: 4 },
+  historyLegendText:{ fontSize: 10, color: COLORS.muted },
 })
