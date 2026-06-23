@@ -29,17 +29,18 @@ function RecurringItem({
 }) {
   const isIncome = item.type === 'INCOME'
 
+  const showOptions = () =>
+    Alert.alert('Opções', item.name, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Editar', onPress: onEdit },
+      { text: item.isActive ? 'Desativar' : 'Ativar', onPress: onToggle },
+      { text: 'Excluir', style: 'destructive', onPress: onDelete },
+    ])
+
   return (
     <TouchableOpacity
       style={[styles.item, !item.isActive && styles.itemInactive]}
-      onLongPress={() =>
-        Alert.alert('Opções', item.name, [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Editar', onPress: onEdit },
-          { text: item.isActive ? 'Desativar' : 'Ativar', onPress: onToggle },
-          { text: 'Excluir', style: 'destructive', onPress: onDelete },
-        ])
-      }
+      onLongPress={showOptions}
       activeOpacity={0.8}
     >
       <View style={[styles.icon, { backgroundColor: isIncome ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)' }]}>
@@ -60,8 +61,8 @@ function RecurringItem({
           <Text style={[styles.amount, { color: isIncome ? COLORS.success : COLORS.danger }]}>
             {isIncome ? '+' : '-'}{fmt(item.amount)}
           </Text>
-          <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
-            <Feather name="edit-2" size={12} color={COLORS.muted} />
+          <TouchableOpacity onPress={showOptions} hitSlop={8} style={{ padding: 4 }}>
+            <Feather name="more-vertical" size={16} color={COLORS.muted} />
           </TouchableOpacity>
         </View>
         <View style={styles.rightBottom}>

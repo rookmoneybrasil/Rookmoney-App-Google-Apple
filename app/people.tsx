@@ -17,17 +17,18 @@ function PersonCard({ person, onDelete, onRename }: { person: Person; onDelete: 
   const netColor = netOwed > 0 ? COLORS.success : netOwed < 0 ? COLORS.danger : COLORS.muted
   const netLabel = netOwed > 0 ? 'te deve' : netOwed < 0 ? 'você deve' : 'quitado'
 
+  const showOptions = () =>
+    Alert.alert('Opções', person.name, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Renomear', onPress: onRename },
+      { text: 'Excluir', style: 'destructive', onPress: onDelete },
+    ])
+
   return (
     <TouchableOpacity
       style={styles.card}
       onPress={() => router.push({ pathname: '/person-detail', params: { id: person.id } })}
-      onLongPress={() =>
-        Alert.alert('Opções', person.name, [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Renomear', onPress: onRename },
-          { text: 'Excluir', style: 'destructive', onPress: onDelete },
-        ])
-      }
+      onLongPress={showOptions}
       activeOpacity={0.85}
     >
       <View style={styles.avatar}>
@@ -41,6 +42,9 @@ function PersonCard({ person, onDelete, onRename }: { person: Person; onDelete: 
           {person.openEntriesCount} {person.openEntriesCount === 1 ? 'pendência' : 'pendências'}
         </Text>
       </View>
+      <TouchableOpacity onPress={showOptions} hitSlop={8} style={{ padding: 4 }}>
+        <Feather name="more-vertical" size={16} color={COLORS.muted} />
+      </TouchableOpacity>
       <View style={styles.right}>
         <Text style={[styles.net, { color: netColor }]}>
           {fmt(Math.abs(netOwed))}

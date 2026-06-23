@@ -73,16 +73,17 @@ function BudgetItem({ budget, onEdit, onDelete }: { budget: Budget; onEdit: () =
   const isWarning = !isOver && pct >= 80
   const barColor  = isOver ? COLORS.danger : isWarning ? COLORS.warning : COLORS.brand
 
+  const showOptions = () =>
+    Alert.alert('Opções', budget.category.name, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Editar valor', onPress: onEdit },
+      { text: 'Excluir', style: 'destructive', onPress: onDelete },
+    ])
+
   return (
     <TouchableOpacity
       style={styles.item}
-      onLongPress={() =>
-        Alert.alert('Opções', budget.category.name, [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Editar valor', onPress: onEdit },
-          { text: 'Excluir', style: 'destructive', onPress: onDelete },
-        ])
-      }
+      onLongPress={showOptions}
       activeOpacity={0.8}
     >
       <View style={[styles.catIcon, { backgroundColor: budget.category.color + '22' }]}>
@@ -110,6 +111,9 @@ function BudgetItem({ budget, onEdit, onDelete }: { budget: Budget; onEdit: () =
           <View style={[styles.progressFill, { width: `${pct}%`, backgroundColor: barColor }]} />
         </View>
       </View>
+      <TouchableOpacity onPress={showOptions} hitSlop={8} style={{ padding: 4 }}>
+        <Feather name="more-vertical" size={16} color={COLORS.muted} />
+      </TouchableOpacity>
     </TouchableOpacity>
   )
 }

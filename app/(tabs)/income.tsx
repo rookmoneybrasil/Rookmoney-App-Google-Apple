@@ -61,6 +61,13 @@ function RecurringRow({ source, currentMonth, now, onEdit, onDelete }: {
   const isFuture  = !!source.startDate && new Date(source.startDate) > now
   const startLabel = isFuture ? format(new Date(source.startDate!), "MMMM 'de' yyyy", { locale: ptBR }) : null
 
+  const showOptions = () =>
+    Alert.alert('Opções', source.name, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Editar', onPress: onEdit },
+      { text: 'Excluir', style: 'destructive', onPress: onDelete },
+    ])
+
   return (
     <TouchableOpacity
       style={[
@@ -69,13 +76,7 @@ function RecurringRow({ source, currentMonth, now, onEdit, onDelete }: {
         : isFuture ? styles.rowFuture
         : styles.rowSuccess,
       ]}
-      onLongPress={() =>
-        Alert.alert('Opções', source.name, [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Editar', onPress: onEdit },
-          { text: 'Excluir', style: 'destructive', onPress: onDelete },
-        ])
-      }
+      onLongPress={showOptions}
       activeOpacity={0.85}
     >
       <View style={[styles.rowIcon, { backgroundColor: COLORS.success + (received ? '26' : '1a') }]}>
@@ -94,6 +95,9 @@ function RecurringRow({ source, currentMonth, now, onEdit, onDelete }: {
           {received ? ` · ${receivedDateLabel(source)}` : ''}
         </Text>
       </View>
+      <TouchableOpacity onPress={showOptions} hitSlop={8} style={{ padding: 4 }}>
+        <Feather name="more-vertical" size={16} color={COLORS.muted} />
+      </TouchableOpacity>
     </TouchableOpacity>
   )
 }
@@ -106,16 +110,17 @@ function EventualRow({ source, onReceive, onEdit, onDelete }: {
 }) {
   const cfg = TYPE_CONFIG[source.type] ?? TYPE_CONFIG.OTHER
 
+  const showOptions = () =>
+    Alert.alert('Opções', source.name, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Editar', onPress: onEdit },
+      { text: 'Excluir', style: 'destructive', onPress: onDelete },
+    ])
+
   return (
     <TouchableOpacity
       style={[styles.row, styles.rowWarning]}
-      onLongPress={() =>
-        Alert.alert('Opções', source.name, [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Editar', onPress: onEdit },
-          { text: 'Excluir', style: 'destructive', onPress: onDelete },
-        ])
-      }
+      onLongPress={showOptions}
       activeOpacity={0.85}
     >
       <View style={[styles.rowIcon, { backgroundColor: COLORS.warning + '1a' }]}>
@@ -131,6 +136,9 @@ function EventualRow({ source, onReceive, onEdit, onDelete }: {
           {source.notes ? ` · ${source.notes}` : ' · Pontual'}
         </Text>
       </View>
+      <TouchableOpacity onPress={showOptions} hitSlop={8} style={{ padding: 4 }}>
+        <Feather name="more-vertical" size={16} color={COLORS.muted} />
+      </TouchableOpacity>
       <TouchableOpacity style={styles.receiveBtn} onPress={onReceive}>
         <Feather name="arrow-down-circle" size={13} color={COLORS.success} />
         <Text style={styles.receiveBtnText}>Recebi</Text>

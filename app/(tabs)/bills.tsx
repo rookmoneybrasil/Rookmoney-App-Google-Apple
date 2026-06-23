@@ -111,16 +111,17 @@ function PendingRow({ item, onPay, onEdit, onDelete }: {
     : status === 'urgent' ? styles.rowUrgent
     : styles.rowDefault
 
+  const showOptions = () =>
+    Alert.alert('Opções', item.name, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Editar', onPress: onEdit },
+      { text: 'Excluir', style: 'destructive', onPress: onDelete },
+    ])
+
   return (
     <TouchableOpacity
       style={[styles.row, rowStyle]}
-      onLongPress={() =>
-        Alert.alert('Opções', item.name, [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Editar', onPress: onEdit },
-          { text: 'Excluir', style: 'destructive', onPress: onDelete },
-        ])
-      }
+      onLongPress={showOptions}
       activeOpacity={0.85}
     >
       <View style={[styles.rowIcon, { backgroundColor: cfg.color + '1a' }]}>
@@ -145,6 +146,9 @@ function PendingRow({ item, onPay, onEdit, onDelete }: {
       </View>
       <View style={styles.rowRight}>
         <Text style={styles.rowAmountText}>{fmt(Number(item.amount))}</Text>
+        <TouchableOpacity onPress={showOptions} hitSlop={8} style={{ padding: 4 }}>
+          <Feather name="more-vertical" size={16} color={COLORS.muted} />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.payBtn} onPress={onPay} hitSlop={6}>
           <Feather name="check" size={12} color={COLORS.success} />
           <Text style={styles.payBtnText}>Pagar</Text>
@@ -160,16 +164,17 @@ function PaidRow({ item, onUnpay, onEdit, onDelete }: {
   onEdit: () => void
   onDelete: () => void
 }) {
+  const showOptions = () =>
+    Alert.alert('Opções', item.name, [
+      { text: 'Editar', onPress: onEdit },
+      { text: 'Estornar pagamento', onPress: onUnpay },
+      { text: 'Excluir', style: 'destructive', onPress: onDelete },
+    ])
+
   return (
     <TouchableOpacity
       style={[styles.row, styles.rowPaid]}
-      onLongPress={() =>
-        Alert.alert('Opções', item.name, [
-          { text: 'Editar', onPress: onEdit },
-          { text: 'Estornar pagamento', onPress: onUnpay },
-          { text: 'Excluir', style: 'destructive', onPress: onDelete },
-        ])
-      }
+      onLongPress={showOptions}
       activeOpacity={0.85}
     >
       <View style={[styles.rowIcon, { backgroundColor: COLORS.success + '1a' }]}>
@@ -182,6 +187,9 @@ function PaidRow({ item, onUnpay, onEdit, onDelete }: {
           {item.recurringBillId ? ' · ↻ fixa' : ''}
         </Text>
       </View>
+      <TouchableOpacity onPress={showOptions} hitSlop={8} style={{ padding: 4 }}>
+        <Feather name="more-vertical" size={16} color={COLORS.muted} />
+      </TouchableOpacity>
       <View style={styles.rowRight}>
         <Text style={[styles.rowAmountText, { color: COLORS.muted }]}>{fmt(Number(item.amount))}</Text>
         <Badge label="Pago" color={COLORS.success} />
@@ -224,6 +232,17 @@ function InstallmentGroupCard({ group, onPay, onDeleteGroup, onEdit }: {
         </View>
         <View style={styles.groupHeaderRight}>
           <Text style={styles.groupCountText}>{group.paidCount}/{group.total}</Text>
+          <TouchableOpacity
+            onPress={() => Alert.alert('Opções', group.name, [
+              { text: 'Cancelar', style: 'cancel' },
+              { text: 'Editar', onPress: onEdit },
+              { text: 'Excluir tudo', style: 'destructive', onPress: onDeleteGroup },
+            ])}
+            hitSlop={8}
+            style={{ padding: 4 }}
+          >
+            <Feather name="more-vertical" size={16} color={COLORS.muted} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={onEdit} hitSlop={8} style={styles.groupEditBtn}>
             <Feather name="edit-2" size={13} color={COLORS.brand} />
           </TouchableOpacity>

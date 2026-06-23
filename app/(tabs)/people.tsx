@@ -49,6 +49,10 @@ function PersonRow({ person, onPress, onLongPress }: {
         </Text>
       </View>
 
+      <TouchableOpacity onPress={onLongPress} hitSlop={8} style={{ padding: 4 }}>
+        <Feather name="more-vertical" size={16} color={COLORS.muted} />
+      </TouchableOpacity>
+
       <View style={styles.rowRight}>
         <View style={styles.rowAmounts}>
           <View style={styles.rowAmountLine}>
