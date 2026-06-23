@@ -488,7 +488,7 @@ export default function ReportsScreen() {
     queryFn:  () => meApi.get().then((r) => r.data),
   })
 
-  const isPro = me?.plan === 'PRO'
+  const isPro = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
 
   const monthStr   = format(currentMonth, 'yyyy-MM')
   const monthLabel = format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR })

@@ -317,7 +317,7 @@ export default function SettingsScreen() {
   })
 
   const user = data ?? (storeUser as unknown as MeData | null)
-  const isPro = user?.plan === 'PRO'
+  const isPro = user?.plan === 'PRO' || user?.plan === 'PRO_PLUS'
 
   const billReminderVal  = notifBillReminder  ?? settings?.notifBillReminder  ?? true
   const categoryLimitVal = notifCategoryLimit ?? settings?.notifCategoryLimit ?? true

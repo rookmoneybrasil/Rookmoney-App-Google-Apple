@@ -16,24 +16,24 @@ interface DisplayMessage extends ChatMessage {
 }
 
 const SUGGESTIONS = [
+  'Analisa minha renda e me ajuda a organizar',
   'Ver meu resumo financeiro',
+  'Quais contas vencem essa semana?',
   'Registrar uma despesa',
-  'Criar uma meta',
-  'Adicionar uma conta a pagar',
 ]
 
 const PAGE_MAP: Record<string, { label: string; path: string }> = {
-  '/dashboard':    { label: 'Início',        path: '/' },
+  '/dashboard':    { label: 'Inicio',        path: '/' },
   '/transactions': { label: 'Extratos',      path: '/transactions' },
   '/goals':        { label: 'Metas',         path: '/goals' },
   '/bills':        { label: 'Contas',        path: '/bills' },
-  '/budget':       { label: 'Orçamento',     path: '/budget' },
-  '/reports':      { label: 'Relatórios',    path: '/reports' },
+  '/budget':       { label: 'Orcamento',     path: '/budget' },
+  '/reports':      { label: 'Relatorios',    path: '/reports' },
   '/people':       { label: 'Pessoas',       path: '/people' },
   '/categories':   { label: 'Categorias',    path: '/categories' },
-  '/recurring':    { label: 'Recorrências',  path: '/recurring' },
+  '/recurring':    { label: 'Recorrencias',  path: '/recurring' },
   '/income':       { label: 'Rendas',        path: '/income' },
-  '/settings':     { label: 'Configurações', path: '/settings' },
+  '/settings':     { label: 'Configuracoes', path: '/settings' },
 }
 
 export default function AiChatScreen() {
@@ -44,16 +44,31 @@ export default function AiChatScreen() {
     queryKey: ['me'],
     queryFn:  () => meApi.get().then(r => r.data),
   })
-  const isPro = me?.plan === 'PRO'
+  const isPro = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
 
   const [messages, setMessages] = useState<DisplayMessage[]>([
     {
       role:    'assistant',
-      content: 'Olá! 👋 Sou o Rook, seu assistente financeiro. Posso registrar transações, criar metas, adicionar contas e muito mais. Como posso ajudar?',
+      content: 'Ola! \u{1F44B} Sou o Rookinho, seu assistente financeiro com IA.\n\nPosso te ajudar a:\n• Registrar transacoes e contas\n• Consultar seus gastos e metas\n• Dar dicas personalizadas\n\nO que deseja fazer?',
     },
   ])
-  const [input, setInput]     = useState('')
-  const [loading, setLoading] = useState(false)
+  const [input, setInput]         = useState('')
+  const [loading, setLoading]     = useState(false)
+  const [remaining, setRemaining] = useState<number | null>(null)
+  const [usageUsed, setUsageUsed] = useState<number | null>(null)
+  const [usageLimit, setUsageLimit] = useState<number | null>(null)
+
+  // Fetch usage on mount
+  useEffect(() => {
+    if (!isPro) return
+    chatApi.getUsage()
+      .then(res => {
+        setUsageUsed(res.data.used)
+        setUsageLimit(res.data.limit)
+        setRemaining(res.data.remaining)
+      })
+      .catch(() => {})
+  }, [isPro])
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true })
@@ -72,16 +87,26 @@ export default function AiChatScreen() {
       const apiMessages = history.map(m => ({ role: m.role, content: m.content }))
       const res = await chatApi.send(apiMessages)
       setMessages(prev => [...prev, { role: 'assistant', content: res.message, navigate: res.navigate }])
+      if (res.remaining != null) {
+        setRemaining(res.remaining)
+        if (usageLimit != null) {
+          setUsageUsed(usageLimit - res.remaining)
+        }
+      }
     } catch (e) {
       const code    = e instanceof Error ? e.message : ''
       const content = code === 'rate_limited'
-        ? '⏳ Você atingiu o limite de mensagens da IA este mês. Tente novamente mais tarde.'
-        : 'Ops, ocorreu um erro. Tente novamente. 😅'
+        ? '⏳ Voce atingiu o limite de mensagens da IA este mes. Tente novamente mais tarde.'
+        : 'Ops, ocorreu um erro. Tente novamente. \u{1F605}'
       setMessages(prev => [...prev, { role: 'assistant', content }])
     } finally {
       setLoading(false)
     }
   }
+
+  const usageText = usageUsed != null && usageLimit != null
+    ? (usageLimit === 0 ? 'Ilimitado' : `${usageUsed}/${usageLimit} mensagens usadas`)
+    : null
 
   return (
     <KeyboardAvoidingView
@@ -99,8 +124,10 @@ export default function AiChatScreen() {
         <View style={styles.headerInfo}>
           <Image source={require('../assets/rookinho.png')} style={styles.headerAvatar} />
           <View>
-            <Text style={styles.headerTitle}>Rook</Text>
-            <Text style={styles.headerSubtitle}>Assistente financeiro</Text>
+            <Text style={styles.headerTitle}>Rookinho</Text>
+            <Text style={styles.headerSubtitle}>
+              {usageText ?? 'Assistente financeiro IA'}
+            </Text>
           </View>
         </View>
         <View style={{ width: 36 }} />
@@ -108,8 +135,8 @@ export default function AiChatScreen() {
 
       {me && !isPro ? (
         <ProGate
-          feature="Assistente Rook (IA)"
-          description="Converse com o Rookinho para registrar transações, criar metas, cadastrar contas e muito mais — exclusivo do plano Pro."
+          feature="Assistente Rookinho (IA)"
+          description="Converse com o Rookinho para registrar transacoes, criar metas, cadastrar contas e muito mais — exclusivo dos planos Pro e Pro+."
         />
       ) : (
         <>
@@ -140,6 +167,18 @@ export default function AiChatScreen() {
               </View>
             )}
           </ScrollView>
+
+          {/* Remaining counter */}
+          {remaining != null && usageLimit != null && usageLimit > 0 && (
+            <View style={styles.remainingBar}>
+              <Feather name="info" size={12} color={COLORS.muted} />
+              <Text style={styles.remainingText}>
+                {remaining > 0
+                  ? `${remaining} mensagens restantes este mes`
+                  : 'Limite de mensagens atingido este mes'}
+              </Text>
+            </View>
+          )}
 
           {/* Suggestions */}
           {messages.length === 1 && (
@@ -213,6 +252,14 @@ const styles = StyleSheet.create({
     marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: COLORS.border,
   },
   navigateLinkText: { fontSize: 12, fontWeight: '600', color: COLORS.brand },
+
+  remainingBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 16, paddingVertical: 6,
+    backgroundColor: COLORS.card,
+    borderTopWidth: 1, borderTopColor: COLORS.border,
+  },
+  remainingText: { fontSize: 11, color: COLORS.muted },
 
   suggestions: { paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
   suggestionBtn: {

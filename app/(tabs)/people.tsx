@@ -117,7 +117,7 @@ export default function PeopleTab() {
     return list
   }, [allPeople, search, filter, sort])
 
-  const isPro   = me?.plan === 'PRO'
+  const isPro   = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
   const atLimit = !isPro && allPeople.length >= (me?.limits?.people ?? 2)
 
   function openCreate() {

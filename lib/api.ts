@@ -832,8 +832,9 @@ export interface ChatMessage {
 }
 
 export interface ChatResponse {
-  message:  string
-  navigate: { path: string; reason: string } | null
+  message:   string
+  navigate:  { path: string; reason: string } | null
+  remaining?: number
 }
 
 export const chatApi = {
@@ -842,6 +843,8 @@ export const chatApi = {
       method: 'POST',
       body:   JSON.stringify({ messages }),
     }),
+  getUsage: () =>
+    request<{ data: { used: number; limit: number; remaining: number } }>('/api/v1/chat'),
 }
 
 // ── Push token ────────────────────────────────────────────────────────
@@ -859,10 +862,10 @@ export const pushTokenApi = {
 // ── Billing ───────────────────────────────────────────────────────────
 
 export const billingApi = {
-  checkout: (annual = false) =>
+  checkout: (plan: 'PRO' | 'PRO_PLUS' = 'PRO', annual = false) =>
     request<{ data: { url: string } }>('/api/v1/billing/checkout', {
       method: 'POST',
-      body:   JSON.stringify({ annual }),
+      body:   JSON.stringify({ plan, annual }),
     }),
   portal: () =>
     request<{ data: { url: string } }>('/api/v1/billing/portal', { method: 'POST' }),

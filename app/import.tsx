@@ -19,7 +19,7 @@ export default function ImportScreen() {
     queryFn:  () => meApi.get().then((r) => r.data),
   })
 
-  const isPro = me?.plan === 'PRO'
+  const isPro = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],

@@ -15,15 +15,17 @@ const DELAY_MS    = 8_000
 const { width }   = Dimensions.get('window')
 
 const COMPARISON = [
-  { label: 'Transações/mês',      free: '50',  pro: 'Ilimitado' },
-  { label: 'Contas a pagar',      free: '5',   pro: 'Ilimitado' },
-  { label: 'Metas',               free: '2',   pro: 'Ilimitado' },
-  { label: 'Pessoas',             free: '2',   pro: 'Ilimitado' },
-  { label: 'Relatórios',          free: null,  pro: true        },
-  { label: 'Projeção financeira', free: null,  pro: true        },
-  { label: 'Orçamento',           free: null,  pro: true        },
-  { label: 'Importar CSV',        free: null,  pro: true        },
-  { label: 'Chat com Rookinho',   free: null,  pro: true        },
+  { label: 'Transações/mês',      free: '50',  pro: 'Ilimitado', proPlus: 'Ilimitado' },
+  { label: 'Contas a pagar',      free: '5',   pro: 'Ilimitado', proPlus: 'Ilimitado' },
+  { label: 'Metas',               free: '2',   pro: 'Ilimitado', proPlus: 'Ilimitado' },
+  { label: 'Pessoas',             free: '2',   pro: 'Ilimitado', proPlus: 'Ilimitado' },
+  { label: 'Relatórios',          free: null,  pro: true,        proPlus: true         },
+  { label: 'Projeção financeira', free: null,  pro: true,        proPlus: true         },
+  { label: 'Orçamento',           free: null,  pro: true,        proPlus: true         },
+  { label: 'Importar CSV',        free: null,  pro: true,        proPlus: true         },
+  { label: 'Chat com Rookinho',   free: null,  pro: '30/mês',    proPlus: 'Ilimitado'  },
+  { label: 'Análises com IA',     free: null,  pro: '4/mês',     proPlus: 'Ilimitado'  },
+  { label: 'Arquivos (upload)',    free: null,  pro: '10/mês',    proPlus: 'Ilimitado'  },
 ]
 
 export function UpsellModal() {
@@ -33,7 +35,7 @@ export function UpsellModal() {
   const user    = useAuthStore((s) => s.user)
 
   useEffect(() => {
-    if (!user || user.plan === 'PRO') return
+    if (!user || user.plan === 'PRO' || user.plan === 'PRO_PLUS') return
     AsyncStorage.getItem(STORAGE_KEY).then((val) => {
       if (val) return
       timer.current = setTimeout(() => {
@@ -68,7 +70,7 @@ export function UpsellModal() {
                   <Text style={s.eyebrow}>DESBLOQUEIE O POTENCIAL TOTAL</Text>
                   <Text style={s.title}>Suas finanças{'\n'}merecem mais</Text>
                   <Text style={s.subtitle}>
-                    Apenas <Text style={s.price}>R$19,90/mês</Text> — cancele quando quiser.
+                    A partir de <Text style={s.price}>R$19,90/mês</Text> — cancele quando quiser.
                   </Text>
                 </View>
 
@@ -82,9 +84,13 @@ export function UpsellModal() {
                       <Feather name="award" size={10} color={COLORS.warning} />
                       <Text style={[s.colHead, { color: COLORS.warning, marginLeft: 3 }]}>PRO</Text>
                     </View>
+                    <View style={s.colProPlus}>
+                      <Feather name="zap" size={10} color={COLORS.brand} />
+                      <Text style={[s.colHead, { color: COLORS.brand, marginLeft: 3 }]}>PRO+</Text>
+                    </View>
                   </View>
                   {/* Data rows */}
-                  {COMPARISON.map(({ label, free, pro }, i) => (
+                  {COMPARISON.map(({ label, free, pro, proPlus }, i) => (
                     <View key={label} style={[s.row, i % 2 === 0 ? s.rowEven : null]}>
                       <View style={s.colLabel}><Text style={s.cell}>{label}</Text></View>
                       <View style={s.colFree}>
@@ -99,6 +105,12 @@ export function UpsellModal() {
                           : <Text style={[s.cell, s.proValue]}>{pro as string}</Text>
                         }
                       </View>
+                      <View style={s.colProPlus}>
+                        {proPlus === true
+                          ? <Feather name="check" size={13} color={COLORS.success} />
+                          : <Text style={[s.cell, s.proValue]}>{proPlus as string}</Text>
+                        }
+                      </View>
                     </View>
                   ))}
                 </View>
@@ -107,7 +119,7 @@ export function UpsellModal() {
                 <View style={s.ctas}>
                   <TouchableOpacity style={s.primaryBtn} onPress={goToBilling} activeOpacity={0.85}>
                     <Feather name="award" size={16} color="#fff" style={{ marginRight: 6 }} />
-                    <Text style={s.primaryBtnText}>Assinar PRO — R$19,90/mês</Text>
+                    <Text style={s.primaryBtnText}>Ver planos a partir de R$19,90</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={close} activeOpacity={0.7} style={s.skipBtn}>
                     <Text style={s.skipText}>Continuar no plano gratuito</Text>
@@ -168,9 +180,10 @@ const s = StyleSheet.create({
   tableHeader: { backgroundColor: 'rgba(255,255,255,0.04)' },
   row:      { flexDirection: 'row', alignItems: 'center' },
   rowEven:  { backgroundColor: 'rgba(255,255,255,0.02)' },
-  colLabel: { flex: 1, paddingHorizontal: 12, paddingVertical: 8 },
-  colFree:  { width: 56, alignItems: 'center', paddingVertical: 8 },
-  colPro:   { width: 64, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', paddingVertical: 8 },
+  colLabel:   { flex: 1, paddingHorizontal: 10, paddingVertical: 8 },
+  colFree:    { width: 44, alignItems: 'center', paddingVertical: 8 },
+  colPro:     { width: 48, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', paddingVertical: 8 },
+  colProPlus: { width: 48, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', paddingVertical: 8 },
   colHead:  { fontSize: 9, fontWeight: '700', color: COLORS.muted, letterSpacing: 0.8 },
   cell:     { fontSize: 11, color: COLORS.muted },
   proValue: { color: COLORS.success, fontWeight: '700' },

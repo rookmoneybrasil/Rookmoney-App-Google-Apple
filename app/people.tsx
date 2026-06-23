@@ -91,7 +91,7 @@ export default function PeopleScreen() {
     setEditing(person)
   }
 
-  const isPro     = me?.plan === 'PRO'
+  const isPro     = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
   const atLimit   = !isPro && (data?.length ?? 0) >= (me?.limits?.people ?? 2)
   const totalOwed = data?.reduce((s, p) => s + (p.theyOweMe - p.iOweThem), 0) ?? 0
 

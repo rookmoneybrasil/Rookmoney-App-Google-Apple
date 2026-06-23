@@ -112,7 +112,7 @@ export default function ProjectionScreen() {
     queryFn:  () => meApi.get().then(r => r.data),
   })
 
-  const isPro = me?.plan === 'PRO'
+  const isPro = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
 
   const { data, isLoading } = useQuery({
     queryKey: ['projection', months],

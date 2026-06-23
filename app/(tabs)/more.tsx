@@ -65,7 +65,7 @@ export default function MoreScreen() {
   const { width: screenW } = useWindowDimensions()
   const itemW = Math.floor((screenW - H_PAD * 2 - GAP * (COLS - 1)) / COLS)
 
-  const isPro     = user?.plan === 'PRO'
+  const isPro     = user?.plan === 'PRO' || user?.plan === 'PRO_PLUS'
   const initials  = (user?.name ?? 'U')
     .split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
 

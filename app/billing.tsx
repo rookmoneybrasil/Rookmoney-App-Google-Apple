@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking, AppState } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native'
 import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -10,25 +10,35 @@ import { meApi, settingsApi, billingApi } from '@/lib/api'
 import { UsageBar } from '@/components/usage-bar'
 
 const PRO_FEATURES: { lib: 'feather' | 'mci'; icon: string; label: string }[] = [
-  { lib: 'mci',     icon: 'infinity',       label: 'Transações, metas e contas ilimitadas' },
-  { lib: 'feather', icon: 'bar-chart-2',    label: 'Relatórios avançados e projeção financeira' },
-  { lib: 'feather', icon: 'message-circle', label: 'Chat com IA — Rookinho responde tudo' },
-  { lib: 'feather', icon: 'upload',         label: 'Importação de extratos CSV' },
-  { lib: 'feather', icon: 'star',           label: 'Orçamento por categoria' },
-  { lib: 'feather', icon: 'shield',         label: 'Suporte prioritário' },
+  { lib: 'mci',     icon: 'infinity',       label: 'Transacoes, metas e contas ilimitadas' },
+  { lib: 'feather', icon: 'bar-chart-2',    label: 'Relatorios avancados e projecao' },
+  { lib: 'feather', icon: 'message-circle', label: '30 mensagens/mes com Rookinho IA' },
+  { lib: 'feather', icon: 'upload',         label: 'Importacao de extratos CSV (10 arquivos)' },
+  { lib: 'feather', icon: 'star',           label: 'Orcamento por categoria' },
+  { lib: 'feather', icon: 'shield',         label: 'Suporte prioritario' },
+]
+
+const PRO_PLUS_FEATURES: { lib: 'feather' | 'mci'; icon: string; label: string }[] = [
+  { lib: 'mci',     icon: 'infinity',       label: 'Tudo do PRO incluso' },
+  { lib: 'feather', icon: 'message-circle', label: 'Rookinho IA ilimitado' },
+  { lib: 'feather', icon: 'upload',         label: 'Uploads e analises ilimitados' },
+  { lib: 'feather', icon: 'zap',            label: 'Funcoes IA avancadas' },
+  { lib: 'feather', icon: 'shield',         label: 'Suporte VIP' },
 ]
 
 const FAQ = [
-  { q: 'Posso cancelar quando quiser?', a: 'Sim, sem multa. Você mantém o acesso PRO até o fim do período pago.' },
-  { q: 'Quais formas de pagamento?',    a: 'Cartão de crédito/débito e Pix (via Stripe).' },
+  { q: 'Posso cancelar quando quiser?', a: 'Sim, sem multa. Voce mantem o acesso ate o fim do periodo pago.' },
+  { q: 'Quais formas de pagamento?',    a: 'Cartao de credito/debito e Pix (via Stripe).' },
   { q: 'O que acontece se eu cancelar?', a: 'Sua conta migra para o plano Free automaticamente, com os limites do plano gratuito.' },
+  { q: 'Qual a diferenca entre PRO e PRO+?', a: 'O PRO tem 30 mensagens/mes com Rookinho IA, 10 arquivos e 4 analises. O PRO+ oferece tudo ilimitado, incluindo Rookinho IA sem limite e funcoes avancadas.' },
+  { q: 'O que e o Rookinho IA?',          a: 'O Rookinho e seu assistente financeiro com inteligencia artificial. Ele registra transacoes, cria metas, analisa seus gastos e da dicas personalizadas — tudo por chat.' },
 ]
 
 export default function BillingScreen() {
   const router      = useRouter()
   const queryClient = useQueryClient()
   const [annual,      setAnnual]      = useState(false)
-  const [loadingUp,   setLoadingUp]   = useState(false)
+  const [loadingPlan, setLoadingPlan] = useState<'PRO' | 'PRO_PLUS' | null>(null)
   const [loadingPort, setLoadingPort] = useState(false)
   const [openFaq,     setOpenFaq]     = useState<number | null>(null)
 
@@ -47,24 +57,30 @@ export default function BillingScreen() {
     queryFn:  () => settingsApi.getPrefs().then(r => r.data),
   })
 
-  const isPro                 = me?.plan === 'PRO'
+  const isPro                 = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
+  const isProPlus             = me?.plan === 'PRO_PLUS'
   const hasStripeSubscription = !!settings?.stripeCustomerId
   const cancelAtPeriodEnd     = settings?.stripeCancelAtPeriodEnd ?? false
   const currentPeriodEnd      = settings?.stripeCurrentPeriodEnd ?? null
 
-  const monthlyPrice = 19.90
-  const annualPrice  = 15.90
-  const price        = annual ? annualPrice : monthlyPrice
+  const proMonthly     = 19.90
+  const proAnnual      = 15.90
+  const proPrice       = annual ? proAnnual : proMonthly
+  const proPlusMonthly = 34.90
+  const proPlusAnnual  = 27.90
+  const proPlusPrice   = annual ? proPlusAnnual : proPlusMonthly
 
-  async function handleCheckout() {
-    setLoadingUp(true)
+  const planLabel = isProPlus ? 'PRO+' : isPro ? 'PRO' : 'Gratuito'
+
+  async function handleCheckout(plan: 'PRO' | 'PRO_PLUS') {
+    setLoadingPlan(plan)
     try {
-      const res = await billingApi.checkout(annual)
+      const res = await billingApi.checkout(plan, annual)
       await Linking.openURL(res.data.url)
     } catch (e: any) {
-      Alert.alert('Erro', e.message ?? 'Não foi possível iniciar o checkout.')
+      Alert.alert('Erro', e.message ?? 'Nao foi possivel iniciar o checkout.')
     } finally {
-      setLoadingUp(false)
+      setLoadingPlan(null)
     }
   }
 
@@ -74,7 +90,7 @@ export default function BillingScreen() {
       const res = await billingApi.portal()
       await Linking.openURL(res.data.url)
     } catch (e: any) {
-      Alert.alert('Erro', e.message ?? 'Não foi possível abrir o portal de assinatura.')
+      Alert.alert('Erro', e.message ?? 'Nao foi possivel abrir o portal de assinatura.')
     } finally {
       setLoadingPort(false)
     }
@@ -102,7 +118,7 @@ export default function BillingScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <View style={styles.statusTitleRow}>
-              <Text style={styles.statusTitle}>Plano {isPro ? 'PRO' : 'Gratuito'}</Text>
+              <Text style={styles.statusTitle}>Plano {planLabel}</Text>
               {isPro && (
                 <View style={[styles.activeBadge, cancelAtPeriodEnd && styles.cancelingBadge]}>
                   <Text style={[styles.activeBadgeText, cancelAtPeriodEnd && styles.cancelingBadgeText]}>
@@ -112,9 +128,11 @@ export default function BillingScreen() {
               )}
             </View>
             <Text style={styles.statusDesc}>
-              {isPro
-                ? 'Você tem acesso a todos os recursos sem limitações.'
-                : 'Upgrade para PRO e desbloqueie tudo.'}
+              {isProPlus
+                ? 'Voce tem acesso completo com IA ilimitada.'
+                : isPro
+                  ? 'Voce tem acesso a todos os recursos.'
+                  : 'Faca upgrade e desbloqueie tudo.'}
             </Text>
           </View>
           {isPro && hasStripeSubscription && (
@@ -135,16 +153,16 @@ export default function BillingScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.cancelBannerTitle}>Cancelamento agendado</Text>
               <Text style={styles.cancelBannerDesc}>
-                Seu plano PRO será cancelado em{' '}
+                Seu plano {planLabel} sera cancelado em{' '}
                 <Text style={styles.cancelBannerDate}>
                   {new Date(currentPeriodEnd).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
                 </Text>
-                . Até lá, você mantém acesso a todos os recursos.
+                . Ate la, voce mantem acesso a todos os recursos.
               </Text>
               <TouchableOpacity onPress={handlePortal} disabled={loadingPort} activeOpacity={0.7} style={styles.reactivateBtn}>
                 {loadingPort
                   ? <ActivityIndicator size="small" color={COLORS.warning} />
-                  : <Text style={styles.reactivateBtnText}>Reativar assinatura →</Text>}
+                  : <Text style={styles.reactivateBtnText}>Reativar assinatura</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -155,7 +173,7 @@ export default function BillingScreen() {
           <View style={styles.usageCard}>
             <Text style={styles.usageTitle}>Uso do plano gratuito</Text>
             <View style={{ gap: 10 }}>
-              <UsageBar used={me.usage.transactionsThisMonth} limit={me.limits.transactionsPerMonth} label="Transações" />
+              <UsageBar used={me.usage.transactionsThisMonth} limit={me.limits.transactionsPerMonth} label="Transacoes" />
               <UsageBar used={me.usage.bills}                 limit={me.limits.bills}                label="Contas" />
               <UsageBar used={me.usage.goals}                 limit={me.limits.goals}                label="Metas" />
               <UsageBar used={me.usage.people}                limit={me.limits.people}               label="Pessoas" />
@@ -164,48 +182,51 @@ export default function BillingScreen() {
           </View>
         )}
 
-        {/* Upgrade section (Free only) */}
-        {!isPro && (
-          <View style={styles.proCard}>
-            <View style={styles.proHeaderRow}>
-              <View style={styles.proBadgeRow}>
-                <MaterialCommunityIcons name="crown" size={16} color={COLORS.warning} />
-                <Text style={styles.proBadgeText}>PRO</Text>
-              </View>
+        {/* Annual/Monthly toggle */}
+        {(!isPro || (isPro && !isProPlus)) && (
+          <View style={styles.toggleRow}>
+            <View style={styles.priceToggle}>
+              <TouchableOpacity
+                style={[styles.toggleOption, !annual && styles.toggleOptionActive]}
+                onPress={() => setAnnual(false)}
+              >
+                <Text style={[styles.toggleText, !annual && styles.toggleTextActive]}>Mensal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleOption, annual && styles.toggleOptionActive]}
+                onPress={() => setAnnual(true)}
+              >
+                <Text style={[styles.toggleText, annual && styles.toggleTextActive]}>Anual</Text>
+                <View style={styles.saveBadge}>
+                  <Text style={styles.saveBadgeText}>-20%</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
-              {/* Toggle */}
-              <View style={styles.priceToggle}>
-                <TouchableOpacity
-                  style={[styles.toggleOption, !annual && styles.toggleOptionActive]}
-                  onPress={() => setAnnual(false)}
-                >
-                  <Text style={[styles.toggleText, !annual && styles.toggleTextActive]}>Mensal</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.toggleOption, annual && styles.toggleOptionActive]}
-                  onPress={() => setAnnual(true)}
-                >
-                  <Text style={[styles.toggleText, annual && styles.toggleTextActive]}>Anual</Text>
-                  <View style={styles.saveBadge}>
-                    <Text style={styles.saveBadgeText}>-20%</Text>
-                  </View>
-                </TouchableOpacity>
+        {/* PRO card (show for Free users, and for PRO users who might want to see their plan) */}
+        {!isPro && (
+          <View style={styles.planCard}>
+            <View style={styles.planHeaderRow}>
+              <View style={styles.planBadgeRow}>
+                <MaterialCommunityIcons name="crown" size={16} color={COLORS.warning} />
+                <Text style={styles.planBadgeText}>PRO</Text>
               </View>
             </View>
 
             <View style={styles.priceRow}>
               <Text style={styles.priceValue}>
-                R$ {price.toFixed(2).replace('.', ',')}
+                R$ {proPrice.toFixed(2).replace('.', ',')}
               </Text>
-              <Text style={styles.pricePeriod}>/mês</Text>
+              <Text style={styles.pricePeriod}>/mes</Text>
             </View>
             {annual && (
               <Text style={styles.annualNote}>
-                🎉 Você economiza R${((monthlyPrice - annualPrice) * 12).toFixed(0)} por ano — cobrado R$190,80/ano
+                Voce economiza R${((proMonthly - proAnnual) * 12).toFixed(0)} por ano
               </Text>
             )}
 
-            {/* Features */}
             <View style={styles.featureList}>
               {PRO_FEATURES.map(f => (
                 <View key={f.label} style={styles.featureRow}>
@@ -221,30 +242,86 @@ export default function BillingScreen() {
 
             <TouchableOpacity
               style={styles.upgradeBtn}
-              onPress={handleCheckout}
-              disabled={loadingUp}
+              onPress={() => handleCheckout('PRO')}
+              disabled={loadingPlan !== null}
               activeOpacity={0.85}
             >
-              {loadingUp
+              {loadingPlan === 'PRO'
                 ? <ActivityIndicator color="#fff" />
                 : <Text style={styles.upgradeBtnText}>
-                    {annual ? '⚡ Assinar anual — 2 meses grátis' : '⚡ Assinar PRO — R$19,90/mês'}
+                    {annual ? 'Assinar PRO anual' : 'Assinar PRO — R$19,90/mes'}
+                  </Text>
+              }
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* PRO+ card (show for Free and PRO users) */}
+        {!isProPlus && (
+          <View style={[styles.planCard, styles.planCardPlus]}>
+            <View style={styles.planHeaderRow}>
+              <View style={styles.planBadgeRow}>
+                <Feather name="zap" size={16} color={COLORS.brand} />
+                <Text style={[styles.planBadgeText, { color: COLORS.brand }]}>PRO+</Text>
+              </View>
+              <View style={styles.recommendedBadge}>
+                <Text style={styles.recommendedText}>RECOMENDADO</Text>
+              </View>
+            </View>
+
+            <View style={styles.priceRow}>
+              <Text style={styles.priceValue}>
+                R$ {proPlusPrice.toFixed(2).replace('.', ',')}
+              </Text>
+              <Text style={styles.pricePeriod}>/mes</Text>
+            </View>
+            {annual && (
+              <Text style={styles.annualNote}>
+                Voce economiza R${((proPlusMonthly - proPlusAnnual) * 12).toFixed(0)} por ano
+              </Text>
+            )}
+
+            <View style={styles.featureList}>
+              {PRO_PLUS_FEATURES.map(f => (
+                <View key={f.label} style={styles.featureRow}>
+                  <View style={[styles.featureIcon, { backgroundColor: 'rgba(99,102,241,0.12)' }]}>
+                    {f.lib === 'mci'
+                      ? <MaterialCommunityIcons name={f.icon as any} size={14} color={COLORS.brand} />
+                      : <Feather name={f.icon as any} size={14} color={COLORS.brand} />}
+                  </View>
+                  <Text style={styles.featureLabel}>{f.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.upgradeBtn, styles.upgradeBtnPlus]}
+              onPress={() => handleCheckout('PRO_PLUS')}
+              disabled={loadingPlan !== null}
+              activeOpacity={0.85}
+            >
+              {loadingPlan === 'PRO_PLUS'
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.upgradeBtnText}>
+                    {isPro
+                      ? 'Upgrade para PRO+'
+                      : annual ? 'Assinar PRO+ anual' : 'Assinar PRO+ — R$34,90/mes'}
                   </Text>
               }
             </TouchableOpacity>
 
-            <Text style={styles.cancelNote}>Cancele quando quiser · Sem multa · Cartão ou Pix</Text>
+            <Text style={styles.cancelNote}>Cancele quando quiser · Sem multa · Cartao ou Pix</Text>
           </View>
         )}
 
-        {/* PRO — manage subscription */}
+        {/* PRO/PRO+ — manage subscription */}
         {isPro && (
           <View style={styles.manageCard}>
             <View style={styles.manageHeaderText}>
               <Text style={styles.manageTitle}>Gerenciar assinatura</Text>
               <Text style={styles.manageSubtitle}>
                 {hasStripeSubscription
-                  ? 'Tudo é gerenciado de forma segura via Stripe'
+                  ? 'Tudo e gerenciado de forma segura via Stripe'
                   : 'Plano ativado manualmente pelo administrador'}
               </Text>
             </View>
@@ -257,7 +334,7 @@ export default function BillingScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.manageRowTitle}>Atualizar forma de pagamento</Text>
-                    <Text style={styles.manageRowDesc}>Trocar cartão ou adicionar novo</Text>
+                    <Text style={styles.manageRowDesc}>Trocar cartao ou adicionar novo</Text>
                   </View>
                   <Feather name="chevron-right" size={16} color={COLORS.muted2} />
                 </TouchableOpacity>
@@ -269,7 +346,7 @@ export default function BillingScreen() {
                     <Feather name="file-text" size={16} color={COLORS.muted} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.manageRowTitle}>Histórico de cobranças</Text>
+                    <Text style={styles.manageRowTitle}>Historico de cobrancas</Text>
                     <Text style={styles.manageRowDesc}>Ver faturas e comprovantes</Text>
                   </View>
                   <Feather name="chevron-right" size={16} color={COLORS.muted2} />
@@ -283,7 +360,7 @@ export default function BillingScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.manageRowTitle, { color: COLORS.danger }]}>Cancelar assinatura</Text>
-                    <Text style={styles.manageRowDesc}>Você mantém o PRO até o fim do período pago</Text>
+                    <Text style={styles.manageRowDesc}>Voce mantem o {planLabel} ate o fim do periodo pago</Text>
                   </View>
                   <Feather name="chevron-right" size={16} color={COLORS.muted2} />
                 </TouchableOpacity>
@@ -296,8 +373,8 @@ export default function BillingScreen() {
               </>
             ) : (
               <View style={styles.manageStatic}>
-                <Text style={styles.manageStaticText}>Seu plano PRO foi ativado pela equipe Rook Money.</Text>
-                <Text style={styles.manageStaticSub}>Para gerenciar cobranças, entre em contato pelo Suporte.</Text>
+                <Text style={styles.manageStaticText}>Seu plano {planLabel} foi ativado pela equipe Rook Money.</Text>
+                <Text style={styles.manageStaticSub}>Para gerenciar cobrancas, entre em contato pelo Suporte.</Text>
               </View>
             )}
           </View>
@@ -305,7 +382,7 @@ export default function BillingScreen() {
 
         {/* FAQ */}
         <View style={styles.faqCard}>
-          <Text style={styles.faqTitle}>Dúvidas frequentes</Text>
+          <Text style={styles.faqTitle}>Duvidas frequentes</Text>
           {FAQ.map((item, i) => (
             <View key={item.q}>
               {i > 0 && <View style={styles.faqDivider} />}
@@ -388,16 +465,8 @@ const styles = StyleSheet.create({
   },
   usageTitle: { fontSize: 13, fontWeight: '600', color: COLORS.text },
 
-  // PRO upgrade card
-  proCard: {
-    backgroundColor: COLORS.card, borderRadius: 20,
-    borderWidth: 1, borderColor: COLORS.border,
-    padding: 20, marginBottom: 16,
-  },
-  proHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 },
-  proBadgeRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  proBadgeText: { fontSize: 13, fontWeight: '800', color: COLORS.warning, textTransform: 'uppercase', letterSpacing: 1 },
-
+  // Toggle row
+  toggleRow: { alignItems: 'center', marginBottom: 16 },
   priceToggle: {
     flexDirection: 'row', backgroundColor: COLORS.card2,
     borderRadius: 12, padding: 4,
@@ -415,6 +484,27 @@ const styles = StyleSheet.create({
   },
   saveBadgeText: { fontSize: 10, color: COLORS.success, fontWeight: '700' },
 
+  // Plan cards
+  planCard: {
+    backgroundColor: COLORS.card, borderRadius: 20,
+    borderWidth: 1, borderColor: COLORS.border,
+    padding: 20, marginBottom: 16,
+  },
+  planCardPlus: {
+    borderColor: 'rgba(99,102,241,0.3)',
+    backgroundColor: 'rgba(99,102,241,0.03)',
+  },
+  planHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 },
+  planBadgeRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  planBadgeText: { fontSize: 13, fontWeight: '800', color: COLORS.warning, textTransform: 'uppercase', letterSpacing: 1 },
+
+  recommendedBadge: {
+    backgroundColor: 'rgba(99,102,241,0.15)', borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 3,
+    borderWidth: 1, borderColor: 'rgba(99,102,241,0.3)',
+  },
+  recommendedText: { fontSize: 9, fontWeight: '800', color: COLORS.brand, letterSpacing: 0.5 },
+
   priceRow:    { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginBottom: 4 },
   priceValue:  { fontSize: 32, fontWeight: '800', color: COLORS.text },
   pricePeriod: { fontSize: 15, color: COLORS.muted },
@@ -428,6 +518,9 @@ const styles = StyleSheet.create({
   upgradeBtn: {
     backgroundColor: COLORS.brand, borderRadius: 14,
     paddingVertical: 15, alignItems: 'center', marginBottom: 8,
+  },
+  upgradeBtnPlus: {
+    backgroundColor: COLORS.brand,
   },
   upgradeBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   cancelNote: { fontSize: 12, color: COLORS.muted, textAlign: 'center' },
