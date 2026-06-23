@@ -71,18 +71,26 @@ function KpiCard({
 }) {
   return (
     <TouchableOpacity style={[styles.kpiWrap, { shadowColor: glowColor }]} onPress={onPress} activeOpacity={onPress ? 0.75 : 1}>
-      <LinearGradient colors={gradientColors} style={[styles.kpiCard, { borderColor: glowColor + '40' }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-        <View style={styles.kpiTop}>
-          <Text style={styles.kpiLabel}>{label}</Text>
-          <Feather name={icon as never} size={13} color={valueColor} style={{ opacity: 0.7 }} />
-        </View>
-        <Text style={[styles.kpiValue, { color: valueColor }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
-        {sub ? <Text style={styles.kpiSub} numberOfLines={1}>{sub}</Text> : null}
-        {sparkChange != null && (
-          <View style={styles.kpiSparkline}>
-            <Sparkline change={sparkChange} color={valueColor} />
+      <LinearGradient colors={[gradientColors[0], gradientColors[1], gradientColors[0]]} style={[styles.kpiCard, { borderColor: glowColor + '55' }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+        {/* Neon glow inner line */}
+        <View style={[styles.kpiGlowLine, { backgroundColor: glowColor + '15' }]} />
+        <View>
+          <View style={styles.kpiTop}>
+            <Text style={styles.kpiLabel}>{label}</Text>
+            <View style={[styles.kpiIconCircle, { backgroundColor: glowColor + '20' }]}>
+              <Feather name={icon as never} size={12} color={valueColor} />
+            </View>
           </View>
-        )}
+          <Text style={[styles.kpiValue, { color: valueColor, textShadowColor: glowColor + '60', textShadowRadius: 10 }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+        </View>
+        <View>
+          {sub ? <Text style={styles.kpiSub} numberOfLines={1}>{sub}</Text> : null}
+          {sparkChange != null && (
+            <View style={styles.kpiSparkline}>
+              <Sparkline change={sparkChange} color={valueColor} />
+            </View>
+          )}
+        </View>
       </LinearGradient>
     </TouchableOpacity>
   )
@@ -663,14 +671,19 @@ const styles = StyleSheet.create({
   kpiRow: { flexDirection: 'row', gap: 10 },
   kpiWrap: {
     flex: 1, borderRadius: 16,
-    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.45, shadowRadius: 12, elevation: 6,
+    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.6, shadowRadius: 16, elevation: 8,
   },
-  kpiCard: { borderRadius: 16, padding: 14, borderWidth: 1, flex: 1 },
+  kpiCard: { borderRadius: 16, padding: 14, borderWidth: 1.5, flex: 1, overflow: 'hidden' },
+  kpiGlowLine: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+    borderTopLeftRadius: 16, borderTopRightRadius: 16,
+  },
+  kpiIconCircle: { width: 24, height: 24, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   kpiTop:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  kpiLabel:    { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.6 },
-  kpiValue:    { fontSize: 20, fontWeight: '800', marginBottom: 4 },
-  kpiSub:      { fontSize: 10, color: 'rgba(255,255,255,0.35)' },
-  kpiSparkline:{ marginTop: 6, alignSelf: 'flex-end' },
+  kpiLabel:    { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.5)', letterSpacing: 0.8, textTransform: 'uppercase' },
+  kpiValue:    { fontSize: 22, fontWeight: '800', marginBottom: 2 },
+  kpiSub:      { fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 },
+  kpiSparkline:{ marginTop: 4, alignSelf: 'flex-end' },
 
   // Card
   card: {
