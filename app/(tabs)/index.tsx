@@ -369,52 +369,56 @@ export default function DashboardScreen() {
           {/* ── VISÃO DO MÊS ─────────────────────────────────────────── */}
           <SectionLabel>{`VISÃO DO MÊS — ${monthLabel}`}</SectionLabel>
           <View style={styles.kpiGrid}>
-            <KpiCard
-              label="A RECEBER"
-              value={fmtShort(data?.totalReceivable ?? 0)}
-              sub={`${fmtShort(data?.totalIncomeReceivable ?? 0)} de rendas`}
-              icon="arrow-down-circle"
-              gradientColors={['#062828', '#0e3a3a']}
-              valueColor="#67e8f9"
-              glowColor="#22d3ee"
-              onPress={() => setKpiDrawer('receivable')}
-            />
-            <KpiCard
-              label="RECEITAS"
-              value={fmtShort(data?.monthIncome ?? 0)}
-              sub={data?.incomeChange != null
-                ? `${data.incomeChange >= 0 ? '↑' : '↓'}${Math.abs(Math.round(data.incomeChange))}% vs mês ant.`
-                : 'Total recebido'}
-              icon="trending-up"
-              gradientColors={['#052e16', '#0a4020']}
-              valueColor={COLORS.success}
-              glowColor={COLORS.success}
-              onPress={() => setKpiDrawer('income')}
-              sparkChange={data?.incomeChange ?? null}
-            />
-            <KpiCard
-              label="A PAGAR"
-              value={fmtShort((data?.pendingBillsAmount ?? 0) + (data?.personPayablesAmount ?? 0))}
-              sub={(data?.pendingBillsCount ?? 0) > 0
-                ? `${data?.pendingBillsCount} conta(s)${data?.expenseChange != null ? ` · ${data.expenseChange >= 0 ? '↑' : '↓'}${Math.abs(Math.round(data.expenseChange))}%` : ''}`
-                : 'Em dia'}
-              icon="trending-down"
-              gradientColors={['#450a0a', '#5c1414']}
-              valueColor="#f43f5e"
-              glowColor="#ef4444"
-              onPress={() => setKpiDrawer('bills')}
-              sparkChange={data?.expenseChange ?? null}
-            />
-            <KpiCard
-              label="SALDO DO MÊS"
-              value={fmtShort(data?.monthBalance ?? 0)}
-              sub={`Já pago: ${fmtShort(data?.monthExpense ?? 0)}`}
-              icon="calendar"
-              gradientColors={['#111e32', '#16294a']}
-              valueColor={COLORS.text}
-              glowColor={COLORS.brand}
-              onPress={() => setKpiDrawer('balance')}
-            />
+            <View style={styles.kpiRow}>
+              <KpiCard
+                label="A RECEBER"
+                value={fmtShort(data?.totalReceivable ?? 0)}
+                sub={`${fmtShort(data?.totalIncomeReceivable ?? 0)} de rendas`}
+                icon="arrow-down-circle"
+                gradientColors={['#062828', '#0e3a3a']}
+                valueColor="#67e8f9"
+                glowColor="#22d3ee"
+                onPress={() => setKpiDrawer('receivable')}
+              />
+              <KpiCard
+                label="RECEITAS"
+                value={fmtShort(data?.monthIncome ?? 0)}
+                sub={data?.incomeChange != null
+                  ? `${data.incomeChange >= 0 ? '↑' : '↓'}${Math.abs(Math.round(data.incomeChange))}% vs mês ant.`
+                  : 'Total recebido'}
+                icon="trending-up"
+                gradientColors={['#052e16', '#0a4020']}
+                valueColor={COLORS.success}
+                glowColor={COLORS.success}
+                onPress={() => setKpiDrawer('income')}
+                sparkChange={data?.incomeChange ?? null}
+              />
+            </View>
+            <View style={styles.kpiRow}>
+              <KpiCard
+                label="A PAGAR"
+                value={fmtShort((data?.pendingBillsAmount ?? 0) + (data?.personPayablesAmount ?? 0))}
+                sub={(data?.pendingBillsCount ?? 0) > 0
+                  ? `${data?.pendingBillsCount} conta(s)${data?.expenseChange != null ? ` · ${data.expenseChange >= 0 ? '↑' : '↓'}${Math.abs(Math.round(data.expenseChange))}%` : ''}`
+                  : 'Em dia'}
+                icon="trending-down"
+                gradientColors={['#450a0a', '#5c1414']}
+                valueColor="#f43f5e"
+                glowColor="#ef4444"
+                onPress={() => setKpiDrawer('bills')}
+                sparkChange={data?.expenseChange ?? null}
+              />
+              <KpiCard
+                label="SALDO DO MÊS"
+                value={fmtShort(data?.monthBalance ?? 0)}
+                sub={`Já pago: ${fmtShort(data?.monthExpense ?? 0)}`}
+                icon="calendar"
+                gradientColors={['#111e32', '#16294a']}
+                valueColor={COLORS.text}
+                glowColor={COLORS.brand}
+                onPress={() => setKpiDrawer('balance')}
+              />
+            </View>
           </View>
 
           {/* ── ATENÇÃO ──────────────────────────────────────────────── */}
@@ -655,12 +659,13 @@ const styles = StyleSheet.create({
   },
 
   // KPI grid
-  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  kpiGrid: { gap: 10, marginBottom: 16 },
+  kpiRow: { flexDirection: 'row', gap: 10 },
   kpiWrap: {
-    width: '47.5%', borderRadius: 16,
+    flex: 1, borderRadius: 16,
     shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.45, shadowRadius: 12, elevation: 6,
   },
-  kpiCard: { borderRadius: 16, padding: 14, borderWidth: 1, minHeight: 110, justifyContent: 'space-between' },
+  kpiCard: { borderRadius: 16, padding: 14, borderWidth: 1, flex: 1 },
   kpiTop:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   kpiLabel:    { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.6 },
   kpiValue:    { fontSize: 20, fontWeight: '800', marginBottom: 4 },
