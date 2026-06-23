@@ -35,6 +35,7 @@ export interface AuthUser {
   email:        string
   plan:         string
   hasOnboarded: boolean
+  profileImage?: string | null
 }
 
 interface AuthState {

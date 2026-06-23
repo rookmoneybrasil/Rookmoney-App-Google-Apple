@@ -1,16 +1,20 @@
-import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, Platform, Image } from 'react-native'
 import { Text } from '@/components/text'
 import { Feather } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useAuthStore } from '@/lib/auth'
+import { useQueryClient } from '@tanstack/react-query'
 import { COLORS } from '@/lib/constants'
 import { RookMoneyLogo } from '@/lib/logo'
 
 export function AppHeader({ bellBadge = 0 }: { bellBadge?: number }) {
   const router = useRouter()
   const user   = useAuthStore((s) => s.user)
+  const qc     = useQueryClient()
+  const meData = qc.getQueryData<any>(['me'])
   const initials = (user?.name ?? 'U')
     .split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()
+  const profileImage = meData?.profileImage ?? user?.profileImage
 
   return (
     <View style={styles.container}>
@@ -36,7 +40,9 @@ export function AppHeader({ bellBadge = 0 }: { bellBadge?: number }) {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.push('/settings')} style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
+          {profileImage
+            ? <Image source={{ uri: profileImage }} style={styles.avatarImg} />
+            : <Text style={styles.avatarText}>{initials}</Text>}
         </TouchableOpacity>
       </View>
     </View>
@@ -74,4 +80,5 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: COLORS.warning,
   },
   avatarText: { fontSize: 12, fontWeight: '700', color: COLORS.text },
+  avatarImg:  { width: 30, height: 30, borderRadius: 15 },
 })
