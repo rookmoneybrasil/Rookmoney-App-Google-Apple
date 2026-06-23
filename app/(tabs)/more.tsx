@@ -65,8 +65,10 @@ export default function MoreScreen() {
   const { width: screenW } = useWindowDimensions()
   const itemW = Math.floor((screenW - H_PAD * 2 - GAP * (COLS - 1)) / COLS)
 
-  const isPro     = user?.plan === 'PRO' || user?.plan === 'PRO_PLUS'
-  const initials  = (user?.name ?? 'U')
+  const isPro      = user?.plan === 'PRO' || user?.plan === 'PRO_PLUS'
+  const isProPlus  = user?.plan === 'PRO_PLUS'
+  const isFree     = !isPro
+  const initials   = (user?.name ?? 'U')
     .split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
 
   function handleLogout() {
@@ -98,7 +100,11 @@ export default function MoreScreen() {
           <Text style={styles.userName} numberOfLines={1}>{user?.name ?? '—'}</Text>
           <Text style={styles.userEmail} numberOfLines={1}>{user?.email ?? '—'}</Text>
         </View>
-        {isPro ? (
+        {isProPlus ? (
+          <View style={styles.proPlusBadge}>
+            <Text style={styles.proPlusText}>PRO+</Text>
+          </View>
+        ) : isPro ? (
           <View style={styles.proBadge}>
             <Text style={styles.proText}>PRO</Text>
           </View>
@@ -108,6 +114,24 @@ export default function MoreScreen() {
           </View>
         )}
       </TouchableOpacity>
+
+      {/* Upgrade CTA for FREE users */}
+      {isFree && (
+        <TouchableOpacity
+          style={styles.upgradeCard}
+          onPress={() => router.push('/billing')}
+          activeOpacity={0.85}
+        >
+          <View style={styles.upgradeIconWrap}>
+            <Feather name="zap" size={20} color="#fff" />
+          </View>
+          <View style={styles.upgradeTextWrap}>
+            <Text style={styles.upgradeTitle}>Assinar PRO</Text>
+            <Text style={styles.upgradeSubtitle}>A partir de R$19,90/mes</Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={COLORS.brand} />
+        </TouchableOpacity>
+      )}
 
       {/* Grid */}
       <View style={styles.grid}>
@@ -174,16 +198,36 @@ const styles = StyleSheet.create({
   userInfo:   { flex: 1 },
   userName:   { fontSize: 15, fontWeight: '600', color: COLORS.text },
   userEmail:  { fontSize: 12, color: COLORS.muted, marginTop: 1 },
-  proBadge: {
+  proPlusBadge: {
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
     backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)',
   },
-  proText:   { color: '#F59E0B', fontSize: 11, fontWeight: '700' },
+  proPlusText: { color: '#F59E0B', fontSize: 11, fontWeight: '700' },
+  proBadge: {
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+    backgroundColor: COLORS.brandDim, borderWidth: 1, borderColor: 'rgba(59,130,246,0.3)',
+  },
+  proText:   { color: COLORS.brand, fontSize: 11, fontWeight: '700' },
   freeBadge: {
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
     backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border,
   },
   freeText: { color: COLORS.muted, fontSize: 11, fontWeight: '600' },
+
+  upgradeCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: COLORS.brandDim, borderRadius: 16, padding: 14,
+    borderWidth: 1, borderColor: 'rgba(59,130,246,0.3)',
+    marginBottom: 20,
+  },
+  upgradeIconWrap: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: COLORS.brand,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  upgradeTextWrap: { flex: 1 },
+  upgradeTitle:    { fontSize: 14, fontWeight: '700', color: COLORS.text },
+  upgradeSubtitle: { fontSize: 12, color: COLORS.brand, marginTop: 1 },
 
   grid: {
     flexDirection: 'row',

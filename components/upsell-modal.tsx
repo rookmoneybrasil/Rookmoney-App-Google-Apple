@@ -119,7 +119,11 @@ export function UpsellModal() {
                 <View style={s.ctas}>
                   <TouchableOpacity style={s.primaryBtn} onPress={goToBilling} activeOpacity={0.85}>
                     <Feather name="award" size={16} color="#fff" style={{ marginRight: 6 }} />
-                    <Text style={s.primaryBtnText}>Ver planos a partir de R$19,90</Text>
+                    <Text style={s.primaryBtnText}>Assinar Pro — R$19,90/mes</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.proPlusBtn} onPress={goToBilling} activeOpacity={0.85}>
+                    <Feather name="zap" size={16} color="#fff" style={{ marginRight: 6 }} />
+                    <Text style={s.primaryBtnText}>Assinar Pro+ — R$34,90/mes</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={close} activeOpacity={0.7} style={s.skipBtn}>
                     <Text style={s.skipText}>Continuar no plano gratuito</Text>
@@ -191,6 +195,11 @@ const s = StyleSheet.create({
   ctas: { padding: 16, gap: 8 },
   primaryBtn: {
     backgroundColor: COLORS.brand,
+    borderRadius: 14, paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+  },
+  proPlusBtn: {
+    backgroundColor: '#d97706',
     borderRadius: 14, paddingVertical: 14,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
   },

@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking, AppState } from 'react-native'
 import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -10,20 +10,23 @@ import { meApi, settingsApi, billingApi } from '@/lib/api'
 import { UsageBar } from '@/components/usage-bar'
 
 const PRO_FEATURES: { lib: 'feather' | 'mci'; icon: string; label: string }[] = [
-  { lib: 'mci',     icon: 'infinity',       label: 'Transacoes, metas e contas ilimitadas' },
-  { lib: 'feather', icon: 'bar-chart-2',    label: 'Relatorios avancados e projecao' },
-  { lib: 'feather', icon: 'message-circle', label: '30 mensagens/mes com Rookinho IA' },
-  { lib: 'feather', icon: 'upload',         label: 'Importacao de extratos CSV (10 arquivos)' },
+  { lib: 'mci',     icon: 'infinity',       label: 'Tudo ilimitado' },
+  { lib: 'feather', icon: 'message-circle', label: 'Rookinho IA — 30 msgs/mes' },
+  { lib: 'feather', icon: 'bar-chart-2',    label: '4 analises financeiras/mes' },
+  { lib: 'feather', icon: 'upload',         label: '10 arquivos no chat/mes' },
+  { lib: 'feather', icon: 'bar-chart-2',    label: 'Relatorios e projecao' },
   { lib: 'feather', icon: 'star',           label: 'Orcamento por categoria' },
-  { lib: 'feather', icon: 'shield',         label: 'Suporte prioritario' },
+  { lib: 'feather', icon: 'upload',         label: 'Importacao CSV' },
+  { lib: 'feather', icon: 'camera',         label: 'Scanner de comprovantes' },
 ]
 
 const PRO_PLUS_FEATURES: { lib: 'feather' | 'mci'; icon: string; label: string }[] = [
-  { lib: 'mci',     icon: 'infinity',       label: 'Tudo do PRO incluso' },
+  { lib: 'mci',     icon: 'infinity',       label: 'Tudo do Pro, mais:' },
   { lib: 'feather', icon: 'message-circle', label: 'Rookinho IA ilimitado' },
-  { lib: 'feather', icon: 'upload',         label: 'Uploads e analises ilimitados' },
-  { lib: 'feather', icon: 'zap',            label: 'Funcoes IA avancadas' },
-  { lib: 'feather', icon: 'shield',         label: 'Suporte VIP' },
+  { lib: 'feather', icon: 'bar-chart-2',    label: 'Analises financeiras ilimitadas' },
+  { lib: 'feather', icon: 'upload',         label: 'Arquivos no chat ilimitados' },
+  { lib: 'feather', icon: 'camera',         label: 'Scanner ilimitado' },
+  { lib: 'feather', icon: 'shield',         label: 'Suporte prioritario' },
 ]
 
 const FAQ = [
@@ -41,11 +44,38 @@ export default function BillingScreen() {
   const [loadingPlan, setLoadingPlan] = useState<'PRO' | 'PRO_PLUS' | null>(null)
   const [loadingPort, setLoadingPort] = useState(false)
   const [openFaq,     setOpenFaq]     = useState<number | null>(null)
+  const prevPlanRef = useRef<string | undefined>(undefined)
 
   useFocusEffect(useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['settings-prefs'] })
     queryClient.invalidateQueries({ queryKey: ['me'] })
   }, [queryClient]))
+
+  // Welcome modal on upgrade: detect plan change when app returns to foreground
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active') {
+        const prev = prevPlanRef.current
+        try {
+          await queryClient.invalidateQueries({ queryKey: ['me'] })
+          const fresh = queryClient.getQueryData<any>(['me'])
+          const newPlan = fresh?.plan
+          if (prev === 'FREE' && (newPlan === 'PRO' || newPlan === 'PRO_PLUS')) {
+            const label = newPlan === 'PRO_PLUS' ? 'PRO+' : 'PRO'
+            const perks = newPlan === 'PRO_PLUS'
+              ? 'Rookinho IA ilimitado, analises ilimitadas, arquivos ilimitados, scanner ilimitado e suporte prioritario.'
+              : 'Tudo ilimitado, Rookinho IA (30 msgs/mes), relatorios, projecao, orcamento e importacao CSV.'
+            Alert.alert(
+              `Bem-vindo ao ${label}!`,
+              `Voce desbloqueou:\n\n${perks}`,
+              [{ text: 'Comecar a usar' }],
+            )
+          }
+        } catch {}
+      }
+    })
+    return () => sub.remove()
+  }, [queryClient])
 
   const { data: me } = useQuery({
     queryKey: ['me'],
@@ -56,6 +86,11 @@ export default function BillingScreen() {
     queryKey: ['settings-prefs'],
     queryFn:  () => settingsApi.getPrefs().then(r => r.data),
   })
+
+  // Keep prevPlanRef in sync for upgrade detection
+  useEffect(() => {
+    if (me?.plan) prevPlanRef.current = me.plan
+  }, [me?.plan])
 
   const isPro                 = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
   const isProPlus             = me?.plan === 'PRO_PLUS'
@@ -119,6 +154,9 @@ export default function BillingScreen() {
           <View style={{ flex: 1 }}>
             <View style={styles.statusTitleRow}>
               <Text style={styles.statusTitle}>Plano {planLabel}</Text>
+              <View style={styles.seuPlanoBadge}>
+                <Text style={styles.seuPlanoText}>SEU PLANO</Text>
+              </View>
               {isPro && (
                 <View style={[styles.activeBadge, cancelAtPeriodEnd && styles.cancelingBadge]}>
                   <Text style={[styles.activeBadgeText, cancelAtPeriodEnd && styles.cancelingBadgeText]}>
@@ -212,6 +250,9 @@ export default function BillingScreen() {
               <View style={styles.planBadgeRow}>
                 <MaterialCommunityIcons name="crown" size={16} color={COLORS.warning} />
                 <Text style={styles.planBadgeText}>PRO</Text>
+              </View>
+              <View style={styles.popularBadge}>
+                <Text style={styles.popularText}>MAIS POPULAR</Text>
               </View>
             </View>
 
@@ -432,6 +473,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)',
   },
   activeBadgeText: { fontSize: 10, fontWeight: '800', color: COLORS.warning, letterSpacing: 0.5 },
+  seuPlanoBadge: {
+    borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2,
+    backgroundColor: 'rgba(59,130,246,0.15)', borderWidth: 1, borderColor: 'rgba(59,130,246,0.3)',
+  },
+  seuPlanoText: { fontSize: 9, fontWeight: '800', color: COLORS.brand, letterSpacing: 0.5 },
   cancelingBadge:     { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.3)' },
   cancelingBadgeText: { color: '#f59e0b' },
 
@@ -504,6 +550,12 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(99,102,241,0.3)',
   },
   recommendedText: { fontSize: 9, fontWeight: '800', color: COLORS.brand, letterSpacing: 0.5 },
+  popularBadge: {
+    backgroundColor: 'rgba(245,158,11,0.15)', borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 3,
+    borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)',
+  },
+  popularText: { fontSize: 9, fontWeight: '800', color: COLORS.warning, letterSpacing: 0.5 },
 
   priceRow:    { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginBottom: 4 },
   priceValue:  { fontSize: 32, fontWeight: '800', color: COLORS.text },
