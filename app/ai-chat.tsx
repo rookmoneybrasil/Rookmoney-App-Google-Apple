@@ -1,19 +1,30 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   View, ScrollView, TouchableOpacity, StyleSheet, Image,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
+import * as FileSystem from 'expo-file-system'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { COLORS } from '@/lib/constants'
 import { chatApi, meApi, type ChatMessage } from '@/lib/api'
 import { ProGate } from '@/components/pro-gate'
 
+interface ChatImage {
+  base64: string
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp'
+}
+
 interface DisplayMessage extends ChatMessage {
   navigate?: { path: string; reason: string } | null
+  image?: ChatImage | null
 }
+
+const STORAGE_KEY = 'rookinho-mobile-chat'
 
 const SUGGESTIONS = [
   'Analisa minha renda e me ajuda a organizar',
@@ -36,6 +47,11 @@ const PAGE_MAP: Record<string, { label: string; path: string }> = {
   '/settings':     { label: 'Configuracoes', path: '/settings' },
 }
 
+const WELCOME: DisplayMessage = {
+  role: 'assistant',
+  content: 'Ola! \u{1F44B} Sou o Rookinho, seu assistente financeiro com IA.\n\nPosso te ajudar a:\n• Registrar transacoes e contas\n• Consultar seus gastos e metas\n• Analisar comprovantes e boletos\n• Dar dicas personalizadas\n\nO que deseja fazer?',
+}
+
 export default function AiChatScreen() {
   const router    = useRouter()
   const scrollRef = useRef<ScrollView>(null)
@@ -46,27 +62,37 @@ export default function AiChatScreen() {
   })
   const isPro = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
 
-  const [messages, setMessages] = useState<DisplayMessage[]>([
-    {
-      role:    'assistant',
-      content: 'Ola! \u{1F44B} Sou o Rookinho, seu assistente financeiro com IA.\n\nPosso te ajudar a:\n• Registrar transacoes e contas\n• Consultar seus gastos e metas\n• Dar dicas personalizadas\n\nO que deseja fazer?',
-    },
-  ])
-  const [input, setInput]         = useState('')
-  const [loading, setLoading]     = useState(false)
-  const [remaining, setRemaining] = useState<number | null>(null)
-  const [usageUsed, setUsageUsed] = useState<number | null>(null)
+  const [messages, setMessages]     = useState<DisplayMessage[]>([WELCOME])
+  const [input, setInput]           = useState('')
+  const [loading, setLoading]       = useState(false)
+  const [remaining, setRemaining]   = useState<number | null>(null)
+  const [usageUsed, setUsageUsed]   = useState<number | null>(null)
   const [usageLimit, setUsageLimit] = useState<number | null>(null)
+  const [pendingImage, setPendingImage] = useState<ChatImage | null>(null)
 
-  // Fetch usage on mount
+  // Load history from AsyncStorage
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY).then(raw => {
+      if (!raw) return
+      try {
+        const saved = JSON.parse(raw) as DisplayMessage[]
+        if (saved.length > 0) setMessages(saved)
+      } catch {}
+    })
+  }, [])
+
+  // Save history
+  useEffect(() => {
+    if (messages.length <= 1) return
+    const toSave = messages.map(m => ({ role: m.role, content: m.content, navigate: m.navigate ?? null }))
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toSave)).catch(() => {})
+  }, [messages])
+
+  // Fetch usage
   useEffect(() => {
     if (!isPro) return
     chatApi.getUsage()
-      .then(res => {
-        setUsageUsed(res.data.used)
-        setUsageLimit(res.data.limit)
-        setRemaining(res.data.remaining)
-      })
+      .then(res => { setUsageUsed(res.data.used); setUsageLimit(res.data.limit); setRemaining(res.data.remaining) })
       .catch(() => {})
   }, [isPro])
 
@@ -74,30 +100,71 @@ export default function AiChatScreen() {
     scrollRef.current?.scrollToEnd({ animated: true })
   }, [messages, loading])
 
-  async function send(text: string) {
-    if (!text.trim() || loading) return
+  const clearHistory = useCallback(() => {
+    Alert.alert('Limpar historico', 'Apagar todas as mensagens?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Limpar', style: 'destructive', onPress: () => {
+        setMessages([WELCOME])
+        AsyncStorage.removeItem(STORAGE_KEY)
+      }},
+    ])
+  }, [])
 
-    const userMsg: DisplayMessage = { role: 'user', content: text.trim() }
+  const pickImage = useCallback(async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      base64: true,
+    })
+    if (result.canceled || !result.assets[0].base64) return
+    const asset = result.assets[0]
+    const ext = (asset.mimeType ?? 'image/jpeg') as ChatImage['mediaType']
+    setPendingImage({ base64: asset.base64!, mediaType: ext })
+  }, [])
+
+  async function send(text: string, image?: ChatImage | null) {
+    if ((!text.trim() && !image) || loading) return
+
+    const userMsg: DisplayMessage = { role: 'user', content: text.trim(), image: image ?? null }
     const history = [...messages, userMsg]
     setMessages(history)
     setInput('')
+    setPendingImage(null)
     setLoading(true)
 
     try {
-      const apiMessages = history.map(m => ({ role: m.role, content: m.content }))
-      const res = await chatApi.send(apiMessages)
+      const apiMessages = history
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .map(m => {
+          if (m.role === 'user' && m.image) {
+            return {
+              role: m.role,
+              content: [
+                { type: 'image', source: { type: 'base64', media_type: m.image.mediaType, data: m.image.base64 } },
+                { type: 'text', text: m.content || 'Analise esta imagem.' },
+              ],
+            }
+          }
+          return { role: m.role, content: m.content }
+        })
+
+      const res = await chatApi.send(apiMessages as ChatMessage[])
       setMessages(prev => [...prev, { role: 'assistant', content: res.message, navigate: res.navigate }])
       if (res.remaining != null) {
         setRemaining(res.remaining)
-        if (usageLimit != null) {
-          setUsageUsed(usageLimit - res.remaining)
-        }
+        if (usageLimit != null) setUsageUsed(usageLimit - res.remaining)
       }
     } catch (e) {
-      const code    = e instanceof Error ? e.message : ''
-      const content = code === 'rate_limited'
-        ? '⏳ Voce atingiu o limite de mensagens da IA este mes. Tente novamente mais tarde.'
-        : 'Ops, ocorreu um erro. Tente novamente. \u{1F605}'
+      const code = e instanceof Error ? e.message : ''
+      let content = 'Ops, ocorreu um erro. Tente novamente.'
+      if (code.includes('rate_limited') || code.includes('Limite de'))
+        content = '⏳ Voce atingiu o limite de mensagens deste mes. O limite renova no inicio do proximo mes.'
+      else if (code.includes('ai_unavailable') || code.includes('temporariamente'))
+        content = 'O assistente de IA esta temporariamente indisponivel. Tente novamente em alguns minutos.'
+      else if (code.includes('file_limit') || code.includes('arquivos'))
+        content = 'Voce atingiu o limite de arquivos deste mes. Faca upgrade pro Pro+ para envio ilimitado.'
+      else if (code.includes('pro_required'))
+        content = 'O Rookinho IA e exclusivo dos planos Pro e Pro+.'
       setMessages(prev => [...prev, { role: 'assistant', content }])
     } finally {
       setLoading(false)
@@ -105,8 +172,10 @@ export default function AiChatScreen() {
   }
 
   const usageText = usageUsed != null && usageLimit != null
-    ? (usageLimit === 0 ? 'Ilimitado' : `${usageUsed}/${usageLimit} mensagens usadas`)
+    ? (usageLimit === 0 ? 'Ilimitado' : `${usageUsed}/${usageLimit} mensagens`)
     : null
+
+  const hasUserMessage = messages.some(m => m.role === 'user')
 
   return (
     <KeyboardAvoidingView
@@ -124,13 +193,19 @@ export default function AiChatScreen() {
         <View style={styles.headerInfo}>
           <Image source={require('../assets/rookinho.png')} style={styles.headerAvatar} />
           <View>
-            <Text style={styles.headerTitle}>Rookinho</Text>
+            <Text style={styles.headerTitle}>Rookinho IA</Text>
             <Text style={styles.headerSubtitle}>
-              {usageText ?? 'Assistente financeiro IA'}
+              {usageText ?? 'Assistente financeiro'}
             </Text>
           </View>
         </View>
-        <View style={{ width: 36 }} />
+        <View style={styles.headerActions}>
+          {hasUserMessage && (
+            <TouchableOpacity onPress={clearHistory} hitSlop={8}>
+              <Feather name="trash-2" size={18} color={COLORS.muted} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {me && !isPro ? (
@@ -147,6 +222,13 @@ export default function AiChatScreen() {
               return (
                 <View key={i} style={[styles.msgRow, msg.role === 'user' ? styles.msgRowUser : styles.msgRowAssistant]}>
                   <View style={[styles.bubble, msg.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant]}>
+                    {msg.image && (
+                      <Image
+                        source={{ uri: `data:${msg.image.mediaType};base64,${msg.image.base64}` }}
+                        style={styles.msgImage}
+                        resizeMode="cover"
+                      />
+                    )}
                     <Text style={[styles.bubbleText, msg.role === 'user' && styles.bubbleTextUser]}>{msg.content}</Text>
                     {page && (
                       <TouchableOpacity style={styles.navigateLink} onPress={() => router.push(page.path as any)}>
@@ -169,19 +251,17 @@ export default function AiChatScreen() {
           </ScrollView>
 
           {/* Remaining counter */}
-          {remaining != null && usageLimit != null && usageLimit > 0 && (
+          {remaining != null && usageLimit != null && usageLimit > 0 && remaining <= 10 && (
             <View style={styles.remainingBar}>
               <Feather name="info" size={12} color={COLORS.muted} />
               <Text style={styles.remainingText}>
-                {remaining > 0
-                  ? `${remaining} mensagens restantes este mes`
-                  : 'Limite de mensagens atingido este mes'}
+                {remaining > 0 ? `${remaining} mensagens restantes este mes` : 'Limite atingido este mes'}
               </Text>
             </View>
           )}
 
           {/* Suggestions */}
-          {messages.length === 1 && (
+          {!hasUserMessage && (
             <View style={styles.suggestions}>
               {SUGGESTIONS.map(s => (
                 <TouchableOpacity key={s} style={styles.suggestionBtn} onPress={() => send(s)} activeOpacity={0.8}>
@@ -191,11 +271,24 @@ export default function AiChatScreen() {
             </View>
           )}
 
+          {/* Pending image preview */}
+          {pendingImage && (
+            <View style={styles.previewRow}>
+              <Image source={{ uri: `data:${pendingImage.mediaType};base64,${pendingImage.base64}` }} style={styles.previewImg} />
+              <TouchableOpacity onPress={() => setPendingImage(null)} style={styles.previewRemove}>
+                <Feather name="x" size={14} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Input */}
           <View style={styles.inputRow}>
+            <TouchableOpacity style={styles.imageBtn} onPress={pickImage} disabled={loading}>
+              <Feather name="image" size={20} color={COLORS.muted} />
+            </TouchableOpacity>
             <TextInput
               style={styles.input}
-              placeholder="Digite sua mensagem..."
+              placeholder={pendingImage ? 'Descreva a imagem...' : 'Pergunte ao Rookinho...'}
               placeholderTextColor={COLORS.muted}
               value={input}
               onChangeText={setInput}
@@ -203,9 +296,9 @@ export default function AiChatScreen() {
               multiline
             />
             <TouchableOpacity
-              style={[styles.sendBtn, (!input.trim() || loading) && styles.sendBtnDisabled]}
-              onPress={() => send(input)}
-              disabled={!input.trim() || loading}
+              style={[styles.sendBtn, (!input.trim() && !pendingImage || loading) && styles.sendBtnDisabled]}
+              onPress={() => send(input, pendingImage)}
+              disabled={(!input.trim() && !pendingImage) || loading}
             >
               {loading ? <ActivityIndicator size="small" color="#fff" /> : <Feather name="send" size={18} color="#fff" />}
             </TouchableOpacity>
@@ -229,6 +322,7 @@ const styles = StyleSheet.create({
   headerAvatar:   { width: 36, height: 36, resizeMode: 'contain' },
   headerTitle:    { fontSize: 15, fontWeight: '700', color: COLORS.text },
   headerSubtitle: { fontSize: 11, color: COLORS.muted, marginTop: 1 },
+  headerActions:  { width: 36, alignItems: 'flex-end' },
 
   messages:        { flex: 1 },
   messagesContent: { padding: 16, gap: 10 },
@@ -246,6 +340,8 @@ const styles = StyleSheet.create({
   bubbleLoading:   { paddingVertical: 12, paddingHorizontal: 16 },
   bubbleText:      { fontSize: 14, color: COLORS.text, lineHeight: 20 },
   bubbleTextUser:  { color: '#fff' },
+
+  msgImage: { width: '100%', height: 150, borderRadius: 12, marginBottom: 8 },
 
   navigateLink: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -268,10 +364,25 @@ const styles = StyleSheet.create({
   },
   suggestionText: { fontSize: 12, color: COLORS.muted },
 
+  previewRow: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    paddingHorizontal: 16, paddingTop: 8,
+  },
+  previewImg: { width: 60, height: 60, borderRadius: 10 },
+  previewRemove: {
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center',
+  },
+
   inputRow: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: 10,
+    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
     paddingHorizontal: 16, paddingVertical: 12,
     borderTopWidth: 1, borderTopColor: COLORS.border,
+  },
+  imageBtn: {
+    width: 40, height: 40, borderRadius: 14,
+    backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border,
+    justifyContent: 'center', alignItems: 'center',
   },
   input: {
     flex: 1, backgroundColor: COLORS.card, borderRadius: 14,

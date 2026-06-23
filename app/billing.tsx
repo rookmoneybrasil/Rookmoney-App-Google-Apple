@@ -131,7 +131,7 @@ export default function BillingScreen() {
               {isProPlus
                 ? 'Voce tem acesso completo com IA ilimitada.'
                 : isPro
-                  ? 'Voce tem acesso a todos os recursos.'
+                  ? 'Voce tem acesso aos recursos principais. Upgrade pro Pro+ para IA ilimitada.'
                   : 'Faca upgrade e desbloqueie tudo.'}
             </Text>
           </View>
