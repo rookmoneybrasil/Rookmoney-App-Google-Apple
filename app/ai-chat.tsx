@@ -98,19 +98,41 @@ export default function AiChatScreen() {
   const [pendingImage, setPendingImage] = useState<ChatImage | null>(null)
   const [showHistory, setShowHistory]   = useState(false)
 
-  // Load conversations on mount
+  // Load conversations on mount + migrate old format
   useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem(CONVS_KEY),
-      AsyncStorage.getItem(ACTIVE_KEY),
-    ]).then(([rawConvs, rawActive]) => {
-      const convs: Conversation[] = rawConvs ? JSON.parse(rawConvs) : []
-      setConversations(convs)
-      if (rawActive) {
-        const conv = convs.find(c => c.id === rawActive)
-        if (conv) { setMessages(conv.messages); setActiveConvId(conv.id) }
-      }
-    }).catch(() => {})
+    (async () => {
+      try {
+        // Migrate old single-chat format
+        const oldChat = await AsyncStorage.getItem('rookinho-mobile-chat')
+        if (oldChat) {
+          const oldMsgs = JSON.parse(oldChat) as DisplayMessage[]
+          if (Array.isArray(oldMsgs) && oldMsgs.length > 1) {
+            const migrated: Conversation = { id: genId(), title: convTitle(oldMsgs), updatedAt: new Date().toISOString(), messages: oldMsgs }
+            const existing = await AsyncStorage.getItem(CONVS_KEY)
+            const convs: Conversation[] = existing ? JSON.parse(existing) : []
+            convs.unshift(migrated)
+            await AsyncStorage.setItem(CONVS_KEY, JSON.stringify(convs.slice(0, 30)))
+            setConversations(convs)
+            setMessages(migrated.messages)
+            setActiveConvId(migrated.id)
+            await AsyncStorage.setItem(ACTIVE_KEY, migrated.id)
+          }
+          await AsyncStorage.removeItem('rookinho-mobile-chat')
+          return
+        }
+
+        const [rawConvs, rawActive] = await Promise.all([
+          AsyncStorage.getItem(CONVS_KEY),
+          AsyncStorage.getItem(ACTIVE_KEY),
+        ])
+        const convs: Conversation[] = rawConvs ? JSON.parse(rawConvs) : []
+        setConversations(convs)
+        if (rawActive) {
+          const conv = convs.find(c => c.id === rawActive)
+          if (conv) { setMessages(conv.messages); setActiveConvId(conv.id) }
+        }
+      } catch {}
+    })()
   }, [])
 
   // Save active conversation when messages change

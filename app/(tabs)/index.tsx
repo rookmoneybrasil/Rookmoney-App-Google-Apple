@@ -660,7 +660,7 @@ const styles = StyleSheet.create({
     width: '47.5%', borderRadius: 16,
     shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.45, shadowRadius: 12, elevation: 6,
   },
-  kpiCard: { borderRadius: 16, padding: 14, borderWidth: 1, minHeight: 90 },
+  kpiCard: { borderRadius: 16, padding: 14, borderWidth: 1, minHeight: 110, justifyContent: 'space-between' },
   kpiTop:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   kpiLabel:    { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.6 },
   kpiValue:    { fontSize: 20, fontWeight: '800', marginBottom: 4 },
