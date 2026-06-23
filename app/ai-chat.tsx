@@ -92,7 +92,7 @@ export default function AiChatScreen() {
   useEffect(() => {
     if (!isPro) return
     chatApi.getUsage()
-      .then(res => { setUsageUsed(res.data.used); setUsageLimit(res.data.limit); setRemaining(res.data.remaining) })
+      .then(res => { setUsageUsed(res.used); setUsageLimit(res.limit); setRemaining(res.remaining) })
       .catch(() => {})
   }, [isPro])
 

@@ -844,7 +844,7 @@ export const chatApi = {
       body:   JSON.stringify({ messages }),
     }),
   getUsage: () =>
-    request<{ data: { used: number; limit: number; remaining: number } }>('/api/v1/chat'),
+    request<{ used: number; limit: number; remaining: number }>('/api/v1/chat'),
 }
 
 // ── Push token ────────────────────────────────────────────────────────
