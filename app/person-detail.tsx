@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl, Share } from 'react-native'
 import { Text } from '@/components/text'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -233,6 +233,96 @@ export default function PersonDetailScreen() {
 
   const hasOldRecurring = openEntries.some(e => (e.installmentTotal ?? 0) >= 24)
 
+  // Show projection whenever there's something projected (recurring OR open entries due)
+  const hasProjectionData = projection.some(m => m.theyOwe > 0 || m.iOwe > 0)
+
+  // ── Share text ────────────────────────────────────────────────────────────
+  const capMonth = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
+
+  function buildShareText() {
+    if (!data) return ''
+    const lines: string[] = [`${data.name} — ${capMonth}/${now.getFullYear()}`, '']
+
+    type ShareItem = { desc: string; amount: number; settled: boolean }
+    const shareIOwe: ShareItem[] = []
+    const shareTheyOwe: ShareItem[] = []
+
+    // Recurring templates
+    for (const r of recurringList) {
+      const entry = recurringEntryMap.get(r.id)
+      const settled = entry?.isSettled ?? false
+      const bucket = r.type === 'I_OWE_THEM' ? shareIOwe : shareTheyOwe
+      bucket.push({ desc: `${r.description} (recorrente, dia ${r.dayOfMonth})`, amount: r.amount, settled })
+    }
+
+    // Single entries this month (skip those covered by recurring)
+    const recurringDescs = new Set(recurringList.map(r => `${r.description}|${r.type}`))
+    const allSingles = allEntries.filter(e => {
+      const d = new Date(e.date)
+      return !e.installmentGroupId && d >= monthStart && d <= monthEnd
+    })
+    for (const e of allSingles) {
+      if (recurringDescs.has(`${e.description}|${e.type}`)) continue
+      const bucket = e.type === 'I_OWE_THEM' ? shareIOwe : shareTheyOwe
+      bucket.push({ desc: e.description, amount: e.amount, settled: e.isSettled })
+    }
+
+    // Installment entries due this month
+    for (const [, grp] of allGroupMap.entries()) {
+      const due = grp.find(e => {
+        const d = new Date(e.date)
+        return d >= monthStart && d <= monthEnd
+      })
+      if (!due) continue
+      const total = due.installmentTotal ?? grp.length
+      const current = due.installmentCurrent ?? 1
+      const remaining = total - current
+      const bucket = due.type === 'I_OWE_THEM' ? shareIOwe : shareTheyOwe
+      bucket.push({
+        desc: `${due.description} (parcela ${current}/${total}, faltam ${remaining})`,
+        amount: due.amount,
+        settled: due.isSettled,
+      })
+    }
+
+    function renderSection(title: string, items: ShareItem[]) {
+      if (items.length === 0) return
+      lines.push(title)
+      let subtotal = 0
+      for (const item of items) {
+        const check = item.settled ? ' ✅' : ''
+        lines.push(`  • ${item.desc} — ${fmt(item.amount)}${check}`)
+        subtotal += item.amount
+      }
+      if (items.length > 1) lines.push(`  Total: ${fmt(subtotal)}`)
+      lines.push('')
+    }
+
+    renderSection('Eu devo:', shareIOwe)
+    renderSection('Me deve:', shareTheyOwe)
+
+    const nextMonth = projection[1]
+    if (nextMonth && (nextMonth.iOwe > 0 || nextMonth.theyOwe > 0)) {
+      lines.push(`Proximo mes (${nextMonth.label}):`)
+      if (nextMonth.iOwe > 0) lines.push(`  Eu devo: ${fmt(nextMonth.iOwe)}`)
+      if (nextMonth.theyOwe > 0) lines.push(`  Me deve: ${fmt(nextMonth.theyOwe)}`)
+      lines.push('')
+    }
+
+    lines.push('— Enviado pelo Rook Money — rookmoney.com')
+    return lines.join('\n')
+  }
+
+  async function handleShare() {
+    const text = buildShareText()
+    if (!text) return
+    try {
+      await Share.share({ message: text })
+    } catch {
+      // user cancelled
+    }
+  }
+
   // Silent auto-migration of old-style recurring groups
   useEffect(() => {
     if (!hasOldRecurring || !id) return
@@ -310,6 +400,10 @@ export default function PersonDetailScreen() {
                   <Feather name="trash-2" size={12} color={COLORS.danger} />
                   <Text style={[styles.profileActionText, { color: COLORS.danger }]}>Excluir</Text>
                 </TouchableOpacity>
+                <TouchableOpacity style={styles.profileActionBtn} onPress={handleShare}>
+                  <Feather name="share-2" size={12} color={COLORS.brand} />
+                  <Text style={[styles.profileActionText, { color: COLORS.brand }]}>Compartilhar</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -367,7 +461,7 @@ export default function PersonDetailScreen() {
           </View>
 
           {/* Projeção dos próximos meses */}
-          {recurringList.length > 0 && (
+          {hasProjectionData && (
             <View style={styles.projectionCard}>
               <View style={styles.projectionHeader}>
                 <Feather name="calendar" size={14} color={COLORS.brand} />
