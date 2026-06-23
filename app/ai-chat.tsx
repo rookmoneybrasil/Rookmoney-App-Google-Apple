@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   View, ScrollView, TouchableOpacity, StyleSheet, Image,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, FlatList,
 } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import { useRouter } from 'expo-router'
@@ -24,7 +24,32 @@ interface DisplayMessage extends ChatMessage {
   image?: ChatImage | null
 }
 
-const STORAGE_KEY = 'rookinho-mobile-chat'
+const CONVS_KEY = 'rookinho-conversations'
+const ACTIVE_KEY = 'rookinho-active-conv'
+
+interface Conversation {
+  id: string
+  title: string
+  updatedAt: string
+  messages: DisplayMessage[]
+}
+
+function genId() { return `conv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` }
+
+function convTitle(msgs: DisplayMessage[]): string {
+  const first = msgs.find(m => m.role === 'user')
+  return first ? first.content.slice(0, 40) + (first.content.length > 40 ? '...' : '') : 'Nova conversa'
+}
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  const diff = Math.floor((now.getTime() - d.getTime()) / 86400000)
+  if (diff === 1) return 'Ontem'
+  if (diff < 7) return d.toLocaleDateString('pt-BR', { weekday: 'short' })
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+}
 
 const SUGGESTIONS = [
   'Analisa minha renda e me ajuda a organizar',
@@ -62,6 +87,8 @@ export default function AiChatScreen() {
   })
   const isPro = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
 
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [activeConvId, setActiveConvId]   = useState<string | null>(null)
   const [messages, setMessages]     = useState<DisplayMessage[]>([WELCOME])
   const [input, setInput]           = useState('')
   const [loading, setLoading]       = useState(false)
@@ -69,25 +96,31 @@ export default function AiChatScreen() {
   const [usageUsed, setUsageUsed]   = useState<number | null>(null)
   const [usageLimit, setUsageLimit] = useState<number | null>(null)
   const [pendingImage, setPendingImage] = useState<ChatImage | null>(null)
+  const [showHistory, setShowHistory]   = useState(false)
 
-  // Load history from AsyncStorage
+  // Load conversations on mount
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then(raw => {
-        if (!raw) return
-        try {
-          const saved = JSON.parse(raw) as DisplayMessage[]
-          if (Array.isArray(saved) && saved.length > 0) setMessages(saved)
-        } catch { /* corrupt data — ignore */ }
-      })
-      .catch(() => { /* AsyncStorage unavailable — ignore */ })
+    Promise.all([
+      AsyncStorage.getItem(CONVS_KEY),
+      AsyncStorage.getItem(ACTIVE_KEY),
+    ]).then(([rawConvs, rawActive]) => {
+      const convs: Conversation[] = rawConvs ? JSON.parse(rawConvs) : []
+      setConversations(convs)
+      if (rawActive) {
+        const conv = convs.find(c => c.id === rawActive)
+        if (conv) { setMessages(conv.messages); setActiveConvId(conv.id) }
+      }
+    }).catch(() => {})
   }, [])
 
-  // Save history
+  // Save active conversation when messages change
   useEffect(() => {
-    if (messages.length <= 1) return
-    const toSave = messages.map(m => ({ role: m.role, content: m.content, navigate: m.navigate ?? null }))
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toSave)).catch(() => {})
+    if (!activeConvId || messages.length <= 1) return
+    setConversations(prev => {
+      const updated = prev.map(c => c.id === activeConvId ? { ...c, messages, title: convTitle(messages), updatedAt: new Date().toISOString() } : c)
+      AsyncStorage.setItem(CONVS_KEY, JSON.stringify(updated.slice(0, 30))).catch(() => {})
+      return updated
+    })
   }, [messages])
 
   // Fetch usage
@@ -102,12 +135,50 @@ export default function AiChatScreen() {
     scrollRef.current?.scrollToEnd({ animated: true })
   }, [messages, loading])
 
-  const clearHistory = useCallback(() => {
-    Alert.alert('Limpar historico', 'Apagar todas as mensagens?', [
+  const startNewConversation = useCallback(() => {
+    if (activeConvId && messages.some(m => m.role === 'user')) {
+      setConversations(prev => {
+        const updated = prev.map(c => c.id === activeConvId ? { ...c, messages, title: convTitle(messages), updatedAt: new Date().toISOString() } : c)
+        AsyncStorage.setItem(CONVS_KEY, JSON.stringify(updated.slice(0, 30))).catch(() => {})
+        return updated
+      })
+    }
+    setMessages([WELCOME])
+    setActiveConvId(null)
+    AsyncStorage.removeItem(ACTIVE_KEY).catch(() => {})
+    setShowHistory(false)
+  }, [activeConvId, messages])
+
+  const loadConversation = useCallback((conv: Conversation) => {
+    setMessages(conv.messages)
+    setActiveConvId(conv.id)
+    AsyncStorage.setItem(ACTIVE_KEY, conv.id).catch(() => {})
+    setShowHistory(false)
+  }, [])
+
+  const deleteConversation = useCallback((id: string) => {
+    setConversations(prev => {
+      const updated = prev.filter(c => c.id !== id)
+      AsyncStorage.setItem(CONVS_KEY, JSON.stringify(updated)).catch(() => {})
+      return updated
+    })
+    if (activeConvId === id) {
+      setMessages([WELCOME])
+      setActiveConvId(null)
+      AsyncStorage.removeItem(ACTIVE_KEY).catch(() => {})
+    }
+  }, [activeConvId])
+
+  const clearAllHistory = useCallback(() => {
+    Alert.alert('Limpar historico', 'Apagar todas as conversas?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Limpar', style: 'destructive', onPress: () => {
+      { text: 'Limpar tudo', style: 'destructive', onPress: () => {
+        setConversations([])
         setMessages([WELCOME])
-        AsyncStorage.removeItem(STORAGE_KEY)
+        setActiveConvId(null)
+        AsyncStorage.removeItem(CONVS_KEY).catch(() => {})
+        AsyncStorage.removeItem(ACTIVE_KEY).catch(() => {})
+        setShowHistory(false)
       }},
     ])
   }, [])
@@ -126,6 +197,15 @@ export default function AiChatScreen() {
 
   async function send(text: string, image?: ChatImage | null) {
     if ((!text.trim() && !image) || loading) return
+
+    // Create conversation on first user message
+    if (!activeConvId) {
+      const id = genId()
+      setActiveConvId(id)
+      AsyncStorage.setItem(ACTIVE_KEY, id).catch(() => {})
+      const newConv: Conversation = { id, title: text.trim().slice(0, 40) || 'Nova conversa', updatedAt: new Date().toISOString(), messages: [] }
+      setConversations(prev => { const updated = [newConv, ...prev]; AsyncStorage.setItem(CONVS_KEY, JSON.stringify(updated.slice(0, 30))).catch(() => {}); return updated })
+    }
 
     const userMsg: DisplayMessage = { role: 'user', content: text.trim(), image: image ?? null }
     const history = [...messages, userMsg]
@@ -202,16 +282,64 @@ export default function AiChatScreen() {
           </View>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity onPress={() => { setMessages([WELCOME]); AsyncStorage.removeItem(STORAGE_KEY).catch(() => {}) }} hitSlop={8}>
+          <TouchableOpacity onPress={() => setShowHistory(true)} hitSlop={8}>
+            <Feather name="clock" size={17} color={COLORS.muted} />
+            {conversations.length > 0 && (
+              <View style={styles.historyBadge}>
+                <Text style={styles.historyBadgeText}>{conversations.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={startNewConversation} hitSlop={8}>
             <Feather name="plus" size={18} color={COLORS.brand} />
           </TouchableOpacity>
-          {hasUserMessage && (
-            <TouchableOpacity onPress={clearHistory} hitSlop={8}>
-              <Feather name="trash-2" size={18} color={COLORS.muted} />
-            </TouchableOpacity>
-          )}
         </View>
       </View>
+
+      {/* History modal */}
+      <Modal visible={showHistory} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Historico ({conversations.length})</Text>
+              <TouchableOpacity onPress={() => setShowHistory(false)} hitSlop={8}>
+                <Feather name="x" size={20} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            {conversations.length === 0 ? (
+              <View style={styles.modalEmpty}>
+                <Text style={styles.modalEmptyText}>Nenhuma conversa salva</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={conversations}
+                keyExtractor={c => c.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[styles.convItem, activeConvId === item.id && styles.convItemActive]}
+                    onPress={() => loadConversation(item)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.convTitle} numberOfLines={1}>{item.title}</Text>
+                      <Text style={styles.convDate}>{fmtDate(item.updatedAt)}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => deleteConversation(item.id)} hitSlop={8} style={styles.convDelete}>
+                      <Feather name="trash-2" size={14} color={COLORS.muted} />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                )}
+                ItemSeparatorComponent={() => <View style={styles.convSep} />}
+              />
+            )}
+            {conversations.length > 1 && (
+              <TouchableOpacity onPress={clearAllHistory} style={styles.clearAllBtn}>
+                <Text style={styles.clearAllText}>Limpar todo o historico</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {me && !isPro ? (
         <ProGate
@@ -400,4 +528,39 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.brand, justifyContent: 'center', alignItems: 'center',
   },
   sendBtnDisabled: { opacity: 0.4 },
+
+  historyBadge: {
+    position: 'absolute', top: -6, right: -8,
+    backgroundColor: COLORS.brand, borderRadius: 8,
+    minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  historyBadgeText: { fontSize: 9, fontWeight: '800', color: '#fff' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalContent: {
+    backgroundColor: COLORS.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    maxHeight: '70%', paddingBottom: 30,
+  },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14,
+    borderBottomWidth: 1, borderBottomColor: COLORS.border,
+  },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+  modalEmpty: { padding: 40, alignItems: 'center' },
+  modalEmptyText: { fontSize: 13, color: COLORS.muted },
+
+  convItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 20, paddingVertical: 14,
+  },
+  convItemActive: { backgroundColor: COLORS.brandDim },
+  convTitle: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  convDate: { fontSize: 11, color: COLORS.muted, marginTop: 2 },
+  convDelete: { padding: 6 },
+  convSep: { height: 1, backgroundColor: COLORS.border, marginLeft: 20 },
+
+  clearAllBtn: { paddingVertical: 14, alignItems: 'center', borderTopWidth: 1, borderTopColor: COLORS.border },
+  clearAllText: { fontSize: 13, color: COLORS.danger },
 })
