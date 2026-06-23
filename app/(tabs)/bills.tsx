@@ -82,13 +82,18 @@ function RecurringRow({ item, onToggle, onEdit, onDelete }: {
           {item.category ? ` · ${item.category.icon} ${item.category.name}` : ''}
         </Text>
       </View>
-      <Switch
-        value={item.isActive}
-        onValueChange={onToggle}
-        trackColor={{ false: COLORS.muted2, true: COLORS.brand }}
-        thumbColor="#fff"
-        style={{ transform: [{ scale: 0.8 }] }}
-      />
+      <TouchableOpacity
+        onPress={() => Alert.alert('Opções', item.name, [
+          { text: 'Editar', onPress: onEdit },
+          { text: item.isActive ? 'Pausar' : 'Ativar', onPress: onToggle },
+          { text: 'Excluir', style: 'destructive', onPress: onDelete },
+          { text: 'Cancelar', style: 'cancel' },
+        ])}
+        hitSlop={8}
+        style={{ padding: 4 }}
+      >
+        <Feather name="more-vertical" size={16} color={COLORS.muted} />
+      </TouchableOpacity>
     </TouchableOpacity>
   )
 }

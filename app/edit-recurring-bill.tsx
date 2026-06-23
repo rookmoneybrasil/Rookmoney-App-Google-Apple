@@ -27,19 +27,31 @@ export default function EditRecurringBillScreen() {
   })
 
   useEffect(() => {
+    // Try cache first, then fetch from API
     const list  = qc.getQueryData<RecurringBill[]>(['recurringBills'])
     const found = list?.find((b) => b.id === id)
     if (found) {
-      setBill(found)
-      setName(found.name)
-      setAmount(String(found.amount))
-      setDayOfMonth(String(found.dayOfMonth))
-      setCategoryId(found.categoryId ?? found.category?.id ?? null)
-      setIsActive(found.isActive)
-      setNotes(found.notes ?? '')
-      setShowNotes(!!(found.notes))
+      populateBill(found)
+    } else if (id) {
+      recurringBillsApi.list().then(res => {
+        const items = (res as any).data ?? res
+        const arr = Array.isArray(items) ? items : []
+        const b = arr.find((x: RecurringBill) => x.id === id)
+        if (b) populateBill(b)
+      }).catch(() => {})
     }
   }, [id])
+
+  function populateBill(found: RecurringBill) {
+    setBill(found)
+    setName(found.name)
+    setAmount(String(found.amount))
+    setDayOfMonth(String(found.dayOfMonth))
+    setCategoryId(found.categoryId ?? found.category?.id ?? null)
+    setIsActive(found.isActive)
+    setNotes(found.notes ?? '')
+    setShowNotes(!!(found.notes))
+  }
 
   const mutation = useMutation({
     mutationFn: () => {
