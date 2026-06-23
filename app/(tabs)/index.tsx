@@ -70,7 +70,7 @@ function KpiCard({
   onPress?: () => void; sparkChange?: number | null
 }) {
   return (
-    <TouchableOpacity style={[styles.kpiWrap, { shadowColor: glowColor }]} onPress={onPress} activeOpacity={onPress ? 0.75 : 1}>
+    <TouchableOpacity style={styles.kpiWrap} onPress={onPress} activeOpacity={onPress ? 0.75 : 1}>
       <LinearGradient colors={[gradientColors[0], gradientColors[1], gradientColors[0]]} style={[styles.kpiCard, { borderColor: glowColor + '55' }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
         {/* Neon glow inner line */}
         <View style={[styles.kpiGlowLine, { backgroundColor: glowColor + '15' }]} />
@@ -671,9 +671,8 @@ const styles = StyleSheet.create({
   kpiRow: { flexDirection: 'row', gap: 10 },
   kpiWrap: {
     flex: 1, borderRadius: 16,
-    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.6, shadowRadius: 16, elevation: 8,
   },
-  kpiCard: { borderRadius: 16, padding: 14, borderWidth: 1.5, flex: 1, overflow: 'hidden' },
+  kpiCard: { borderRadius: 16, padding: 14, borderWidth: 1, flex: 1, overflow: 'hidden' },
   kpiGlowLine: {
     position: 'absolute', top: 0, left: 0, right: 0, height: 1,
     borderTopLeftRadius: 16, borderTopRightRadius: 16,
