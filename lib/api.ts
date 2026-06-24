@@ -38,16 +38,16 @@ export interface LoginResponse {
 
 export const authApi = {
   login: (email: string, password: string) =>
-    request<LoginResponse>('/api/v1/auth/login', {
+    request<{ data: LoginResponse }>('/api/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
-    }),
+    }).then(r => r.data),
 
   register: (name: string, email: string, password: string) =>
-    request<LoginResponse>('/api/v1/auth/register', {
+    request<{ data: LoginResponse }>('/api/v1/auth/register', {
       method: 'POST',
       body: JSON.stringify({ name, email, password }),
-    }),
+    }).then(r => r.data),
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────
