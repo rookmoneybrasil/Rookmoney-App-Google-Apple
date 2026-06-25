@@ -44,7 +44,7 @@ export default function EditCategoryScreen() {
       return categoriesApi.update(id!, { name: name.trim(), icon, color })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['categories'] })
+      qc.refetchQueries({ queryKey: ['categories'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -53,7 +53,7 @@ export default function EditCategoryScreen() {
   const deleteMutation = useMutation({
     mutationFn: () => categoriesApi.delete(id!),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['categories'] })
+      qc.refetchQueries({ queryKey: ['categories'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

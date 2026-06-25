@@ -8,6 +8,7 @@ import { format, addMonths, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { COLORS } from '@/lib/constants'
 import { transactionsApi, categoriesApi, type Transaction } from '@/lib/api'
+import { EmptyState } from '@/components/empty-state'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
@@ -140,8 +141,8 @@ export default function TransactionsScreen() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => transactionsApi.delete(id),
     onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: ['transactions'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['transactions'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
@@ -291,12 +292,11 @@ export default function TransactionsScreen() {
             </View>
           }
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Feather name="repeat" size={36} color={COLORS.muted} />
-              <Text style={styles.emptyText}>
-                {hasActiveFilters ? 'Nenhum resultado para os filtros aplicados.' : 'Nenhuma transação encontrada.'}
-              </Text>
-            </View>
+            <EmptyState
+              mood="confused"
+              title="Nenhuma transação encontrada"
+              subtitle={hasActiveFilters ? 'Nenhum resultado para os filtros aplicados.' : 'Suas movimentações aparecerão aqui'}
+            />
           }
         />
       )}

@@ -14,6 +14,7 @@ import {
   type TopExpense, type SpendingDay, type IncomeSourceReport,
 } from '@/lib/api'
 import { ProGate } from '@/components/pro-gate'
+import { FadeIn } from '@/components/animated-entry'
 import * as Print from 'expo-print'
 import * as Sharing from 'expo-sharing'
 
@@ -621,6 +622,7 @@ export default function ReportsScreen() {
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={COLORS.brand} />}
         >
           {/* KPIs */}
+          <FadeIn delay={0}>
           <View style={styles.kpiGrid}>
             <KpiCard
               icon="trending-up" color={COLORS.success}
@@ -644,8 +646,10 @@ export default function ReportsScreen() {
               sub={savingsRateInfo(data!.period.savingsRate).message}
             />
           </View>
+          </FadeIn>
 
           {/* Evolução mensal */}
+          <FadeIn delay={80}>
           <ReportCard
             icon="bar-chart-2"
             title="Evolução mensal"
@@ -661,16 +665,21 @@ export default function ReportsScreen() {
               <LegendItem color={COLORS.warning} label="% Poupança" variant="dashed" />
             </View>
           </ReportCard>
+          </FadeIn>
 
           {/* Gastos por categoria */}
+          <FadeIn delay={160}>
           <ReportCard icon="layers" title="Gastos por categoria" sub="variação vs mês anterior">
             <CategoryBreakdown categories={data!.categoryTrend} totalExpense={data!.period.totalExpense} />
           </ReportCard>
+          </FadeIn>
 
           {/* Maiores despesas */}
+          <FadeIn delay={240}>
           <ReportCard icon="trending-down" title="Maiores despesas" sub={`top ${data!.topExpenses.length} no período`}>
             <TopExpensesList expenses={data!.topExpenses} periodExpense={data!.period.totalExpense} />
           </ReportCard>
+          </FadeIn>
 
           {/* Padrão de gasto por dia */}
           <ReportCard

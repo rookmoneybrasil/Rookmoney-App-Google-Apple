@@ -58,8 +58,8 @@ export default function EditTransactionScreen() {
       })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['transactions'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['transactions'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => { if (e.message) Alert.alert('Erro', e.message) },
@@ -68,8 +68,8 @@ export default function EditTransactionScreen() {
   const deleteMutation = useMutation({
     mutationFn: () => transactionsApi.delete(id!),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['transactions'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['transactions'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

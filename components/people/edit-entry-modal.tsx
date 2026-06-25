@@ -63,9 +63,9 @@ export function EditEntryModal({ visible, entry, personId, isGroup, groupSize, o
       })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['person', personId] })
-      qc.invalidateQueries({ queryKey: ['people'] })
-      if (isGroup) qc.invalidateQueries({ queryKey: ['personRecurring', personId] })
+      qc.refetchQueries({ queryKey: ['person', personId] })
+      qc.refetchQueries({ queryKey: ['people'] })
+      if (isGroup) qc.refetchQueries({ queryKey: ['personRecurring', personId] })
       onClose()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

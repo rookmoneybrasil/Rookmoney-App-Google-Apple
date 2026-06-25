@@ -59,8 +59,8 @@ export default function NewBillScreen() {
       })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['bills'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['bills'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

@@ -54,8 +54,8 @@ export function EditRecurringModal({ visible, item, personId, onClose }: Props) 
       })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['personRecurring', personId] })
-      qc.invalidateQueries({ queryKey: ['person', personId] })
+      qc.refetchQueries({ queryKey: ['personRecurring', personId] })
+      qc.refetchQueries({ queryKey: ['person', personId] })
       onClose()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

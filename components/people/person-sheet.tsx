@@ -34,8 +34,8 @@ export function PersonSheet({ visible, person, onClose }: Props) {
       return person ? peopleApi.update(person.id, body) : peopleApi.create(body)
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['people'] })
-      if (person) qc.invalidateQueries({ queryKey: ['person', person.id] })
+      qc.refetchQueries({ queryKey: ['people'] })
+      if (person) qc.refetchQueries({ queryKey: ['person', person.id] })
       onClose()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

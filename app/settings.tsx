@@ -15,6 +15,7 @@ const Notifications: typeof NotificationsType | null = isExpoGo
   ? null
   : (require('expo-notifications') as typeof NotificationsType)
 import { isHapticsEnabled, setHapticsEnabled } from '@/lib/haptics'
+import { FadeIn } from '@/components/animated-entry'
 
 const SANDBOX_NUMBER = '+1 415 523 8886'
 
@@ -98,8 +99,8 @@ function EditProfileSheet({ user, settings, onClose }: { user: MeData; settings?
     },
     onSuccess: () => {
       authUpdate({ name: name.trim() })
-      qc.invalidateQueries({ queryKey: ['me'] })
-      qc.invalidateQueries({ queryKey: ['settings-prefs'] })
+      qc.refetchQueries({ queryKey: ['me'] })
+      qc.refetchQueries({ queryKey: ['settings-prefs'] })
       onClose()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -332,7 +333,7 @@ export default function SettingsScreen() {
     mutationFn: (body: { notifBillReminder?: boolean; notifCategoryLimit?: boolean; notifMonthlyEmail?: boolean }) =>
       settingsApi.updateNotifications(body),
     onError: () => {
-      qc.invalidateQueries({ queryKey: ['settings-prefs'] })
+      qc.refetchQueries({ queryKey: ['settings-prefs'] })
       Alert.alert('Erro', 'Não foi possível salvar a preferência.')
     },
   })
@@ -340,7 +341,7 @@ export default function SettingsScreen() {
   const prefsMutation = useMutation({
     mutationFn: (body: { currency?: string; dateFormat?: string }) => settingsApi.updatePreferences(body),
     onError: () => {
-      qc.invalidateQueries({ queryKey: ['settings-prefs'] })
+      qc.refetchQueries({ queryKey: ['settings-prefs'] })
       Alert.alert('Erro', 'Não foi possível salvar a preferência.')
     },
   })
@@ -348,7 +349,7 @@ export default function SettingsScreen() {
   const whatsappMutation = useMutation({
     mutationFn: (phone: string) => settingsApi.update({ whatsappPhone: phone }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['settings-prefs'] })
+      qc.refetchQueries({ queryKey: ['settings-prefs'] })
       setWhatsappInput('')
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -356,7 +357,7 @@ export default function SettingsScreen() {
 
   const disconnectGoogleMutation = useMutation({
     mutationFn: settingsApi.disconnectGoogle,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings-prefs'] }),
+    onSuccess: () => qc.refetchQueries({ queryKey: ['settings-prefs'] }),
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
@@ -496,6 +497,7 @@ export default function SettingsScreen() {
         ) : (
           <>
             {/* Profile */}
+            <FadeIn delay={0}>
             <View style={styles.avatarSection}>
               <View style={styles.avatar}>
                 {user?.profileImage
@@ -520,8 +522,10 @@ export default function SettingsScreen() {
                 <Text style={styles.editProfileText}>Editar perfil</Text>
               </TouchableOpacity>
             </View>
+            </FadeIn>
 
             {/* CONTA */}
+            <FadeIn delay={80}>
             <Text style={styles.sectionLabel}>CONTA</Text>
 
             <View style={styles.section}>
@@ -580,8 +584,10 @@ export default function SettingsScreen() {
                 </View>
               </View>
             </View>
+            </FadeIn>
 
             {/* PREFERÊNCIAS */}
+            <FadeIn delay={160}>
             <Text style={styles.sectionLabel}>PREFERÊNCIAS</Text>
 
             <View style={styles.section}>
@@ -707,8 +713,10 @@ export default function SettingsScreen() {
                 </View>
               </View>
             </View>
+            </FadeIn>
 
             {/* PLANO */}
+            <FadeIn delay={240}>
             <Text style={styles.sectionLabel}>PLANO</Text>
 
             <View style={styles.section}>
@@ -783,6 +791,7 @@ export default function SettingsScreen() {
                 </View>
               </View>
             </View>
+            </FadeIn>
 
             {/* DADOS E PRIVACIDADE */}
             <Text style={styles.sectionLabel}>DADOS E PRIVACIDADE</Text>

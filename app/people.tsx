@@ -74,7 +74,7 @@ export default function PeopleScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => peopleApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['people'] }),
+    onSuccess: () => qc.refetchQueries({ queryKey: ['people'] }),
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
@@ -84,7 +84,7 @@ export default function PeopleScreen() {
       return peopleApi.update(editing!.id, { name: editName.trim() })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['people'] })
+      qc.refetchQueries({ queryKey: ['people'] })
       setEditing(null)
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

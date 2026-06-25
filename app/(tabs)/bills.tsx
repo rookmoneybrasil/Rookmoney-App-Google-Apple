@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal, Pressable, Switch } from 'react-native'
 import { Text } from '@/components/text'
-import { useRouter } from 'expo-router'
+import { PressableScale } from '@/components/pressable-scale'
+import { AnimatedProgress } from '@/components/animated-progress'
+import { SwipeableRow } from '@/components/swipeable-row'
+import { triggerConfetti } from '@/components/confetti'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { Feather } from '@expo/vector-icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, addMonths, differenceInCalendarDays } from 'date-fns'
@@ -9,6 +13,8 @@ import { ptBR } from 'date-fns/locale'
 import { COLORS } from '@/lib/constants'
 import { billsApi, recurringBillsApi, peopleApi, type Bill, type RecurringBill } from '@/lib/api'
 import { hapticSuccess, hapticLight } from '@/lib/haptics'
+import { ListSkeleton } from '@/components/skeleton'
+import { FadeIn } from '@/components/animated-entry'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
@@ -57,16 +63,16 @@ function RecurringRow({ item, onToggle, onEdit, onDelete }: {
   onDelete: () => void
 }) {
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[styles.row, item.isActive ? styles.rowRecurring : styles.rowPaused]}
       onLongPress={() =>
         Alert.alert('Opções', item.name, [
+          { text: 'Cancelar', style: 'cancel' },
           { text: 'Editar', onPress: onEdit },
           { text: item.isActive ? 'Pausar' : 'Ativar', onPress: onToggle },
           { text: 'Excluir', style: 'destructive', onPress: onDelete },
         ])
       }
-      activeOpacity={0.85}
     >
       <View style={[styles.rowIcon, { backgroundColor: (item.isActive ? COLORS.brand : COLORS.muted) + '22' }]}>
         <Feather name="refresh-cw" size={15} color={item.isActive ? COLORS.brand : COLORS.muted} />
@@ -94,7 +100,7 @@ function RecurringRow({ item, onToggle, onEdit, onDelete }: {
       >
         <Feather name="more-vertical" size={16} color={COLORS.muted} />
       </TouchableOpacity>
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 
@@ -119,42 +125,46 @@ function PendingRow({ item, onPay, onEdit, onDelete }: {
     ])
 
   return (
-    <TouchableOpacity
-      style={[styles.row, rowStyle]}
-      onLongPress={showOptions}
-      activeOpacity={0.85}
+    <SwipeableRow
+      leftAction={{ icon: 'check-circle', label: 'Pagar', color: '#fff', bg: '#16a34a', onPress: onPay }}
+      rightAction={{ icon: 'trash-2', label: 'Excluir', color: '#fff', bg: '#dc2626', onPress: onDelete }}
     >
-      <View style={[styles.rowIcon, { backgroundColor: cfg.color + '1a' }]}>
-        {item.category?.icon
-          ? <Text style={styles.rowEmoji}>{item.category.icon}</Text>
-          : item.recurringBillId
-            ? <Feather name="refresh-cw" size={14} color={COLORS.brand} />
-            : <Feather name="file-text" size={14} color={COLORS.muted} />}
-      </View>
-      <View style={styles.rowInfo}>
-        <View style={styles.rowNameWrap}>
-          <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
-          {!!item.installmentTotal && item.installmentTotal > 1 && (
-            <Badge label={`${item.installmentCurrent}/${item.installmentTotal}`} color={COLORS.brand} />
-          )}
-          <Badge label={cfg.label} color={cfg.color} dot />
+      <PressableScale
+        style={[styles.row, rowStyle]}
+        onLongPress={showOptions}
+      >
+        <View style={[styles.rowIcon, { backgroundColor: cfg.color + '1a' }]}>
+          {item.category?.icon
+            ? <Text style={styles.rowEmoji}>{item.category.icon}</Text>
+            : item.recurringBillId
+              ? <Feather name="refresh-cw" size={14} color={COLORS.brand} />
+              : <Feather name="file-text" size={14} color={COLORS.muted} />}
         </View>
-        <Text style={styles.rowSubtitle}>
-          {item.category?.name ?? 'Sem categoria'} · vence {format(new Date(item.dueDate), 'dd/MM/yyyy')}
-          {item.recurringBillId ? ' · ↻ fixa' : ''}
-        </Text>
-      </View>
-      <View style={styles.rowRight}>
-        <Text style={styles.rowAmountText}>{fmt(Number(item.amount))}</Text>
-        <TouchableOpacity onPress={showOptions} hitSlop={8} style={{ padding: 4 }}>
-          <Feather name="more-vertical" size={16} color={COLORS.muted} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.payBtn} onPress={onPay} hitSlop={6}>
-          <Feather name="check" size={12} color={COLORS.success} />
-          <Text style={styles.payBtnText}>Pagar</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
+        <View style={styles.rowInfo}>
+          <View style={styles.rowNameWrap}>
+            <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
+            {!!item.installmentTotal && item.installmentTotal > 1 && (
+              <Badge label={`${item.installmentCurrent}/${item.installmentTotal}`} color={COLORS.brand} />
+            )}
+            <Badge label={cfg.label} color={cfg.color} dot />
+          </View>
+          <Text style={styles.rowSubtitle}>
+            {item.category?.name ?? 'Sem categoria'} · vence {format(new Date(item.dueDate), 'dd/MM/yyyy')}
+            {item.recurringBillId ? ' · ↻ fixa' : ''}
+          </Text>
+        </View>
+        <View style={styles.rowRight}>
+          <Text style={styles.rowAmountText}>{fmt(Number(item.amount))}</Text>
+          <TouchableOpacity onPress={showOptions} hitSlop={8} style={{ padding: 4 }}>
+            <Feather name="more-vertical" size={16} color={COLORS.muted} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.payBtn} onPress={onPay} hitSlop={6}>
+            <Feather name="check" size={12} color={COLORS.success} />
+            <Text style={styles.payBtnText}>Pagar</Text>
+          </TouchableOpacity>
+        </View>
+      </PressableScale>
+    </SwipeableRow>
   )
 }
 
@@ -166,16 +176,16 @@ function PaidRow({ item, onUnpay, onEdit, onDelete }: {
 }) {
   const showOptions = () =>
     Alert.alert('Opções', item.name, [
+      { text: 'Cancelar', style: 'cancel' },
       { text: 'Editar', onPress: onEdit },
       { text: 'Estornar pagamento', onPress: onUnpay },
       { text: 'Excluir', style: 'destructive', onPress: onDelete },
     ])
 
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[styles.row, styles.rowPaid]}
       onLongPress={showOptions}
-      activeOpacity={0.85}
     >
       <View style={[styles.rowIcon, { backgroundColor: COLORS.success + '1a' }]}>
         <Feather name="check" size={15} color={COLORS.success} />
@@ -194,7 +204,7 @@ function PaidRow({ item, onUnpay, onEdit, onDelete }: {
         <Text style={[styles.rowAmountText, { color: COLORS.muted }]}>{fmt(Number(item.amount))}</Text>
         <Badge label="Pago" color={COLORS.success} />
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 
@@ -252,9 +262,7 @@ function InstallmentGroupCard({ group, onPay, onDeleteGroup, onEdit }: {
 
       {open && (
         <View style={styles.groupBody}>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${pct}%` }]} />
-          </View>
+          <AnimatedProgress value={pct} max={100} height={6} color={COLORS.brand} bgColor={COLORS.muted2} borderRadius={3} />
           <View style={styles.groupProgressRow}>
             <Text style={styles.groupProgressText}>{pct}% pago</Text>
             <Text style={styles.groupProgressText}>Próxima: {format(new Date(group.nextDue.dueDate), 'dd/MM/yyyy')}</Text>
@@ -378,7 +386,12 @@ function ProjectionModal({
 export default function BillsScreen() {
   const router = useRouter()
   const qc     = useQueryClient()
+  const scrollRef = useRef<any>(null)
   const [projectionIdx, setProjectionIdx] = useState<number | null>(null)
+
+  useFocusEffect(useCallback(() => {
+    scrollRef.current?.scrollTo?.({ y: 0, animated: false })
+  }, []))
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['bills'],
@@ -393,61 +406,42 @@ export default function BillsScreen() {
     queryFn:  () => peopleApi.list().then((r) => r.data),
   })
 
+  const refetchAll = async () => {
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ['bills'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['recurringBills'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['dashboard'], type: 'active' }),
+    ])
+  }
   const payMutation = useMutation({
     mutationFn: (id: string) => billsApi.pay(id),
-    onSuccess: () => {
-      hapticSuccess()
-      qc.invalidateQueries({ queryKey: ['bills'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
+    onSuccess: async () => { hapticSuccess(); await refetchAll() },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
   const unpayMutation = useMutation({
     mutationFn: (id: string) => billsApi.unpay(id),
-    onSuccess: () => {
-      hapticLight()
-      qc.invalidateQueries({ queryKey: ['bills'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
+    onSuccess: async () => { hapticLight(); await refetchAll() },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
   const deleteMutation = useMutation({
     mutationFn: (id: string) => billsApi.delete(id),
-    onSuccess: () => {
-      hapticLight()
-      qc.invalidateQueries({ queryKey: ['bills'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
+    onSuccess: async () => { hapticLight(); await refetchAll() },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
   const toggleRecurringMutation = useMutation({
     mutationFn: (item: RecurringBill) => recurringBillsApi.update(item.id, { isActive: !item.isActive }),
-    onSuccess: () => {
-      hapticLight()
-      qc.invalidateQueries({ queryKey: ['recurringBills'] })
-      qc.invalidateQueries({ queryKey: ['bills'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
+    onSuccess: async () => { hapticLight(); await refetchAll() },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
   const deleteRecurringMutation = useMutation({
     mutationFn: (id: string) => recurringBillsApi.delete(id),
-    onSuccess: () => {
-      hapticLight()
-      qc.invalidateQueries({ queryKey: ['recurringBills'] })
-      qc.invalidateQueries({ queryKey: ['bills'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
+    onSuccess: async () => { hapticLight(); await refetchAll() },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
   const deleteGroupMutation = useMutation({
     mutationFn: (group: InstallmentGroup) =>
       Promise.all(group.items.map((inst) => billsApi.delete(inst.id))),
-    onSuccess: () => {
-      hapticSuccess()
-      qc.invalidateQueries({ queryKey: ['bills'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
+    onSuccess: async () => { hapticSuccess(); await refetchAll() },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
@@ -545,13 +539,15 @@ export default function BillsScreen() {
   return (
     <View style={styles.screen}>
       {loading ? (
-        <ActivityIndicator color={COLORS.brand} style={{ marginTop: 100 }} />
+        <ListSkeleton rows={5} />
       ) : (
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={COLORS.brand} />}
         >
           {/* Header */}
+          <FadeIn delay={0}>
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
               <Text style={styles.monthLabel}>{format(now, "MMMM 'de' yyyy", { locale: ptBR })}</Text>
@@ -564,6 +560,7 @@ export default function BillsScreen() {
               <Feather name="plus" size={22} color="#fff" />
             </TouchableOpacity>
           </View>
+          </FadeIn>
 
           {bills.length === 0 && recurring.length === 0 ? (
             <View style={styles.empty}>
@@ -578,6 +575,7 @@ export default function BillsScreen() {
               {bills.length > 0 && (
                 <>
                   {/* Summary cards */}
+                  <FadeIn delay={80}>
                   <View style={styles.summaryRow}>
                     <View style={styles.summaryCard}>
                       <Text style={styles.summaryLabel}>Este mês</Text>
@@ -609,6 +607,7 @@ export default function BillsScreen() {
                       <Text style={styles.summaryCount}>{paid.length} conta{paid.length !== 1 ? 's' : ''}</Text>
                     </View>
                   </View>
+                  </FadeIn>
 
                   {overdueList.length > 0 && (
                     <View style={styles.overdueAlert}>
@@ -626,6 +625,7 @@ export default function BillsScreen() {
 
               {/* Projeção de gastos */}
               {(activeRecurring.length > 0 || pending.length > 0 || activeGroups.length > 0) && (
+                <FadeIn delay={160}>
                 <View style={styles.projectionCard}>
                   <View style={styles.projectionHeader}>
                     <Feather name="calendar" size={14} color={COLORS.brand} />
@@ -655,11 +655,13 @@ export default function BillsScreen() {
                   </View>
                   <Text style={styles.projectionFooter}>Toque em um mês para ver o detalhamento.</Text>
                 </View>
+                </FadeIn>
               )}
 
               <View style={styles.divider} />
 
               {/* Contas Fixas */}
+              <FadeIn delay={240}>
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <View style={[styles.sectionBar, { backgroundColor: COLORS.brand }]} />
@@ -693,6 +695,7 @@ export default function BillsScreen() {
                   </>
                 )}
               </View>
+              </FadeIn>
 
               {/* Pendentes */}
               <View style={styles.section}>

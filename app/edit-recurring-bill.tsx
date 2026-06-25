@@ -71,9 +71,9 @@ export default function EditRecurringBillScreen() {
       })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['recurringBills'] })
-      qc.invalidateQueries({ queryKey: ['bills'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['recurringBills'] })
+      qc.refetchQueries({ queryKey: ['bills'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -82,9 +82,9 @@ export default function EditRecurringBillScreen() {
   const deleteMutation = useMutation({
     mutationFn: () => recurringBillsApi.delete(id!),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['recurringBills'] })
-      qc.invalidateQueries({ queryKey: ['bills'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['recurringBills'] })
+      qc.refetchQueries({ queryKey: ['bills'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

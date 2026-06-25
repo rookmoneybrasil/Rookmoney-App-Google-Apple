@@ -67,8 +67,8 @@ export default function NewBudgetScreen() {
       return budgetsApi.create({ categoryId, amount: amt, month })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['budgets'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['budgets'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

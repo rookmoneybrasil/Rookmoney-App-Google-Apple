@@ -1,16 +1,20 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import { View, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert, ScrollView } from 'react-native'
 import { Text, TextInput } from '@/components/text'
-import { useRouter } from 'expo-router'
+import { PressableScale } from '@/components/pressable-scale'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { COLORS } from '@/lib/constants'
+import { ListSkeleton } from '@/components/skeleton'
 import { peopleApi, meApi, type Person } from '@/lib/api'
 import { ProGate } from '@/components/pro-gate'
 import { PersonAvatar } from '@/components/people/avatar'
 import { PersonSheet } from '@/components/people/person-sheet'
+import { FadeIn } from '@/components/animated-entry'
+import { EmptyState } from '@/components/empty-state'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
@@ -37,7 +41,7 @@ function PersonRow({ person, onPress, onLongPress }: {
   onLongPress: () => void
 }) {
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress} onLongPress={onLongPress} activeOpacity={0.85}>
+    <PressableScale style={styles.row} onPress={onPress} onLongPress={onLongPress}>
       <PersonAvatar name={person.name} color={person.color} size="md" />
 
       <View style={styles.rowInfo}>
@@ -70,13 +74,18 @@ function PersonRow({ person, onPress, onLongPress }: {
         </View>
         <Feather name="chevron-right" size={16} color={COLORS.muted} />
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 
 export default function PeopleTab() {
   const router = useRouter()
   const qc     = useQueryClient()
+  const scrollRef = useRef<any>(null)
+
+  useFocusEffect(useCallback(() => {
+    scrollRef.current?.scrollToOffset?.({ offset: 0, animated: false })
+  }, []))
 
   const [search, setSearch]           = useState('')
   const [filter, setFilter]           = useState<Filter>('all')
@@ -94,9 +103,16 @@ export default function PeopleTab() {
     queryFn:  () => peopleApi.list().then(r => r.data),
   })
 
+  const refetchAll = async () => {
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ['people'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['dashboard'], type: 'active' }),
+    ])
+  }
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => peopleApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['people'] }),
+    onSuccess: async () => { await refetchAll() },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
@@ -154,9 +170,10 @@ export default function PeopleTab() {
   return (
     <View style={styles.screen}>
       {isLoading ? (
-        <ActivityIndicator color={COLORS.brand} style={{ marginTop: 100 }} />
+        <ListSkeleton rows={4} />
       ) : (
         <FlatList
+          ref={scrollRef}
           data={people}
           keyExtractor={p => p.id}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={COLORS.brand} />}
@@ -164,6 +181,7 @@ export default function PeopleTab() {
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           ListHeaderComponent={
             <>
+              <FadeIn delay={0}>
               <View style={styles.header}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.monthLabel}>{format(new Date(), "MMMM 'de' yyyy", { locale: ptBR })}</Text>
@@ -182,9 +200,11 @@ export default function PeopleTab() {
                   </TouchableOpacity>
                 )}
               </View>
+              </FadeIn>
 
               {allPeople.length > 0 && (
                 <>
+                  <FadeIn delay={80}>
                   <View style={styles.summaryRow}>
                     <View style={styles.summaryCard}>
                       <View style={[styles.summaryIcon, { backgroundColor: COLORS.success + '1a' }]}>
@@ -218,8 +238,10 @@ export default function PeopleTab() {
                       </View>
                     </View>
                   </View>
+                  </FadeIn>
 
                   {/* Busca */}
+                  <FadeIn delay={160}>
                   <View style={styles.searchBox}>
                     <Feather name="search" size={14} color={COLORS.muted} />
                     <TextInput
@@ -249,6 +271,7 @@ export default function PeopleTab() {
                       <Text style={styles.sortBtnText}>{SORTS.find(s => s.value === sort)?.label}</Text>
                     </TouchableOpacity>
                   </View>
+                  </FadeIn>
                 </>
               )}
             </>
@@ -278,9 +301,11 @@ export default function PeopleTab() {
           ListEmptyComponent={
             allPeople.length === 0 ? (
               <View style={styles.empty}>
-                <Feather name="users" size={40} color={COLORS.muted2} />
-                <Text style={styles.emptyTitle}>Nenhuma pessoa ainda</Text>
-                <Text style={styles.emptyDesc}>Adicione pessoas para controlar quem te deve ou o que você deve.</Text>
+                <EmptyState
+                  mood="confused"
+                  title="Nenhuma pessoa cadastrada"
+                  subtitle="Adicione pessoas para controlar empréstimos e dívidas"
+                />
                 <TouchableOpacity style={styles.emptyBtn} onPress={openCreate}>
                   <Text style={styles.emptyBtnText}>Adicionar pessoa</Text>
                 </TouchableOpacity>

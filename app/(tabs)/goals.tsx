@@ -1,15 +1,21 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
-import { useRouter } from 'expo-router'
+import { PressableScale } from '@/components/pressable-scale'
+import { AnimatedProgress } from '@/components/animated-progress'
+import { triggerConfetti } from '@/components/confetti'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import Svg, { Circle } from 'react-native-svg'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { COLORS, GOAL_COLORS } from '@/lib/constants'
+import { ListSkeleton } from '@/components/skeleton'
 import { goalsApi, categoriesApi, type Goal, type Category } from '@/lib/api'
 import { hapticSuccess, hapticLight } from '@/lib/haptics'
+import { FadeIn } from '@/components/animated-entry'
+import { EmptyState } from '@/components/empty-state'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
@@ -48,6 +54,13 @@ function EditGoalSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
   const [color,       setColor]       = useState(goal.color ?? GOAL_COLORS[0])
   const qc = useQueryClient()
 
+  const refetchAll = async () => {
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ['goals'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['dashboard'], type: 'active' }),
+    ])
+  }
+
   const mutation = useMutation({
     mutationFn: () => {
       const amt = parseFloat(target.replace(',', '.'))
@@ -62,9 +75,8 @@ function EditGoalSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
         color,
       })
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['goals'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    onSuccess: async () => {
+      await refetchAll()
       onClose()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -178,7 +190,7 @@ function GoalCard({
   const contributions = goal.contributions ?? []
 
   return (
-    <View style={styles.goalCard}>
+    <PressableScale style={styles.goalCard}>
       <View style={styles.goalTop}>
         <View style={[styles.goalIconWrap, { backgroundColor: (goal.color ?? '#3B82F6') + '20' }]}>
           <Text style={styles.goalIcon}>{goal.icon ?? '🎯'}</Text>
@@ -192,9 +204,7 @@ function GoalCard({
         <CircularProgress pct={pct} color={COLORS.brand} />
       </View>
 
-      <View style={styles.progressBg}>
-        <View style={[styles.progressFill, { width: `${Math.min(pct, 100)}%`, backgroundColor: COLORS.brand }]} />
-      </View>
+      <AnimatedProgress value={Math.min(pct, 100)} max={100} height={6} color={COLORS.brand} bgColor={COLORS.border} borderRadius={3} style={{ marginTop: 14, marginBottom: 6 }} />
       <View style={styles.amountsRow}>
         <Text style={styles.amountCurrent}>{fmt(current)}</Text>
         <Text style={styles.amountTarget}>meta: {fmt(target)}</Text>
@@ -248,7 +258,7 @@ function GoalCard({
           })}
         </View>
       )}
-    </View>
+    </PressableScale>
   )
 }
 
@@ -295,16 +305,22 @@ function ContributeSheet({ goal, onClose }: { goal: Goal; onClose: () => void })
     ? [source, note.trim()].filter(Boolean).join(' · ') || undefined
     : undefined
 
+  const refetchAll = async () => {
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ['goals'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['dashboard'], type: 'active' }),
+    ])
+  }
+
   const mutation = useMutation({
     mutationFn: async () => {
       const val = parseFloat(amount.replace(',', '.'))
       if (mode === 'contribute') await goalsApi.contribute(goal.id, val, finalNote, categoryId)
       else                        await goalsApi.withdraw(goal.id, val)
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       hapticSuccess()
-      qc.invalidateQueries({ queryKey: ['goals'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      await refetchAll()
       onClose()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -426,21 +442,30 @@ function ContributeSheet({ goal, onClose }: { goal: Goal; onClose: () => void })
 export default function GoalsScreen() {
   const router  = useRouter()
   const qc      = useQueryClient()
+  const scrollRef = useRef<any>(null)
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
   const [editingGoal,  setEditingGoal]  = useState<Goal | null>(null)
   const [showCompleted, setShowCompleted] = useState(false)
+
+  useFocusEffect(useCallback(() => {
+    scrollRef.current?.scrollTo?.({ y: 0, animated: false })
+  }, []))
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['goals', 'all'],
     queryFn:  () => goalsApi.list(true).then((r) => r.data),
   })
 
+  const refetchAll = async () => {
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ['goals'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['dashboard'], type: 'active' }),
+    ])
+  }
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => goalsApi.delete(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['goals'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
+    onSuccess: async () => { await refetchAll() },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
@@ -456,6 +481,7 @@ export default function GoalsScreen() {
 
   return (
     <View style={styles.screen}>
+      <FadeIn delay={0}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Metas</Text>
@@ -471,24 +497,28 @@ export default function GoalsScreen() {
           <Text style={styles.addBtnText}>Nova meta</Text>
         </TouchableOpacity>
       </View>
+      </FadeIn>
 
       {isLoading ? (
-        <ActivityIndicator color={COLORS.brand} style={{ marginTop: 60 }} />
+        <ListSkeleton rows={3} />
       ) : (
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={COLORS.brand} />}
         >
           {active.length === 0 && completed.length === 0 && (
-            <View style={styles.empty}>
-              <Feather name="target" size={40} color={COLORS.muted} />
-              <Text style={styles.emptyTitle}>Nenhuma meta ainda</Text>
-              <Text style={styles.emptyText}>Crie sua primeira meta financeira</Text>
-            </View>
+            <EmptyState
+              mood="determined"
+              title="Nenhuma meta ainda"
+              subtitle="Crie sua primeira meta e comece a economizar!"
+            />
           )}
 
-          {active.map((g) => (
-            <GoalCard key={g.id} goal={g} onContribute={setSelectedGoal} onEdit={setEditingGoal} onDelete={handleDelete} />
+          {active.map((g, i) => (
+            <FadeIn key={g.id} delay={80 + i * 80}>
+            <GoalCard goal={g} onContribute={setSelectedGoal} onEdit={setEditingGoal} onDelete={handleDelete} />
+            </FadeIn>
           ))}
 
           <TouchableOpacity style={styles.addCard} onPress={() => router.push('/new-goal')}>
@@ -511,12 +541,14 @@ export default function GoalsScreen() {
           )}
 
           {showCompleted && completed.length > 0 && (
+            <FadeIn delay={80}>
             <View style={styles.completedSection}>
               <Text style={styles.completedSectionTitle}>Concluídas</Text>
               {completed.map((g) => (
                 <CompletedGoalRow key={g.id} goal={g} />
               ))}
             </View>
+            </FadeIn>
           )}
         </ScrollView>
       )}

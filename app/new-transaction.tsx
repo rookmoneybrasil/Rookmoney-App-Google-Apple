@@ -43,8 +43,8 @@ export default function NewTransactionModal() {
         date,
         categoryId,
       })
-      queryClient.invalidateQueries({ queryKey: ['transactions'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.refetchQueries({ queryKey: ['transactions'] })
+      queryClient.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro ao salvar.')

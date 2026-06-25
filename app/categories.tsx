@@ -60,7 +60,7 @@ export default function CategoriesScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => categoriesApi.delete(id),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['categories'] }),
+    onSuccess:  () => qc.refetchQueries({ queryKey: ['categories'] }),
     onError:    (e: Error) => Alert.alert('Erro', e.message),
   })
 

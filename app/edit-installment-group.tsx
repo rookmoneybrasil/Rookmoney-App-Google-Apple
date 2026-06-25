@@ -44,8 +44,8 @@ export default function EditInstallmentGroupScreen() {
       })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['bills'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['bills'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -54,8 +54,8 @@ export default function EditInstallmentGroupScreen() {
   const deleteMutation = useMutation({
     mutationFn: () => billsApi.deleteGroup(params.groupId!),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['bills'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['bills'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

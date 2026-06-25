@@ -65,8 +65,8 @@ export default function EditIncomeScreen() {
       return incomeSourcesApi.update(id!, { name: name.trim(), type, amount: amt, isRecurring, dayOfMonth: day, startDate: startDate.trim() || null, notes: notes.trim() || null, categoryId: categoryId || null })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['income-sources'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['income-sources'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -75,8 +75,8 @@ export default function EditIncomeScreen() {
   const deleteMutation = useMutation({
     mutationFn: () => incomeSourcesApi.delete(id!),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['income-sources'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['income-sources'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

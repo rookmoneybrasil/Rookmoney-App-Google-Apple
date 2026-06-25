@@ -32,8 +32,8 @@ export function InstallmentGroup({ personId, entries }: Props) {
   const deleteGroupMutation = useMutation({
     mutationFn: () => peopleApi.deleteEntryGroup(entries[0].id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['person', personId] })
-      qc.invalidateQueries({ queryKey: ['people'] })
+      qc.refetchQueries({ queryKey: ['person', personId] })
+      qc.refetchQueries({ queryKey: ['people'] })
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })

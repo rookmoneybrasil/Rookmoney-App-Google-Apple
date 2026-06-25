@@ -43,8 +43,8 @@ export default function NewGoalScreen() {
       })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['goals'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['goals'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

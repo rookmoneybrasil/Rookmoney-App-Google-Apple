@@ -1,4 +1,6 @@
-import { View, Modal, TouchableOpacity, StyleSheet, Pressable, ScrollView } from 'react-native'
+import { useEffect, useRef } from 'react'
+import { View, Modal, TouchableOpacity, StyleSheet, Pressable, ScrollView, Animated, Easing } from 'react-native'
+import { BlurView } from 'expo-blur'
 import { Text } from '@/components/text'
 import { Feather } from '@expo/vector-icons'
 import { format } from 'date-fns'
@@ -46,16 +48,34 @@ const classifyBill = (dueDate: string) => {
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 export function KpiDrawer({ type, data, onClose }: Props) {
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const slideAnim = useRef(new Animated.Value(300)).current
+
+  useEffect(() => {
+    if (type) {
+      fadeAnim.setValue(0)
+      slideAnim.setValue(300)
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, damping: 22, stiffness: 220, useNativeDriver: true }),
+      ]).start()
+    }
+  }, [type])
+
   return (
-    <Modal visible={!!type} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={styles.drawer}>
+    <Modal visible={!!type} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)' }]} />
+        </Animated.View>
+      </Pressable>
+      <Animated.View style={[styles.drawer, { transform: [{ translateY: slideAnim }] }]}>
         <View style={styles.handle} />
         {type === 'receivable' && <ReceivableContent data={data} onClose={onClose} />}
         {type === 'income'     && <IncomeContent     data={data} onClose={onClose} />}
         {type === 'bills'      && <BillsContent      data={data} onClose={onClose} />}
         {type === 'balance'    && <BalanceContent    data={data} onClose={onClose} />}
-      </View>
+      </Animated.View>
     </Modal>
   )
 }

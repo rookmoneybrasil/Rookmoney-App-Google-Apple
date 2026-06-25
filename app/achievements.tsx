@@ -1,11 +1,16 @@
-import { View, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
+import { View, StyleSheet, ScrollView, ActivityIndicator, Image } from 'react-native'
 import { Text } from '@/components/text'
+import { PressableScale } from '@/components/pressable-scale'
+import { AnimatedProgress } from '@/components/animated-progress'
+import { AnimatedNumber } from '@/components/animated-number'
 import { Feather } from '@expo/vector-icons'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { achievementsApi, type AchievementItem, type AchievementCategory } from '@/lib/api'
 import { CATEGORY_ORDER, CATEGORY_LABELS, CATEGORY_COLORS, ACHIEVEMENT_TEXT } from '@/lib/achievements'
 import { COLORS } from '@/lib/constants'
+import { ListSkeleton } from '@/components/skeleton'
+import { FadeIn } from '@/components/animated-entry'
 
 export default function AchievementsScreen() {
   const router = useRouter()
@@ -23,8 +28,8 @@ export default function AchievementsScreen() {
 
   if (isLoading || !data) {
     return (
-      <View style={[styles.screen, styles.center]}>
-        <ActivityIndicator size="large" color={COLORS.brand} />
+      <View style={styles.screen}>
+        <ListSkeleton rows={6} />
       </View>
     )
   }
@@ -40,6 +45,7 @@ export default function AchievementsScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       {/* Header */}
+      <FadeIn delay={0}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.headerRow}>
@@ -49,30 +55,32 @@ export default function AchievementsScreen() {
           <Text style={styles.subtitle}>{done} de {total} desbloqueadas</Text>
         </View>
         <View style={styles.headerRight}>
-          <Text style={styles.pctText}>{pct}%</Text>
+          <AnimatedNumber value={pct} format={(n) => `${Math.round(n)}%`} style={styles.pctText} />
           <View style={styles.trophyWrap}>
             <Text style={{ fontSize: 24 }}>🏆</Text>
           </View>
         </View>
       </View>
+      </FadeIn>
 
       {/* Progress bar */}
+      <FadeIn delay={80}>
       <View style={styles.progressCard}>
         <View style={styles.progressRow}>
           <Text style={styles.progressLabel}>Progresso geral</Text>
           <Text style={styles.progressCount}>{done}/{total}</Text>
         </View>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${pct}%` }]} />
-        </View>
+        <AnimatedProgress value={done} max={total} height={10} color="#fbbf24" bgColor={COLORS.card2} borderRadius={5} />
       </View>
+      </FadeIn>
 
       {/* Categories */}
-      {grouped.map(({ category, items }) => {
+      {grouped.map(({ category, items }, groupIdx) => {
         const catUnlocked = items.filter((a: AchievementItem) => a.unlocked).length
         const catColor = CATEGORY_COLORS[category]
         return (
-          <View key={category} style={styles.categorySection}>
+          <FadeIn key={category} delay={160 + groupIdx * 80}>
+          <View style={styles.categorySection}>
             <View style={styles.categoryHeader}>
               <Text style={styles.categoryTitle}>{CATEGORY_LABELS[category]}</Text>
               <View style={styles.categoryBadge}>
@@ -84,8 +92,8 @@ export default function AchievementsScreen() {
               {items.map((a: AchievementItem) => {
                 const meta = ACHIEVEMENT_TEXT[a.slug]
                 return (
-                  <View
-                    key={a.slug}
+                  <View key={a.slug} style={styles.cardWrap}>
+                  <PressableScale
                     style={[
                       styles.card,
                       a.unlocked
@@ -93,7 +101,10 @@ export default function AchievementsScreen() {
                         : { opacity: 0.5, borderColor: COLORS.border },
                     ]}
                   >
-                    <Text style={styles.cardIcon}>{a.icon}</Text>
+                    <Image
+                      source={{ uri: `https://rookmoney.com/achievements/${a.slug}.png` }}
+                      style={[styles.cardImage, !a.unlocked && { opacity: 0.4 }]}
+                    />
                     <Text style={[styles.cardName, !a.unlocked && { color: COLORS.muted }]} numberOfLines={1}>
                       {meta?.name ?? a.slug}
                     </Text>
@@ -110,11 +121,13 @@ export default function AchievementsScreen() {
                         <Feather name="lock" size={10} color={COLORS.muted} />
                       </View>
                     )}
+                  </PressableScale>
                   </View>
                 )
               })}
             </View>
           </View>
+          </FadeIn>
         )
       })}
 
@@ -162,15 +175,18 @@ const styles = StyleSheet.create({
   categoryBadgeText: { fontSize: 10, color: COLORS.muted, fontWeight: '600' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  cardWrap: { width: '47%' as any },
   card: {
-    width: '47%' as any,
     backgroundColor: COLORS.card,
-    borderRadius: 14, padding: 14,
+    borderRadius: 14, padding: 12,
     borderWidth: 1,
+    height: 140,
+    overflow: 'hidden',
   },
-  cardIcon: { fontSize: 28, marginBottom: 6 },
-  cardName: { fontSize: 13, fontWeight: '600', color: COLORS.text, marginBottom: 3 },
-  cardDesc: { fontSize: 11, color: COLORS.muted, lineHeight: 15 },
-  cardDate: { fontSize: 10, color: '#34d399', marginTop: 6, fontWeight: '500' },
+  cardImage: { width: 36, height: 36, borderRadius: 8, marginBottom: 8 },
+  cardInfo: {},
+  cardName: { fontSize: 13, fontWeight: '600', color: COLORS.text },
+  cardDesc: { fontSize: 10, color: COLORS.muted, lineHeight: 14, marginTop: 2 },
+  cardDate: { fontSize: 9, color: '#34d399', marginTop: 4, fontWeight: '500' },
   lockIcon: { position: 'absolute', top: 10, right: 10 },
 })

@@ -58,8 +58,8 @@ export default function EditBillScreen() {
       })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['bills'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['bills'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -68,8 +68,8 @@ export default function EditBillScreen() {
   const deleteMutation = useMutation({
     mutationFn: () => billsApi.delete(id!),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['bills'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['bills'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

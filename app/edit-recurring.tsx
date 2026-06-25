@@ -65,9 +65,9 @@ export default function EditRecurringScreen() {
       return recurringApi.update(id!, { name: name.trim(), type, amount: amt, frequency, categoryId: categoryId || undefined, dayOfMonth: day, description: description.trim() || null })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['recurring'] })
-      qc.invalidateQueries({ queryKey: ['transactions'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['recurring'] })
+      qc.refetchQueries({ queryKey: ['transactions'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -76,9 +76,9 @@ export default function EditRecurringScreen() {
   const deleteMutation = useMutation({
     mutationFn: () => recurringApi.delete(id!),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['recurring'] })
-      qc.invalidateQueries({ queryKey: ['transactions'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['recurring'] })
+      qc.refetchQueries({ queryKey: ['transactions'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

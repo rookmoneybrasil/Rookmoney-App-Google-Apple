@@ -114,10 +114,19 @@ export default function PersonDetailScreen() {
     enabled:  !!id,
   })
 
+  const refetchAll = async () => {
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ['person', id], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['people'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['personRecurring', id], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['dashboard'], type: 'active' }),
+    ])
+  }
+
   const deletePersonMutation = useMutation({
     mutationFn: () => peopleApi.delete(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['people'] })
+    onSuccess: async () => {
+      await refetchAll()
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -329,9 +338,9 @@ export default function PersonDetailScreen() {
     personRecurringApi.migrate()
       .then(({ data }) => {
         if (data.converted > 0) {
-          qc.invalidateQueries({ queryKey: ['person', id] })
-          qc.invalidateQueries({ queryKey: ['personRecurring', id] })
-          qc.invalidateQueries({ queryKey: ['people'] })
+          qc.refetchQueries({ queryKey: ['person', id] })
+          qc.refetchQueries({ queryKey: ['personRecurring', id] })
+          qc.refetchQueries({ queryKey: ['people'] })
         }
       })
       .catch(() => {})

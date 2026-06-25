@@ -16,7 +16,7 @@ export default function NewPersonModal() {
   const mutation = useMutation({
     mutationFn: () => peopleApi.create({ name: name.trim(), notes: notes.trim() || undefined }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['people'] })
+      qc.refetchQueries({ queryKey: ['people'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

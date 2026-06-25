@@ -31,7 +31,7 @@ export default function NewCategoryScreen() {
       return categoriesApi.create({ name: name.trim(), icon, color })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['categories'] })
+      qc.refetchQueries({ queryKey: ['categories'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

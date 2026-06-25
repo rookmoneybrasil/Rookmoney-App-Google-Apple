@@ -1,14 +1,19 @@
 import { useState } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { PressableScale } from '@/components/pressable-scale'
+import { AnimatedProgress } from '@/components/animated-progress'
 import { useRouter } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
+import { Feather } from '@expo/vector-icons'
 import { format, addMonths, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { COLORS } from '@/lib/constants'
+import { ListSkeleton } from '@/components/skeleton'
 import { budgetsApi, meApi, type Budget } from '@/lib/api'
 import { ProGate } from '@/components/pro-gate'
+import { FadeIn } from '@/components/animated-entry'
+import { EmptyState } from '@/components/empty-state'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
@@ -26,7 +31,7 @@ function EditBudgetSheet({ budget, onClose }: { budget: Budget; onClose: () => v
       return budgetsApi.update({ categoryId: budget.categoryId, amount: amt, month: budget.month })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['budgets'] })
+      qc.refetchQueries({ queryKey: ['budgets'] })
       onClose()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -81,10 +86,9 @@ function BudgetItem({ budget, onEdit, onDelete }: { budget: Budget; onEdit: () =
     ])
 
   return (
-    <TouchableOpacity
+    <PressableScale
       style={styles.item}
       onLongPress={showOptions}
-      activeOpacity={0.8}
     >
       <View style={[styles.catIcon, { backgroundColor: budget.category.color + '22' }]}>
         <Text style={styles.catEmoji}>{budget.category.icon}</Text>
@@ -107,14 +111,12 @@ function BudgetItem({ budget, onEdit, onDelete }: { budget: Budget; onEdit: () =
           {!isOver && !isWarning && <Text style={styles.pctText}>{pct}%</Text>}
         </View>
         <Text style={styles.itemAmounts}>{fmt(budget.spent)} / {fmt(budget.amount)}</Text>
-        <View style={styles.progressBg}>
-          <View style={[styles.progressFill, { width: `${pct}%`, backgroundColor: barColor }]} />
-        </View>
+        <AnimatedProgress value={pct} max={100} height={5} color={barColor} bgColor={COLORS.border} borderRadius={3} />
       </View>
       <TouchableOpacity onPress={showOptions} hitSlop={8} style={{ padding: 4 }}>
         <Feather name="more-vertical" size={16} color={COLORS.muted} />
       </TouchableOpacity>
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 
@@ -144,8 +146,8 @@ export default function BudgetScreen() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => budgetsApi.delete(id),
     onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: ['budgets'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['budgets'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
     },
     onError:    (e: Error) => Alert.alert('Erro', e.message),
   })
@@ -159,6 +161,7 @@ export default function BudgetScreen() {
   return (
     <View style={styles.screen}>
       {/* Header */}
+      <FadeIn delay={0}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Feather name="arrow-left" size={20} color={COLORS.text} />
@@ -194,6 +197,7 @@ export default function BudgetScreen() {
           <Text style={styles.addBtnText}>Definir</Text>
         </TouchableOpacity>
       </View>
+      </FadeIn>
 
       {me && !isPro ? (
         <ProGate
@@ -201,13 +205,14 @@ export default function BudgetScreen() {
           description="Defina limites de gastos por categoria e acompanhe seu orçamento mensal."
         />
       ) : isLoading ? (
-        <ActivityIndicator color={COLORS.brand} style={{ marginTop: 60 }} />
+        <ListSkeleton rows={4} />
       ) : (
         <ScrollView
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={COLORS.brand} />}
         >
           {budgets.length > 0 && (
+            <FadeIn delay={80}>
             <View style={styles.summaryRow}>
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryLabel}>Orçamento total</Text>
@@ -226,25 +231,25 @@ export default function BudgetScreen() {
                 </Text>
               </View>
             </View>
+            </FadeIn>
           )}
 
           {budgets.length === 0 ? (
-            <View style={styles.empty}>
-              <View style={styles.emptyIconWrap}>
-                <MaterialCommunityIcons name="piggy-bank-outline" size={26} color={COLORS.muted} />
-              </View>
-              <Text style={styles.emptyTitle}>Nenhum orçamento definido</Text>
-              <Text style={styles.emptyText}>Defina limites por categoria para controlar seus gastos.</Text>
-            </View>
+            <EmptyState
+              mood="determined"
+              title="Nenhum orçamento definido"
+              subtitle="Defina limites por categoria para controlar seus gastos"
+            />
           ) : (
             <>
-              {budgets.map((b) => (
+              {budgets.map((b, i) => (
+                <FadeIn key={b.id} delay={160 + i * 80}>
                 <BudgetItem
-                  key={b.id}
                   budget={b}
                   onEdit={() => setEditingBudget(b)}
                   onDelete={() => deleteMutation.mutate(b.id)}
                 />
+                </FadeIn>
               ))}
 
               {overBudget.length > 0 && (

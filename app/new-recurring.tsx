@@ -58,8 +58,8 @@ export default function NewRecurringScreen() {
       })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['recurring'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.refetchQueries({ queryKey: ['recurring'] })
+      qc.refetchQueries({ queryKey: ['dashboard'] })
       router.back()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

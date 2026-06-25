@@ -1,4 +1,5 @@
-import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native'
+import { useRef, useEffect, useState } from 'react'
+import { View, TouchableOpacity, StyleSheet, Platform, Animated, LayoutChangeEvent } from 'react-native'
 import { Text } from '@/components/text'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
@@ -19,18 +20,74 @@ interface Props {
   navigation: { navigate: (name: string) => void; emit: (opts: { type: string; data: { tabName: string }; canPreventDefault: boolean }) => { defaultPrevented: boolean } }
 }
 
+function TabIcon({ icon, focused }: { icon: FeatherName; focused: boolean }) {
+  const scale = useRef(new Animated.Value(1)).current
+
+  useEffect(() => {
+    if (focused) {
+      scale.setValue(0.8)
+      Animated.spring(scale, {
+        toValue: 1,
+        damping: 8,
+        stiffness: 300,
+        useNativeDriver: true,
+      }).start()
+    }
+  }, [focused])
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Feather name={icon} size={21} color={focused ? COLORS.brand : COLORS.muted} />
+    </Animated.View>
+  )
+}
+
 export function FloatingTabBar({ state, navigation }: Props) {
   const billsBadge  = useBadgeStore((s) => s.billsBadge)
   const peopleBadge = useBadgeStore((s) => s.peopleBadge)
+  const pillX = useRef(new Animated.Value(0)).current
+  const [tabWidth, setTabWidth] = useState(0)
 
   const badges: Partial<Record<string, number>> = {
     bills:  billsBadge,
     people: peopleBadge,
   }
 
+  const activeIdx = TABS.findIndex((t) => {
+    const routeIdx = state.routes.findIndex((r) => r.name === t.name)
+    return routeIdx === state.index
+  })
+
+  useEffect(() => {
+    if (tabWidth > 0) {
+      Animated.spring(pillX, {
+        toValue: activeIdx * tabWidth,
+        damping: 18,
+        stiffness: 200,
+        useNativeDriver: true,
+      }).start()
+    }
+  }, [activeIdx, tabWidth])
+
+  const handleBarLayout = (e: LayoutChangeEvent) => {
+    const barW = e.nativeEvent.layout.width - 12
+    setTabWidth(barW / TABS.length)
+  }
+
   return (
     <View style={styles.outer}>
-      <View style={styles.bar}>
+      <View style={styles.bar} onLayout={handleBarLayout}>
+        {tabWidth > 0 && (
+          <Animated.View
+            style={[
+              styles.activePill,
+              {
+                width: tabWidth - 8,
+                transform: [{ translateX: Animated.add(pillX, 4 + 6) }],
+              },
+            ]}
+          />
+        )}
         {TABS.map((tab) => {
           const routeIdx = state.routes.findIndex((r) => r.name === tab.name)
           const focused  = routeIdx === state.index
@@ -53,13 +110,8 @@ export function FloatingTabBar({ state, navigation }: Props) {
                 }
               }}
             >
-              {focused && <View style={styles.activePill} />}
               <View style={styles.iconWrap}>
-                <Feather
-                  name={tab.icon as FeatherName}
-                  size={21}
-                  color={focused ? COLORS.brand : COLORS.muted}
-                />
+                <TabIcon icon={tab.icon as FeatherName} focused={focused} />
                 {badge > 0 && (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>{badge > 9 ? '9+' : String(badge)}</Text>
@@ -97,6 +149,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.45,
     shadowRadius: 16,
     elevation: 10,
+    position: 'relative',
   },
   tab: {
     flex: 1,
@@ -104,12 +157,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 4,
     gap: 3,
-    position: 'relative',
+    zIndex: 1,
   },
   activePill: {
     position: 'absolute',
-    top: 0, bottom: 0,
-    left: 4, right: 4,
+    top: 4, bottom: 4,
     borderRadius: 18,
     backgroundColor: COLORS.brand + '18',
   },

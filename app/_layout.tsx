@@ -17,12 +17,15 @@ import {
 import type * as NotificationsType from 'expo-notifications'
 import Constants from 'expo-constants'
 import { useAuthStore } from '@/lib/auth'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { COLORS } from '@/lib/constants'
 import { AnimatedSplash } from '@/components/animated-splash'
 import { UpsellModal } from '@/components/upsell-modal'
 import { loadHapticsPreference } from '@/lib/haptics'
+import { Platform } from 'react-native'
 import { pushTokenApi } from '@/lib/api'
 import { AchievementToastProvider } from '@/components/achievement-toast'
+import { ConfettiProvider } from '@/components/confetti'
 
 SplashScreen.preventAutoHideAsync()
 loadHapticsPreference()
@@ -55,7 +58,7 @@ async function registerPushToken() {
     const token = (await Notifications.getExpoPushTokenAsync({
       projectId: '158da268-5531-48b4-a07f-a4e383f34a9d',
     })).data
-    await pushTokenApi.register(token)
+    await pushTokenApi.register(token, Platform.OS)
   } catch (e) {
     // silent — push token registration is best-effort
   }
@@ -169,63 +172,71 @@ export default function RootLayout() {
   if (!fontsLoaded) return null
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={navTheme}>
         <StatusBar style="light" backgroundColor={COLORS.bg} />
         <AuthGate />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.bg } }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
+        <Stack screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: COLORS.bg },
+          animation: 'fade_from_bottom',
+          animationDuration: 200,
+        }}>
+          <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
+          <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
 
           {/* Onboarding */}
-          <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="onboarding" options={{ gestureEnabled: false, animation: 'fade' }} />
 
-          {/* Stack screens */}
-          <Stack.Screen name="budget"        options={{ headerShown: false }} />
-          <Stack.Screen name="transactions"  options={{ headerShown: false }} />
-          <Stack.Screen name="recurring"     options={{ headerShown: false }} />
-          <Stack.Screen name="reports"       options={{ headerShown: false }} />
-          <Stack.Screen name="categories"    options={{ headerShown: false }} />
-          <Stack.Screen name="settings"      options={{ headerShown: false }} />
-          <Stack.Screen name="goals"         options={{ headerShown: false }} />
-          <Stack.Screen name="calendar"      options={{ headerShown: false }} />
-          <Stack.Screen name="notifications" options={{ headerShown: false }} />
-          <Stack.Screen name="projection"    options={{ headerShown: false }} />
-          <Stack.Screen name="people"        options={{ headerShown: false }} />
-          <Stack.Screen name="person-detail" options={{ headerShown: false }} />
-          <Stack.Screen name="billing"       options={{ headerShown: false }} />
-          <Stack.Screen name="achievements"  options={{ headerShown: false }} />
-          <Stack.Screen name="changelog"     options={{ headerShown: false }} />
-          <Stack.Screen name="ai-chat"       options={{ headerShown: false }} />
+          {/* Stack screens — smooth slide */}
+          <Stack.Screen name="budget" />
+          <Stack.Screen name="transactions" />
+          <Stack.Screen name="recurring" />
+          <Stack.Screen name="reports" />
+          <Stack.Screen name="categories" />
+          <Stack.Screen name="settings" />
+          <Stack.Screen name="goals" />
+          <Stack.Screen name="calendar" />
+          <Stack.Screen name="notifications" />
+          <Stack.Screen name="projection" />
+          <Stack.Screen name="people" />
+          <Stack.Screen name="person-detail" />
+          <Stack.Screen name="billing" />
+          <Stack.Screen name="achievements" />
+          <Stack.Screen name="changelog" />
+          <Stack.Screen name="ai-chat" />
 
           {/* Google OAuth callback */}
-          <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
+          <Stack.Screen name="auth/callback" options={{ animation: 'none' }} />
 
-          {/* Edit screens */}
-          <Stack.Screen name="edit-bill"           options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="edit-transaction"    options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="edit-income"         options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="edit-recurring"      options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="edit-recurring-bill" options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="edit-category"       options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="feedback"            options={{ headerShown: false }} />
+          {/* Edit screens — transparent modal with blur */}
+          <Stack.Screen name="edit-bill"           options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="edit-transaction"    options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="edit-income"         options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="edit-recurring"      options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="edit-recurring-bill" options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="edit-category"       options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="feedback" />
 
-          {/* Modal screens */}
-          <Stack.Screen name="new-transaction"   options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="new-goal"          options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="new-budget"        options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="new-bill"          options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="new-income"        options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="new-recurring"     options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="new-recurring-bill" options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="new-category"      options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="new-person"        options={{ presentation: 'modal', headerShown: false }} />
+          {/* New screens — transparent modal with blur */}
+          <Stack.Screen name="new-transaction"    options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="new-goal"           options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="new-budget"         options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="new-bill"           options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="new-income"         options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="new-recurring"      options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="new-recurring-bill" options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="new-category"       options={{ presentation: 'transparentModal', animation: 'fade' }} />
+          <Stack.Screen name="new-person"         options={{ presentation: 'transparentModal', animation: 'fade' }} />
         </Stack>
 
         <AchievementToastProvider />
+        <ConfettiProvider />
         <UpsellModal />
         {showSplash && <AnimatedSplash onFinish={() => setShowSplash(false)} />}
       </ThemeProvider>
     </QueryClientProvider>
+    </GestureHandlerRootView>
   )
 }

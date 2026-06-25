@@ -95,9 +95,9 @@ export function EntryModal({ visible, personId, personName, onClose }: Props) {
       })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['person', personId] })
-      qc.invalidateQueries({ queryKey: ['people'] })
-      if (mode === 'recorrente') qc.invalidateQueries({ queryKey: ['personRecurring', personId] })
+      qc.refetchQueries({ queryKey: ['person', personId] })
+      qc.refetchQueries({ queryKey: ['people'] })
+      if (mode === 'recorrente') qc.refetchQueries({ queryKey: ['personRecurring', personId] })
       onClose()
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),

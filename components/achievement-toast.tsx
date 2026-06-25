@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { View, StyleSheet, TouchableOpacity, Animated } from 'react-native'
+import { View, StyleSheet, TouchableOpacity, Animated, Image } from 'react-native'
 import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
 import { achievementsApi } from '@/lib/api'
@@ -79,7 +79,10 @@ function AchievementToast({ toast, onPress }: { toast: ToastItem; onPress: () =>
   return (
     <Animated.View style={[styles.toast, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
       <TouchableOpacity style={styles.toastInner} onPress={onPress} activeOpacity={0.85}>
-        <Text style={styles.toastIcon}>{toast.icon}</Text>
+        <Image
+          source={{ uri: `https://rookmoney.com/achievements/${toast.slug}.png` }}
+          style={styles.toastImage}
+        />
         <View style={styles.toastText}>
           <Text style={styles.toastLabel}>CONQUISTA DESBLOQUEADA!</Text>
           <Text style={styles.toastName} numberOfLines={1}>{meta?.name ?? toast.slug}</Text>
@@ -110,7 +113,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 16, paddingVertical: 14,
   },
-  toastIcon:  { fontSize: 32 },
+  toastImage: { width: 40, height: 40, borderRadius: 10 },
   toastText:  { flex: 1 },
   toastLabel: { fontSize: 9, fontWeight: '700', color: '#fbbf24', letterSpacing: 1.2 },
   toastName:  { fontSize: 14, fontWeight: '600', color: COLORS.text, marginTop: 2 },

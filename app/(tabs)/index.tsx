@@ -1,14 +1,19 @@
 import { View, ScrollView, TouchableOpacity, FlatList, StyleSheet, RefreshControl, ActivityIndicator, Animated, Easing } from 'react-native'
+import { FadeIn, FadeInScale } from '@/components/animated-entry'
+import { PressableScale } from '@/components/pressable-scale'
+import { AnimatedProgress } from '@/components/animated-progress'
+import { AnimatedNumber } from '@/components/animated-number'
 import { Text } from '@/components/text'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useRouter } from 'expo-router'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { Feather } from '@expo/vector-icons'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import Svg, { Circle, Path } from 'react-native-svg'
 import { COLORS } from '@/lib/constants'
+import { DashboardSkeleton } from '@/components/skeleton'
 import { dashboardApi, goalsApi, budgetsApi, type Transaction, type Goal, type Budget } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
 import { AppHeader } from '@/components/app-header'
@@ -63,14 +68,14 @@ function Sparkline({ change, color }: { change: number; color: string }) {
 
 // ── KPI Card ──────────────────────────────────────────────────────────────
 function KpiCard({
-  label, value, sub, icon, gradientColors, valueColor, glowColor, onPress, sparkChange,
+  label, rawValue, sub, icon, gradientColors, valueColor, glowColor, onPress, sparkChange,
 }: {
-  label: string; value: string; sub?: string; icon: string
+  label: string; rawValue: number; sub?: string; icon: string
   gradientColors: readonly [string, string]; valueColor: string; glowColor: string
   onPress?: () => void; sparkChange?: number | null
 }) {
   return (
-    <TouchableOpacity style={styles.kpiWrap} onPress={onPress} activeOpacity={onPress ? 0.75 : 1}>
+    <TouchableOpacity style={styles.kpiWrap} activeOpacity={0.85} onPress={onPress}>
       <LinearGradient colors={[gradientColors[0], gradientColors[1], gradientColors[0]]} style={[styles.kpiCard, { borderColor: glowColor + '55' }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
         {/* Neon glow inner line */}
         <View style={[styles.kpiGlowLine, { backgroundColor: glowColor + '15' }]} />
@@ -81,7 +86,13 @@ function KpiCard({
               <Feather name={icon as never} size={12} color={valueColor} />
             </View>
           </View>
-          <Text style={[styles.kpiValue, { color: valueColor, textShadowColor: glowColor + '60', textShadowRadius: 10 }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+          <AnimatedNumber
+            value={rawValue}
+            format={fmtShort}
+            duration={900}
+            delay={100}
+            style={[styles.kpiValue, { color: valueColor, textShadowColor: glowColor + '60', textShadowRadius: 10 }]}
+          />
         </View>
         <View>
           {sub ? <Text style={styles.kpiSub} numberOfLines={1}>{sub}</Text> : null}
@@ -149,9 +160,7 @@ function GoalRow({ goal }: { goal: Goal }) {
         <Text style={styles.goalRowName} numberOfLines={1}>{goal.icon ? `${goal.icon} ` : ''}{goal.name}</Text>
         <Text style={[styles.goalRowPct, { color }]}>{pct.toFixed(0)}%</Text>
       </View>
-      <View style={styles.goalRowBar}>
-        <View style={[styles.goalRowBarFill, { width: `${pct}%` as `${number}%`, backgroundColor: color }]} />
-      </View>
+      <AnimatedProgress value={pct} max={100} height={4} color={color} bgColor={COLORS.border} borderRadius={2} />
       <View style={styles.goalRowFooter}>
         <Text style={styles.goalRowAmt}>{fmtShort(goal.currentAmount)}</Text>
         <Text style={styles.goalRowAmt}>{fmtShort(goal.targetAmount)}</Text>
@@ -171,9 +180,7 @@ function BudgetRow({ budget }: { budget: Budget }) {
         <Text style={styles.budgetRowName} numberOfLines={1}>{budget.category.name}</Text>
         <Text style={[styles.budgetRowPct, { color }]}>{pct.toFixed(0)}%</Text>
       </View>
-      <View style={styles.budgetBarWrap}>
-        <View style={[styles.budgetBarFill, { width: `${pct}%` as `${number}%`, backgroundColor: color }]} />
-      </View>
+      <AnimatedProgress value={pct} max={100} height={4} color={color} bgColor={COLORS.border} borderRadius={2} />
     </View>
   )
 }
@@ -347,16 +354,41 @@ export default function DashboardScreen() {
     setOverdueBadge(data.overdueCount ?? 0)
   }, [data])
 
+  const scrollRef = useRef<any>(null)
+  const scrollY = useRef(new Animated.Value(0)).current
+
+  useFocusEffect(useCallback(() => {
+    scrollRef.current?.scrollTo?.({ y: 0, animated: false })
+  }, []))
+  const headerTranslateY = scrollY.interpolate({
+    inputRange: [0, 80],
+    outputRange: [0, -100],
+    extrapolate: 'clamp',
+  })
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 60],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  })
+
   return (
     <View style={styles.screen}>
-      <AppHeader bellBadge={overdueCount} />
+      <Animated.View style={{ transform: [{ translateY: headerTranslateY }], opacity: headerOpacity, zIndex: 10 }}>
+        <AppHeader bellBadge={overdueCount} />
+      </Animated.View>
       <KpiDrawer type={kpiDrawer} data={data} onClose={() => setKpiDrawer(null)} />
-      <ScrollView
+      <Animated.ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={COLORS.brand} />}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+        scrollEventThrottle={16}
       >
-      {/* Greeting */}
-      <View style={styles.header}>
+      {/* Greeting — parallax: moves slower than scroll */}
+      <Animated.View style={[styles.header, {
+        transform: [{ translateY: scrollY.interpolate({ inputRange: [0, 200], outputRange: [0, 40], extrapolate: 'clamp' }) }],
+        opacity: scrollY.interpolate({ inputRange: [0, 150], outputRange: [1, 0], extrapolate: 'clamp' }),
+      }]}>
         <Rookinho mood={data?.mood} size={64} />
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={styles.headerGreeting}>{greeting()}, {firstName}.</Text>
@@ -368,19 +400,22 @@ export default function DashboardScreen() {
             <Text style={styles.overdueBadgeText}>{overdueCount} em atraso</Text>
           </TouchableOpacity>
         )}
-      </View>
+      </Animated.View>
 
       {isLoading ? (
-        <ActivityIndicator color={COLORS.brand} style={{ marginTop: 80 }} />
+        <DashboardSkeleton />
       ) : (
         <>
           {/* ── VISÃO DO MÊS ─────────────────────────────────────────── */}
+          <FadeIn delay={0} slideFrom={25}>
           <SectionLabel>{`VISÃO DO MÊS — ${monthLabel}`}</SectionLabel>
+          </FadeIn>
+          <FadeIn delay={80} slideFrom={20}>
           <View style={styles.kpiGrid}>
             <View style={styles.kpiRow}>
               <KpiCard
                 label="A RECEBER"
-                value={fmtShort(data?.totalReceivable ?? 0)}
+                rawValue={data?.totalReceivable ?? 0}
                 sub={`${fmtShort(data?.totalIncomeReceivable ?? 0)} de rendas`}
                 icon="arrow-down-circle"
                 gradientColors={['#062828', '#0e3a3a']}
@@ -390,7 +425,7 @@ export default function DashboardScreen() {
               />
               <KpiCard
                 label="RECEITAS"
-                value={fmtShort(data?.monthIncome ?? 0)}
+                rawValue={data?.monthIncome ?? 0}
                 sub={data?.incomeChange != null
                   ? `${data.incomeChange >= 0 ? '↑' : '↓'}${Math.abs(Math.round(data.incomeChange))}% vs mês ant.`
                   : 'Total recebido'}
@@ -405,7 +440,7 @@ export default function DashboardScreen() {
             <View style={styles.kpiRow}>
               <KpiCard
                 label="A PAGAR"
-                value={fmtShort((data?.pendingBillsAmount ?? 0) + (data?.personPayablesAmount ?? 0))}
+                rawValue={(data?.pendingBillsAmount ?? 0) + (data?.personPayablesAmount ?? 0)}
                 sub={(data?.pendingBillsCount ?? 0) > 0
                   ? `${data?.pendingBillsCount} conta(s)${data?.expenseChange != null ? ` · ${data.expenseChange >= 0 ? '↑' : '↓'}${Math.abs(Math.round(data.expenseChange))}%` : ''}`
                   : 'Em dia'}
@@ -418,7 +453,7 @@ export default function DashboardScreen() {
               />
               <KpiCard
                 label="SALDO DO MÊS"
-                value={fmtShort(data?.monthBalance ?? 0)}
+                rawValue={data?.monthBalance ?? 0}
                 sub={`Já pago: ${fmtShort(data?.monthExpense ?? 0)}`}
                 icon="calendar"
                 gradientColors={['#111e32', '#16294a']}
@@ -428,10 +463,11 @@ export default function DashboardScreen() {
               />
             </View>
           </View>
+          </FadeIn>
 
           {/* ── ATENÇÃO ──────────────────────────────────────────────── */}
           {(!!data?.insight || !!nextBill) && (
-            <>
+            <FadeIn delay={160} slideFrom={20}>
               <SectionLabel>ATENÇÃO</SectionLabel>
               {!!data?.insight && (
                 <View style={styles.insightCard}>
@@ -440,10 +476,11 @@ export default function DashboardScreen() {
                 </View>
               )}
               <NextBillHighlight bill={nextBill} />
-            </>
+            </FadeIn>
           )}
 
           {/* ── ESTE MÊS ─────────────────────────────────────────────── */}
+          <FadeIn delay={240} slideFrom={20}>
           <SectionLabel>ESTE MÊS</SectionLabel>
 
           {/* Ritmo de gastos */}
@@ -506,7 +543,10 @@ export default function DashboardScreen() {
             </View>
           )}
 
+          </FadeIn>
+
           {/* ── ATIVIDADE RECENTE ─────────────────────────────────────── */}
+          <FadeIn delay={320} slideFrom={20}>
           <SectionLabel>ATIVIDADE RECENTE</SectionLabel>
 
           {/* Transações recentes */}
@@ -543,7 +583,10 @@ export default function DashboardScreen() {
             </View>
           )}
 
+          </FadeIn>
+
           {/* ── COMPROMISSOS ─────────────────────────────────────────── */}
+          <FadeIn delay={400} slideFrom={20}>
           <SectionLabel>COMPROMISSOS</SectionLabel>
 
           {/* A Pagar */}
@@ -611,7 +654,10 @@ export default function DashboardScreen() {
             )}
           </View>
 
+          </FadeIn>
+
           {/* ── PLANEJAMENTO ──────────────────────────────────────────── */}
+          <FadeIn delay={480} slideFrom={20}>
           <SectionLabel>PLANEJAMENTO</SectionLabel>
 
           {/* Orçamento */}
@@ -634,12 +680,16 @@ export default function DashboardScreen() {
             <FinancialHealthCard health={health} />
           </View>
 
+          </FadeIn>
+
           {/* ── FUTURO ───────────────────────────────────────────────── */}
+          <FadeIn delay={560} slideFrom={20}>
           <SectionLabel>FUTURO</SectionLabel>
           <ProjectionsSection projections={data?.projections ?? []} />
+          </FadeIn>
         </>
       )}
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   )
 }

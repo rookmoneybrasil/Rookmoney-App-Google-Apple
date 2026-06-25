@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform } from 'react-native'
 import { Text, TextInput } from '@/components/text'
-import { useRouter } from 'expo-router'
+import { PressableScale } from '@/components/pressable-scale'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { Feather } from '@expo/vector-icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { COLORS } from '@/lib/constants'
+import { ListSkeleton } from '@/components/skeleton'
 import { incomeSourcesApi, transactionsApi, categoriesApi, type IncomeSource, type IncomeHistoryEntry, type Category } from '@/lib/api'
+import { FadeIn } from '@/components/animated-entry'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
@@ -69,7 +72,7 @@ function RecurringRow({ source, currentMonth, now, onEdit, onDelete }: {
     ])
 
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[
         styles.row,
         received  ? styles.rowReceived
@@ -77,7 +80,6 @@ function RecurringRow({ source, currentMonth, now, onEdit, onDelete }: {
         : styles.rowSuccess,
       ]}
       onLongPress={showOptions}
-      activeOpacity={0.85}
     >
       <View style={[styles.rowIcon, { backgroundColor: COLORS.success + (received ? '26' : '1a') }]}>
         <Text style={styles.rowEmoji}>{cfg.icon}</Text>
@@ -98,7 +100,7 @@ function RecurringRow({ source, currentMonth, now, onEdit, onDelete }: {
       <TouchableOpacity onPress={showOptions} hitSlop={8} style={{ padding: 4 }}>
         <Feather name="more-vertical" size={16} color={COLORS.muted} />
       </TouchableOpacity>
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 
@@ -118,10 +120,9 @@ function EventualRow({ source, onReceive, onEdit, onDelete }: {
     ])
 
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[styles.row, styles.rowWarning]}
       onLongPress={showOptions}
-      activeOpacity={0.85}
     >
       <View style={[styles.rowIcon, { backgroundColor: COLORS.warning + '1a' }]}>
         <Text style={styles.rowEmoji}>{cfg.icon}</Text>
@@ -143,7 +144,7 @@ function EventualRow({ source, onReceive, onEdit, onDelete }: {
         <Feather name="arrow-down-circle" size={13} color={COLORS.success} />
         <Text style={styles.receiveBtnText}>Recebi</Text>
       </TouchableOpacity>
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 
@@ -296,23 +297,23 @@ function SourceHistoryRow({ source, entries }: { source: IncomeSource; entries: 
   const hasVariation  = entries.length > 1 && entries.some((e) => e.amount !== entries[0].amount)
   const latest        = entries[0]
 
+  const refetchAll = async () => {
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ['income-sources'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['income-history'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['dashboard'], type: 'active' }),
+    ])
+  }
+
   const revertMutation = useMutation({
     mutationFn: () => incomeSourcesApi.revert(source.id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['income-sources'] })
-      qc.invalidateQueries({ queryKey: ['income-history'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
+    onSuccess: async () => { await refetchAll() },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
   const deleteTxMutation = useMutation({
     mutationFn: (txId: string) => transactionsApi.delete(txId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['income-history'] })
-      qc.invalidateQueries({ queryKey: ['transactions'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
+    onSuccess: async () => { await refetchAll() },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
@@ -430,8 +431,13 @@ function IncomeHistorySection({ sources, history }: { sources: IncomeSource[]; h
 export default function IncomeScreen() {
   const router = useRouter()
   const qc     = useQueryClient()
+  const scrollRef = useRef<any>(null)
 
   const [receiptSource, setReceiptSource] = useState<IncomeSource | null>(null)
+
+  useFocusEffect(useCallback(() => {
+    scrollRef.current?.scrollTo?.({ y: 0, animated: false })
+  }, []))
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['income-sources'],
@@ -448,12 +454,17 @@ export default function IncomeScreen() {
     queryFn:  () => categoriesApi.list().then((r) => r.data),
   })
 
+  const refetchAll = async () => {
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ['income-sources'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['income-history'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['dashboard'], type: 'active' }),
+    ])
+  }
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => incomeSourcesApi.delete(id),
-    onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: ['income-sources'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    },
+    onSuccess: async () => { await refetchAll() },
     onError:    (e: Error) => Alert.alert('Erro', e.message),
   })
 
@@ -462,11 +473,8 @@ export default function IncomeScreen() {
       await transactionsApi.create({ amount, type: 'INCOME', description: source.name, date, categoryId })
       await incomeSourcesApi.update(source.id, { lastAutoPayMonth: format(new Date(), 'yyyy-MM') })
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['income-sources'] })
-      qc.invalidateQueries({ queryKey: ['income-history'] })
-      qc.invalidateQueries({ queryKey: ['transactions'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    onSuccess: async () => {
+      await refetchAll()
       setReceiptSource(null)
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
@@ -508,13 +516,15 @@ export default function IncomeScreen() {
   return (
     <View style={styles.screen}>
       {isLoading ? (
-        <ActivityIndicator color={COLORS.brand} style={{ marginTop: 100 }} />
+        <ListSkeleton rows={4} />
       ) : (
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={COLORS.brand} />}
         >
           {/* Header */}
+          <FadeIn delay={0}>
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
               <Text style={styles.monthLabel}>{format(now, "MMMM 'de' yyyy", { locale: ptBR })}</Text>
@@ -527,6 +537,7 @@ export default function IncomeScreen() {
               <Feather name="plus" size={22} color="#fff" />
             </TouchableOpacity>
           </View>
+          </FadeIn>
 
           {sources.length === 0 ? (
             <View style={styles.empty}>
@@ -539,6 +550,7 @@ export default function IncomeScreen() {
           ) : (
             <>
               {/* Summary cards */}
+              <FadeIn delay={80}>
               <View style={styles.summaryRow}>
                 <View style={styles.summaryCard}>
                   <View style={styles.summaryLabelRow}>
@@ -565,8 +577,10 @@ export default function IncomeScreen() {
                   <Text style={styles.summaryCount}>{sources.length} fontes</Text>
                 </View>
               </View>
+              </FadeIn>
 
               {/* Projeção de receitas */}
+              <FadeIn delay={160}>
               <View style={styles.projectionCard}>
                 <View style={styles.projectionHeader}>
                   <Feather name="calendar" size={14} color={COLORS.success} />
@@ -587,10 +601,12 @@ export default function IncomeScreen() {
                 </View>
                 <Text style={styles.projectionFooter}>Recorrentes confirmadas + eventuais pendentes deste mês.</Text>
               </View>
+              </FadeIn>
 
               <View style={styles.divider} />
 
               {/* Recorrentes */}
+              <FadeIn delay={240}>
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <View style={[styles.sectionBar, { backgroundColor: COLORS.success }]} />
@@ -621,8 +637,10 @@ export default function IncomeScreen() {
                   ))
                 )}
               </View>
+              </FadeIn>
 
               {/* Eventuais */}
+              <FadeIn delay={320}>
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <View style={[styles.sectionBar, { backgroundColor: COLORS.warning }]} />
@@ -652,6 +670,7 @@ export default function IncomeScreen() {
                   ))
                 )}
               </View>
+              </FadeIn>
 
               <View style={styles.divider} />
             </>

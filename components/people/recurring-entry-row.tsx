@@ -43,8 +43,8 @@ export function RecurringEntryRow({ item, personId, monthEntryId, paidThisMonth,
     },
     onSuccess: () => {
       setPaid(p => !p)
-      qc.invalidateQueries({ queryKey: ['person', personId] })
-      qc.invalidateQueries({ queryKey: ['people'] })
+      qc.refetchQueries({ queryKey: ['person', personId] })
+      qc.refetchQueries({ queryKey: ['people'] })
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
@@ -52,8 +52,8 @@ export function RecurringEntryRow({ item, personId, monthEntryId, paidThisMonth,
   const stopMutation = useMutation({
     mutationFn: () => personRecurringApi.delete(item.id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['personRecurring', personId] })
-      qc.invalidateQueries({ queryKey: ['person', personId] })
+      qc.refetchQueries({ queryKey: ['personRecurring', personId] })
+      qc.refetchQueries({ queryKey: ['person', personId] })
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })

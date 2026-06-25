@@ -17,8 +17,8 @@ export function EntryActions({ entryId, personId, isSettled }: Props) {
   const settleMutation = useMutation({
     mutationFn: () => isSettled ? peopleApi.unsettleEntry(entryId) : peopleApi.settleEntry(entryId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['person', personId] })
-      qc.invalidateQueries({ queryKey: ['people'] })
+      qc.refetchQueries({ queryKey: ['person', personId] })
+      qc.refetchQueries({ queryKey: ['people'] })
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
@@ -26,8 +26,8 @@ export function EntryActions({ entryId, personId, isSettled }: Props) {
   const deleteMutation = useMutation({
     mutationFn: () => peopleApi.deleteEntry(entryId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['person', personId] })
-      qc.invalidateQueries({ queryKey: ['people'] })
+      qc.refetchQueries({ queryKey: ['person', personId] })
+      qc.refetchQueries({ queryKey: ['people'] })
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
