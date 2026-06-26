@@ -7,19 +7,21 @@ import { COLORS } from '@/lib/constants'
 import { notificationsApi, type AppNotification } from '@/lib/api'
 
 const TYPE_ICON: Record<AppNotification['type'], keyof typeof Feather.glyphMap> = {
-  bill:   'file-text',
-  goal:   'target',
-  budget: 'pie-chart',
-  person: 'users',
-  income: 'trending-up',
+  bill:     'file-text',
+  goal:     'target',
+  budget:   'pie-chart',
+  person:   'users',
+  income:   'trending-up',
+  rookinho: 'message-circle',
 }
 
 const TYPE_COLOR: Record<AppNotification['type'], string> = {
-  bill:   COLORS.warning,
-  goal:   COLORS.brand,
-  budget: COLORS.danger,
-  person: '#a78bfa',
-  income: COLORS.success,
+  bill:     COLORS.warning,
+  goal:     COLORS.brand,
+  budget:   COLORS.danger,
+  person:   '#a78bfa',
+  income:   COLORS.success,
+  rookinho: '#f59e0b',
 }
 
 const URGENCY_DOT: Record<AppNotification['urgency'], string> = {

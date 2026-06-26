@@ -22,7 +22,7 @@ import { COLORS } from '@/lib/constants'
 import { AnimatedSplash } from '@/components/animated-splash'
 import { UpsellModal } from '@/components/upsell-modal'
 import { loadHapticsPreference } from '@/lib/haptics'
-import { Platform, Alert } from 'react-native'
+import { Platform } from 'react-native'
 import { pushTokenApi } from '@/lib/api'
 import { AchievementToastProvider } from '@/components/achievement-toast'
 import { ConfettiProvider } from '@/components/confetti'
@@ -48,21 +48,19 @@ if (Notifications) {
 }
 
 async function registerPushToken() {
-  if (!Notifications) { Alert.alert('1', 'Notifications null'); return }
+  if (!Notifications) return
   const perms = await Notifications.getPermissionsAsync() as { status: string }
   const granted    = perms.status === 'granted'
     ? true
     : ((await Notifications.requestPermissionsAsync()) as { status: string }).status === 'granted'
-  if (!granted) { Alert.alert('2', 'denied: ' + perms.status); return }
+  if (!granted) return
   try {
-    const t = (await Notifications.getExpoPushTokenAsync({
+    const token = (await Notifications.getExpoPushTokenAsync({
       projectId: '48ed8ac5-7530-48b9-a722-46769e9e96a6',
     })).data
-    Alert.alert('3', 'token: ' + t)
-    await pushTokenApi.register(t, Platform.OS)
-    Alert.alert('4', 'OK registrado')
-  } catch (e: any) {
-    Alert.alert('ERR', String(e?.message ?? e))
+    await pushTokenApi.register(token, Platform.OS)
+  } catch (e) {
+    // silent — push token registration is best-effort
   }
 }
 
