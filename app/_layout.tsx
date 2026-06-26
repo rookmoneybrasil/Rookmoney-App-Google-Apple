@@ -144,6 +144,7 @@ function AuthGate() {
         router.replace('/(tabs)')
       }
     } else if (token && !inAuth && !inOnboarding) {
+      registerPushToken()
       const u = useAuthStore.getState().user
       if (u && !u.hasOnboarded && (segments[0] as string) !== 'onboarding') {
         router.replace('/onboarding')
