@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "632276062518",
+    "project_id": "rook-money-497621",
+    "storage_bucket": "rook-money-497621.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:632276062518:android:ecb618ef9d8b7808b46397",
+        "android_client_info": {
+          "package_name": "com.rookmoney.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "632276062518-5r2qr85oard7v8qdrt9oedgp1setk931.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCmHAfM2LD81XIKE52UQtS9EaX46iA8XSA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "632276062518-5r2qr85oard7v8qdrt9oedgp1setk931.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
