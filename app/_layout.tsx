@@ -56,7 +56,7 @@ async function registerPushToken() {
   if (!granted) { Alert.alert('2', 'denied: ' + perms.status); return }
   try {
     const t = (await Notifications.getExpoPushTokenAsync({
-      projectId: '158da268-5531-48b4-a07f-a4e383f34a9d',
+      projectId: '48ed8ac5-7530-48b9-a722-46769e9e96a6',
     })).data
     Alert.alert('3', 'token: ' + t)
     await pushTokenApi.register(t, Platform.OS)
