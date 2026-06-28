@@ -17,7 +17,14 @@ const Notifications: typeof NotificationsType | null = isExpoGo
 import { isHapticsEnabled, setHapticsEnabled } from '@/lib/haptics'
 import { FadeIn } from '@/components/animated-entry'
 
-const SANDBOX_NUMBER = '+1 415 523 8886'
+const ROOKINHO_NUMBER = '5513991117381'
+
+function normalizePhone(raw: string): string | null {
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length === 11) return `+55${digits}`
+  if (digits.length === 12 || digits.length === 13) return `+${digits}`
+  return null
+}
 
 const CURRENCIES = [
   { value: 'BRL', label: 'R$ BRL' },
@@ -347,7 +354,12 @@ export default function SettingsScreen() {
   })
 
   const whatsappMutation = useMutation({
-    mutationFn: (phone: string) => settingsApi.update({ whatsappPhone: phone }),
+    mutationFn: (phone: string) => {
+      if (!phone) return settingsApi.update({ whatsappPhone: '' })
+      const normalized = normalizePhone(phone)
+      if (!normalized) throw new Error('Número inválido. Use o formato: (11) 99999-9999')
+      return settingsApi.update({ whatsappPhone: normalized })
+    },
     onSuccess: () => {
       qc.refetchQueries({ queryKey: ['settings-prefs'] })
       setWhatsappInput('')
@@ -787,6 +799,94 @@ export default function SettingsScreen() {
                       <Text style={styles.viewPlansBtnText}>Ver planos e preços</Text>
                       <Feather name="arrow-right" size={15} color={COLORS.warning} />
                     </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </View>
+            </FadeIn>
+
+            {/* WHATSAPP */}
+            <FadeIn delay={320}>
+            <Text style={styles.sectionLabel}>WHATSAPP</Text>
+
+            <View style={styles.section}>
+              <View style={styles.cardHeader}>
+                <FontAwesome name="whatsapp" size={16} color="#25D366" />
+                <Text style={styles.cardHeaderTitle}>Rookinho no WhatsApp</Text>
+              </View>
+              <View style={styles.card}>
+                <View style={{ padding: 16, gap: 12 }}>
+                  {user?.plan !== 'PRO_PLUS' ? (
+                    <View style={{ backgroundColor: 'rgba(245,158,11,0.06)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)', borderRadius: 12, padding: 14, gap: 4 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: COLORS.warning }}>Exclusivo do plano PRO+</Text>
+                      <Text style={{ fontSize: 12, color: COLORS.muted, lineHeight: 18 }}>
+                        Faça upgrade para o PRO+ e converse com o Rookinho direto no WhatsApp.
+                      </Text>
+                    </View>
+                  ) : displayWhatsapp ? (
+                    <>
+                      <View style={styles.whatsappLinked}>
+                        <Feather name="check-circle" size={16} color={COLORS.success} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.whatsappLinkedTitle}>WhatsApp vinculado</Text>
+                          <Text style={styles.whatsappLinkedNumber}>{displayWhatsapp}</Text>
+                        </View>
+                      </View>
+
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#25D366', borderRadius: 12, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                        onPress={() => Linking.openURL(`https://wa.me/${ROOKINHO_NUMBER}`)}
+                      >
+                        <FontAwesome name="whatsapp" size={18} color="#fff" />
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Falar com Rookinho no WhatsApp</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.whatsappUnlinkRow}
+                        onPress={() => {
+                          Alert.alert('Desvincular', 'Remover seu WhatsApp?', [
+                            { text: 'Cancelar', style: 'cancel' },
+                            { text: 'Remover', style: 'destructive', onPress: () => whatsappMutation.mutate('') },
+                          ])
+                        }}
+                        disabled={whatsappMutation.isPending}
+                      >
+                        <Feather name="trash-2" size={13} color={COLORS.danger} />
+                        <Text style={styles.whatsappUnlinkText}>
+                          {whatsappMutation.isPending ? 'Removendo...' : 'Desvincular número'}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.whatsappBox}>
+                        <Text style={styles.whatsappBoxTitle}>Como funciona</Text>
+                        <Text style={styles.whatsappBoxItem}>1. Vincule seu número abaixo</Text>
+                        <Text style={styles.whatsappBoxItem}>2. Clique no botão para abrir o WhatsApp</Text>
+                        <Text style={styles.whatsappBoxItem}>3. Converse com o Rookinho — contas, gastos, fotos de boleto</Text>
+                      </View>
+
+                      <Text style={styles.label}>Seu número de WhatsApp</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={whatsappInput}
+                        onChangeText={setWhatsappInput}
+                        placeholder="(11) 99999-9999"
+                        placeholderTextColor={COLORS.muted}
+                        keyboardType="phone-pad"
+                      />
+
+                      <TouchableOpacity
+                        style={[styles.primaryBtn, whatsappMutation.isPending && { opacity: 0.6 }]}
+                        onPress={() => whatsappMutation.mutate(whatsappInput)}
+                        disabled={!whatsappInput.trim() || whatsappMutation.isPending}
+                      >
+                        <FontAwesome name="whatsapp" size={16} color="#fff" />
+                        <Text style={styles.primaryBtnText}>
+                          {whatsappMutation.isPending ? 'Vinculando...' : 'Vincular WhatsApp'}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
                   )}
                 </View>
               </View>

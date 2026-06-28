@@ -28,6 +28,7 @@ const PRO_PLUS_FEATURES: { lib: 'feather' | 'mci'; icon: string; label: string }
   { lib: 'feather', icon: 'bar-chart-2',    label: 'Analises financeiras ilimitadas' },
   { lib: 'feather', icon: 'upload',         label: 'Arquivos no chat ilimitados' },
   { lib: 'feather', icon: 'camera',         label: 'Scanner ilimitado' },
+  { lib: 'mci',     icon: 'whatsapp',       label: 'Rookinho no WhatsApp' },
   { lib: 'feather', icon: 'shield',         label: 'Suporte prioritario' },
 ]
 
@@ -65,13 +66,24 @@ export default function BillingScreen() {
           if (prev === 'FREE' && (newPlan === 'PRO' || newPlan === 'PRO_PLUS')) {
             const label = newPlan === 'PRO_PLUS' ? 'PRO+' : 'PRO'
             const perks = newPlan === 'PRO_PLUS'
-              ? 'Rookinho IA ilimitado, analises ilimitadas, arquivos ilimitados, scanner ilimitado e suporte prioritario.'
+              ? 'Rookinho IA ilimitado, analises ilimitadas, arquivos ilimitados, scanner ilimitado, Rookinho no WhatsApp e suporte prioritario.'
               : 'Tudo ilimitado, Rookinho IA (30 msgs/mes), relatorios, projecao, orcamento e importacao CSV.'
-            Alert.alert(
-              `Bem-vindo ao ${label}!`,
-              `Voce desbloqueou:\n\n${perks}`,
-              [{ text: 'Comecar a usar' }],
-            )
+            if (newPlan === 'PRO_PLUS') {
+              Alert.alert(
+                `Bem-vindo ao ${label}!`,
+                `Voce desbloqueou:\n\n${perks}\n\nVincule seu WhatsApp em Configuracoes para conversar com o Rookinho direto no WhatsApp!`,
+                [
+                  { text: 'Vincular agora', onPress: () => router.push('/settings') },
+                  { text: 'Depois' },
+                ],
+              )
+            } else {
+              Alert.alert(
+                `Bem-vindo ao ${label}!`,
+                `Voce desbloqueou:\n\n${perks}`,
+                [{ text: 'Comecar a usar' }],
+              )
+            }
           }
         } catch {}
       }
