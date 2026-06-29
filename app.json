@@ -23,7 +23,7 @@
     },
     "android": {
       "package": "com.rookmoney.app",
-      "versionCode": 28,
+      "versionCode": 30,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.INTERNET",
