@@ -1,7 +1,7 @@
 import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { Text } from '@/components/text'
 import { useRouter } from 'expo-router'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
 import { notificationsApi, type AppNotification } from '@/lib/api'
@@ -39,15 +39,15 @@ const GROUP_LABELS: Record<AppNotification['urgency'], string> = {
 function NotificationRow({ item, onPress }: { item: AppNotification; onPress: () => void }) {
   const color = TYPE_COLOR[item.type]
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={[styles.row, !item.isNew && styles.rowRead]} onPress={onPress} activeOpacity={0.7}>
       <View style={[styles.rowIcon, { backgroundColor: color + '22' }]}>
         <Feather name={TYPE_ICON[item.type]} size={15} color={color} />
       </View>
       <View style={styles.rowInfo}>
-        <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={[styles.rowTitle, !item.isNew && styles.rowTitleRead]} numberOfLines={1}>{item.title}</Text>
         <Text style={styles.rowMessage} numberOfLines={2}>{item.message}</Text>
       </View>
-      <View style={[styles.urgencyDot, { backgroundColor: URGENCY_DOT[item.urgency] }]} />
+      {item.isNew && <View style={[styles.urgencyDot, { backgroundColor: URGENCY_DOT[item.urgency] }]} />}
       <Feather name="chevron-right" size={16} color={COLORS.muted} />
     </TouchableOpacity>
   )
@@ -55,14 +55,23 @@ function NotificationRow({ item, onPress }: { item: AppNotification; onPress: ()
 
 export default function NotificationsScreen() {
   const router = useRouter()
+  const qc = useQueryClient()
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['notifications'],
     queryFn:  () => notificationsApi.list().then((r) => r.data),
   })
 
+  const markReadMutation = useMutation({
+    mutationFn: () => notificationsApi.markRead(),
+    onSuccess: () => qc.refetchQueries({ queryKey: ['notifications'] }),
+  })
+
+  const notifications = data?.notifications ?? []
+  const newCount = data?.newCount ?? 0
+
   const groups = (['high', 'medium', 'low'] as const)
-    .map((urgency) => ({ urgency, items: (data ?? []).filter((n) => n.urgency === urgency) }))
+    .map((urgency) => ({ urgency, items: notifications.filter((n) => n.urgency === urgency) }))
     .filter((g) => g.items.length > 0)
 
   return (
@@ -71,8 +80,21 @@ export default function NotificationsScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
           <Feather name="arrow-left" size={22} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notificações</Text>
-        <View style={{ width: 22 }} />
+        <Text style={styles.headerTitle}>
+          Notificações
+          {newCount > 0 && <Text style={styles.newBadge}> ({newCount})</Text>}
+        </Text>
+        {newCount > 0 ? (
+          <TouchableOpacity
+            onPress={() => markReadMutation.mutate()}
+            disabled={markReadMutation.isPending}
+            hitSlop={12}
+          >
+            <Feather name="check-circle" size={20} color={COLORS.brand} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 22 }} />
+        )}
       </View>
 
       {isLoading ? (
@@ -119,6 +141,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+  newBadge: { fontSize: 14, fontWeight: '600', color: COLORS.brand },
 
   content: { paddingHorizontal: 20, paddingBottom: 40 },
 
@@ -138,9 +161,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12,
     borderBottomWidth: 1, borderBottomColor: COLORS.border,
   },
+  rowRead: { opacity: 0.55 },
   rowIcon: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   rowInfo: { flex: 1 },
-  rowTitle:   { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  rowTitle:     { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  rowTitleRead: { fontWeight: '400' },
   rowMessage: { fontSize: 12, color: COLORS.muted, marginTop: 2, lineHeight: 16 },
   urgencyDot: { width: 8, height: 8, borderRadius: 4 },
 

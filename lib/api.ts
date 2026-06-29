@@ -803,10 +803,12 @@ export interface AppNotification {
   message: string
   href:    string
   urgency: 'high' | 'medium' | 'low'
+  isNew:   boolean
 }
 
 export const notificationsApi = {
-  list: () => request<{ data: AppNotification[] }>('/api/v1/notifications'),
+  list: () => request<{ data: { notifications: AppNotification[]; newCount: number } }>('/api/v1/notifications'),
+  markRead: () => request('/api/v1/notifications', { method: 'PATCH' }),
 }
 
 // ── Export ────────────────────────────────────────────────────────────
