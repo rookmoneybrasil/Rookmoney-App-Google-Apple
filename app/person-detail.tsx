@@ -176,16 +176,16 @@ export default function PersonDetailScreen() {
       groupSeen.add(e.installmentGroupId)
     }
 
-    if (e.type === 'THEY_OWE_ME') theyOweTotal += e.amount
-    else                           iOweTotal    += e.amount
+    if (e.type === 'THEY_OWE_ME') theyOweTotal += Number(e.amount)
+    else                           iOweTotal    += Number(e.amount)
   }
 
   let recurringTheyOwe = 0
   let recurringIOwe    = 0
   for (const r of recurringList) {
     if (recurringEntryMap.has(r.id)) continue
-    if (r.type === 'THEY_OWE_ME') recurringTheyOwe += r.amount
-    else                           recurringIOwe    += r.amount
+    if (r.type === 'THEY_OWE_ME') recurringTheyOwe += Number(r.amount)
+    else                           recurringIOwe    += Number(r.amount)
   }
 
   const theyOweTotalWithRecurring = theyOweTotal + recurringTheyOwe
@@ -194,7 +194,7 @@ export default function PersonDetailScreen() {
 
   const settledThisMonth = settledEntries
     .filter(e => new Date(e.date) >= monthStart && new Date(e.date) <= monthEnd)
-    .reduce((s, e) => s + e.amount, 0)
+    .reduce((s, e) => s + Number(e.amount), 0)
 
   const monthLabel = format(now, 'MMMM', { locale: ptBR })
   const projection = Array.from({ length: 3 }, (_, i) => {
@@ -215,8 +215,8 @@ export default function PersonDetailScreen() {
         if (seenGroups.has(e.installmentGroupId)) continue
         seenGroups.add(e.installmentGroupId)
       }
-      if (e.type === 'THEY_OWE_ME') projTheyOwe += e.amount
-      else                           projIOwe    += e.amount
+      if (e.type === 'THEY_OWE_ME') projTheyOwe += Number(e.amount)
+      else                           projIOwe    += Number(e.amount)
     }
 
     const dStart = new Date(d.getFullYear(), d.getMonth(), 1)
@@ -233,8 +233,8 @@ export default function PersonDetailScreen() {
       )
       if (alreadyHasEntry) continue
 
-      if (r.type === 'THEY_OWE_ME') projTheyOwe += r.amount
-      else                           projIOwe    += r.amount
+      if (r.type === 'THEY_OWE_ME') projTheyOwe += Number(r.amount)
+      else                           projIOwe    += Number(r.amount)
     }
 
     return { label, theyOwe: projTheyOwe, iOwe: projIOwe, balance: projTheyOwe - projIOwe }
