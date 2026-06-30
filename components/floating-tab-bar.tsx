@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import { View, TouchableOpacity, StyleSheet, Platform, Animated, LayoutChangeEvent } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Text } from '@/components/text'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
@@ -43,6 +44,7 @@ function TabIcon({ icon, focused }: { icon: FeatherName; focused: boolean }) {
 }
 
 export function FloatingTabBar({ state, navigation }: Props) {
+  const insets      = useSafeAreaInsets()
   const billsBadge  = useBadgeStore((s) => s.billsBadge)
   const peopleBadge = useBadgeStore((s) => s.peopleBadge)
   const pillX = useRef(new Animated.Value(0)).current
@@ -74,8 +76,10 @@ export function FloatingTabBar({ state, navigation }: Props) {
     setTabWidth(barW / TABS.length)
   }
 
+  const bottomPad = Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 16)
+
   return (
-    <View style={styles.outer}>
+    <View style={[styles.outer, { paddingBottom: bottomPad }]}>
       <View style={styles.bar} onLayout={handleBarLayout}>
         {tabWidth > 0 && (
           <Animated.View
@@ -127,12 +131,9 @@ export function FloatingTabBar({ state, navigation }: Props) {
   )
 }
 
-const PB = Platform.OS === 'android' ? 10 : 24
-
 const styles = StyleSheet.create({
   outer: {
     paddingHorizontal: 16,
-    paddingBottom: PB,
     paddingTop: 6,
     backgroundColor: 'transparent',
   },

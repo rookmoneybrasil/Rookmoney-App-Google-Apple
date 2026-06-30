@@ -23,6 +23,7 @@ import { AnimatedSplash } from '@/components/animated-splash'
 import { UpsellModal } from '@/components/upsell-modal'
 import { loadHapticsPreference } from '@/lib/haptics'
 import { Platform } from 'react-native'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { pushTokenApi } from '@/lib/api'
 import { AchievementToastProvider } from '@/components/achievement-toast'
 import { ConfettiProvider } from '@/components/confetti'
@@ -174,6 +175,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+    <SafeAreaProvider>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={navTheme}>
         <StatusBar style="light" backgroundColor={COLORS.bg} />
@@ -238,6 +240,7 @@ export default function RootLayout() {
         {showSplash && <AnimatedSplash onFinish={() => setShowSplash(false)} />}
       </ThemeProvider>
     </QueryClientProvider>
+    </SafeAreaProvider>
     </GestureHandlerRootView>
   )
 }
