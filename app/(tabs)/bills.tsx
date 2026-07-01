@@ -294,7 +294,7 @@ type ProjectionItem = {
   label: string
   amount: number
   isCurrent: boolean
-  breakdown: { fixed: number; avulso: number; installment: number }
+  breakdown: { fixed: number; avulso: number; installment: number; overdue?: number }
   items: { fixed: Bill[]; fixedIsRec: boolean; avulso: Bill[]; installments: Bill[] }
 }
 
@@ -309,7 +309,7 @@ function ProjectionModal({
 }) {
   if (!month) return null
   const { items, breakdown } = month
-  const hasContent = breakdown.fixed > 0 || breakdown.avulso > 0 || breakdown.installment > 0
+  const hasContent = breakdown.fixed > 0 || breakdown.avulso > 0 || breakdown.installment > 0 || (breakdown.overdue ?? 0) > 0
   const displayTotal = month.isCurrent ? month.amount + iOweTotal : month.amount
 
   return (
@@ -334,6 +334,16 @@ function ProjectionModal({
 
         {!hasContent && (
           <Text style={styles.modalEmpty}>Nenhuma conta prevista para este mês.</Text>
+        )}
+
+        {(breakdown.overdue ?? 0) > 0 && (
+          <View style={styles.modalSection}>
+            <Text style={[styles.modalSectionTitle, { color: COLORS.danger }]}>⚠️ EM ATRASO</Text>
+            <View style={styles.modalItem}>
+              <Text style={styles.modalItemName} numberOfLines={1}>Contas em atraso</Text>
+              <Text style={[styles.modalItemAmount, { color: COLORS.danger }]}>{fmt(breakdown.overdue!)}</Text>
+            </View>
+          </View>
         )}
 
         {breakdown.fixed > 0 && (
@@ -494,12 +504,18 @@ export default function BillsScreen() {
     .sort((a, b) => b.grandTotal - a.grandTotal)
 
   const pending = regular.filter((b) => !b.isPaid)
-  // Only show paid bills from the current month
+  // Current month paid bills
   const paid = regular.filter((b) => {
     if (!b.isPaid) return false
     const d = new Date(b.dueDate)
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
   })
+  // Past months paid bills (history)
+  const paidHistory = regular.filter((b) => {
+    if (!b.isPaid) return false
+    const d = new Date(b.dueDate)
+    return !(d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth())
+  }).sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime())
 
   const totalPending = pending.reduce((s, b) => s + Number(b.amount), 0)
     + activeGroups.reduce((s, g) => s + Number(g.nextDue.amount), 0)
@@ -559,9 +575,9 @@ export default function BillsScreen() {
 
     return {
       label,
-      amount: fixedAmount + avulsoAmount + installmentAmount,
+      amount: fixedAmount + avulsoAmount + installmentAmount + (i === 0 ? overdueTotal : 0),
       isCurrent: i === 0,
-      breakdown: { fixed: fixedAmount, avulso: avulsoAmount, installment: installmentAmount },
+      breakdown: { fixed: fixedAmount, avulso: avulsoAmount, installment: installmentAmount, overdue: i === 0 ? overdueTotal : 0 },
       items: { fixed: fixedBills, fixedIsRec: i > 0, avulso: avulsoBills, installments: installmentBills },
     }
   })
@@ -684,6 +700,7 @@ export default function BillsScreen() {
                           <Text style={styles.projectionMonthLabel}>{m.label}</Text>
                         </View>
                         <Text style={styles.projectionTotal}>-{fmt(displayAmt)}</Text>
+                        {m.isCurrent && (m.breakdown.overdue ?? 0) > 0 && <Text style={[styles.projectionDetail, { color: COLORS.danger }]}>⚠️ {fmt(m.breakdown.overdue!)} atraso</Text>}
                         {m.breakdown.fixed > 0 && <Text style={styles.projectionDetail}>🔁 {fmt(m.breakdown.fixed)} fixas</Text>}
                         {m.breakdown.avulso > 0 && <Text style={styles.projectionDetail}>💸 {fmt(m.breakdown.avulso)} avulso</Text>}
                         {m.breakdown.installment > 0 && <Text style={styles.projectionDetail}>📅 {fmt(m.breakdown.installment)} parcelas</Text>}
@@ -822,6 +839,31 @@ export default function BillsScreen() {
                         item={bill}
                         onUnpay={() => unpayMutation.mutate(bill.id)}
                         onEdit={() => router.push(`/edit-bill?id=${bill.id}`)}
+                        onDelete={() => Alert.alert('Excluir conta', `Excluir "${bill.name}"?`, [
+                          { text: 'Cancelar', style: 'cancel' },
+                          { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate(bill.id) },
+                        ])}
+                      />
+                    ))}
+                  </View>
+                </>
+              )}
+
+              {/* Histórico de contas pagas */}
+              {paidHistory.length > 0 && (
+                <>
+                  <View style={styles.divider} />
+                  <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                      <View style={[styles.sectionBar, { backgroundColor: COLORS.muted }]} />
+                      <Feather name="archive" size={14} color={COLORS.muted} />
+                      <Text style={[styles.sectionTitle, { color: COLORS.muted }]}>Histórico de contas pagas</Text>
+                    </View>
+                    {paidHistory.map((bill) => (
+                      <PaidRow
+                        key={bill.id}
+                        item={bill}
+                        onUnpay={() => unpayMutation.mutate(bill.id)}
                         onDelete={() => Alert.alert('Excluir conta', `Excluir "${bill.name}"?`, [
                           { text: 'Cancelar', style: 'cancel' },
                           { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate(bill.id) },
