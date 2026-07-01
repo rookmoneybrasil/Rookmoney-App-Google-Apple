@@ -17,6 +17,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.rookmoney.app",
       "buildNumber": "2",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -37,6 +38,7 @@
       "expo-router",
       "expo-secure-store",
       "expo-asset",
+      "expo-apple-authentication",
       [
         "expo-notifications",
         {
@@ -50,6 +52,12 @@
         {
           "photosPermission": "Permite anexar capturas de tela ao feedback.",
           "cameraPermission": "Permite tirar foto para anexar ao feedback."
+        }
+      ],
+      [
+        "react-native-iap",
+        {
+          "paymentProvider": "Both"
         }
       ]
     ],
