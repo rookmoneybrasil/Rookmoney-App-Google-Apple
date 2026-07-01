@@ -65,6 +65,16 @@ export function useGooglePlayIAP() {
       }
     }
 
+    // Re-fetch if products were empty on initial connection (e.g. not yet propagated)
+    if (subsRef.current.length === 0) {
+      try {
+        const result = await iap.fetchProducts({ skus: ALL_SKUS, type: 'subs' })
+        subsRef.current = Array.isArray(result) ? result : []
+      } catch (err) {
+        console.warn('[IAP] re-fetch failed:', err)
+      }
+    }
+
     const skuMap = {
       PRO:      annual ? GOOGLE_PLAY_SKUS.PRO_ANNUAL      : GOOGLE_PLAY_SKUS.PRO_MONTHLY,
       PRO_PLUS: annual ? GOOGLE_PLAY_SKUS.PRO_PLUS_ANNUAL : GOOGLE_PLAY_SKUS.PRO_PLUS_MONTHLY,
@@ -74,7 +84,7 @@ export function useGooglePlayIAP() {
     const sub = subsRef.current.find((s: any) => s.productId === sku)
     const offerToken = sub?.subscriptionOfferDetails?.[0]?.offerToken
     if (!sub || !offerToken) {
-      Alert.alert('Erro', 'Produto nao encontrado na Google Play.')
+      Alert.alert('Produto indisponivel', 'O produto ainda nao esta disponivel na sua conta. Aguarde alguns minutos e tente novamente.')
       return false
     }
 

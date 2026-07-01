@@ -110,7 +110,7 @@ export default function BillingScreen() {
 
   const isPro                 = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
   const isProPlus             = me?.plan === 'PRO_PLUS'
-  const hasStripeSubscription = !!settings?.stripeCustomerId
+  const hasStripeSubscription = !!settings?.stripeSubscriptionId
   const hasGooglePlaySub      = settings?.subscriptionSource === 'google_play'
   const cancelAtPeriodEnd     = settings?.stripeCancelAtPeriodEnd ?? false
   const currentPeriodEnd      = settings?.stripeCurrentPeriodEnd ?? null
