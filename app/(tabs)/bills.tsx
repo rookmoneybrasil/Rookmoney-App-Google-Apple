@@ -310,7 +310,7 @@ function ProjectionModal({
   if (!month) return null
   const { items, breakdown } = month
   const hasContent = breakdown.fixed > 0 || breakdown.avulso > 0 || breakdown.installment > 0 || (breakdown.overdue ?? 0) > 0
-  const displayTotal = month.isCurrent ? month.amount + iOweTotal : month.amount
+  const displayTotal = month.amount + iOweTotal
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
@@ -393,7 +393,7 @@ function ProjectionModal({
           </View>
         )}
 
-        {month.isCurrent && iOweTotal > 0 && (
+        {iOweTotal > 0 && (
           <View style={styles.modalSection}>
             <Text style={styles.modalSectionTitle}>👥 PESSOAS</Text>
             <View style={styles.modalItem}>
@@ -687,7 +687,7 @@ export default function BillsScreen() {
                   </View>
                   <View style={styles.projectionRow}>
                     {projection.map((m, idx) => {
-                      const displayAmt = m.isCurrent ? m.amount + iOweTotal : m.amount
+                      const displayAmt = m.amount + iOweTotal
                       return (
                       <TouchableOpacity
                         key={m.label}
@@ -704,7 +704,7 @@ export default function BillsScreen() {
                         {m.breakdown.fixed > 0 && <Text style={styles.projectionDetail}>🔁 {fmt(m.breakdown.fixed)} fixas</Text>}
                         {m.breakdown.avulso > 0 && <Text style={styles.projectionDetail}>💸 {fmt(m.breakdown.avulso)} avulso</Text>}
                         {m.breakdown.installment > 0 && <Text style={styles.projectionDetail}>📅 {fmt(m.breakdown.installment)} parcelas</Text>}
-                        {m.isCurrent && iOweTotal > 0 && <Text style={styles.projectionDetail}>👥 {fmt(iOweTotal)} pessoas</Text>}
+                        {iOweTotal > 0 && <Text style={styles.projectionDetail}>👥 {fmt(iOweTotal)} pessoas</Text>}
                         <View style={styles.projectionTapHint}>
                           <Feather name="chevron-right" size={10} color={COLORS.muted2} />
                         </View>
