@@ -73,8 +73,8 @@ function EditBudgetSheet({ budget, onClose }: { budget: Budget; onClose: () => v
 }
 
 function BudgetItem({ budget, onEdit, onDelete }: { budget: Budget; onEdit: () => void; onDelete: () => void }) {
-  const pct       = budget.amount > 0 ? Math.min(Math.round((budget.spent / budget.amount) * 100), 100) : 0
-  const isOver    = budget.spent > budget.amount
+  const pct       = Number(budget.amount) > 0 ? Math.min(Math.round((budget.spent / Number(budget.amount)) * 100), 100) : 0
+  const isOver    = budget.spent > Number(budget.amount)
   const isWarning = !isOver && pct >= 80
   const barColor  = isOver ? COLORS.danger : isWarning ? COLORS.warning : COLORS.brand
 
@@ -110,7 +110,7 @@ function BudgetItem({ budget, onEdit, onDelete }: { budget: Budget; onEdit: () =
           )}
           {!isOver && !isWarning && <Text style={styles.pctText}>{pct}%</Text>}
         </View>
-        <Text style={styles.itemAmounts}>{fmt(budget.spent)} / {fmt(budget.amount)}</Text>
+        <Text style={styles.itemAmounts}>{fmt(budget.spent)} / {fmt(Number(budget.amount))}</Text>
         <AnimatedProgress value={pct} max={100} height={5} color={barColor} bgColor={COLORS.border} borderRadius={3} />
       </View>
       <TouchableOpacity onPress={showOptions} hitSlop={8} style={{ padding: 4 }}>
@@ -153,10 +153,10 @@ export default function BudgetScreen() {
   })
 
   const budgets = data ?? []
-  const totalBudget    = budgets.reduce((s, b) => s + b.amount, 0)
+  const totalBudget    = budgets.reduce((s, b) => s + Number(b.amount), 0)
   const totalSpent     = budgets.reduce((s, b) => s + b.spent, 0)
   const totalAvailable = totalBudget - totalSpent
-  const overBudget     = budgets.filter((b) => b.spent > b.amount)
+  const overBudget     = budgets.filter((b) => b.spent > Number(b.amount))
 
   return (
     <View style={styles.screen}>
