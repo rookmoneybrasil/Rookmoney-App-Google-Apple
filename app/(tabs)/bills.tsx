@@ -516,26 +516,33 @@ export default function BillsScreen() {
   const pausedRecurring  = recurring.filter((r) => !r.isActive)
   const monthlyFixed     = activeRecurring.reduce((s, r) => s + Number(r.amount), 0)
 
-  const overdueList  = pending.filter((b) => classifyBillStatus(b.dueDate, false) === 'overdue')
-  const overdueTotal = overdueList.reduce((s, b) => s + Number(b.amount), 0)
+  const people     = peopleData ?? []
+  const iOwePeople = people.filter((p) => (p.iOweThem ?? 0) > 0)
+  const iOweTotal  = iOwePeople.reduce((s, p) => s + (p.iOweThem ?? 0), 0)
 
   const inSameMonth = (dateStr: string, ref: Date) => {
     const d = new Date(dateStr)
     return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth()
   }
 
-  const pendingThisMonth = pending.filter((b) => inSameMonth(b.dueDate, now))
+  // Overdue = all bills past due date (any month). Includes overdue installments.
+  const overdueList  = pending.filter((b) => classifyBillStatus(b.dueDate, false) === 'overdue')
+  const overdueInstallments = activeGroups.flatMap((g) => g.items)
+    .filter((inst) => !inst.isPaid && classifyBillStatus(inst.dueDate, false) === 'overdue')
+  const overdueTotal = overdueList.reduce((s, b) => s + Number(b.amount), 0)
+    + overdueInstallments.reduce((s, inst) => s + Number(inst.amount), 0)
+
+  // Current month: non-overdue bills only (overdue ones are already in overdueTotal)
+  const pendingThisMonth = pending.filter((b) =>
+    inSameMonth(b.dueDate, now) && classifyBillStatus(b.dueDate, false) !== 'overdue'
+  )
   const totalThisMonth = pendingThisMonth.reduce((s, b) => s + Number(b.amount), 0)
     + activeGroups
         .flatMap((g) => g.items)
-        .filter((inst) => !inst.isPaid && inSameMonth(inst.dueDate, now))
+        .filter((inst) => !inst.isPaid && inSameMonth(inst.dueDate, now) && classifyBillStatus(inst.dueDate, false) !== 'overdue')
         .reduce((s, inst) => s + Number(inst.amount), 0)
 
   const grandTotal = totalThisMonth + overdueTotal + iOweTotal
-
-  const people     = peopleData ?? []
-  const iOwePeople = people.filter((p) => (p.iOweThem ?? 0) > 0)
-  const iOweTotal  = iOwePeople.reduce((s, p) => s + (p.iOweThem ?? 0), 0)
 
   const projection = Array.from({ length: 3 }, (_, i) => {
     const d     = addMonths(now, i)
