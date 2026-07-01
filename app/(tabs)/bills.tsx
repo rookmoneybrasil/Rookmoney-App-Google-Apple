@@ -293,20 +293,24 @@ function InstallmentGroupCard({ group, onPay, onDeleteGroup, onEdit }: {
 type ProjectionItem = {
   label: string
   amount: number
+  isCurrent: boolean
   breakdown: { fixed: number; avulso: number; installment: number }
   items: { fixed: Bill[]; fixedIsRec: boolean; avulso: Bill[]; installments: Bill[] }
 }
 
 function ProjectionModal({
   month,
+  iOweTotal,
   onClose,
 }: {
   month: ProjectionItem | null
+  iOweTotal: number
   onClose: () => void
 }) {
   if (!month) return null
   const { items, breakdown } = month
   const hasContent = breakdown.fixed > 0 || breakdown.avulso > 0 || breakdown.installment > 0
+  const displayTotal = month.isCurrent ? month.amount + iOweTotal : month.amount
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
@@ -325,7 +329,7 @@ function ProjectionModal({
 
         <View style={styles.modalTotalRow}>
           <Text style={styles.modalTotalLabel}>Total previsto</Text>
-          <Text style={styles.modalTotalValue}>-{fmt(month.amount)}</Text>
+          <Text style={styles.modalTotalValue}>-{fmt(displayTotal)}</Text>
         </View>
 
         {!hasContent && (
@@ -376,6 +380,16 @@ function ProjectionModal({
                 <Text style={[styles.modalItemAmount, { color: COLORS.brand }]}>{fmt(Number(b.amount))}</Text>
               </View>
             ))}
+          </View>
+        )}
+
+        {month.isCurrent && iOweTotal > 0 && (
+          <View style={styles.modalSection}>
+            <Text style={styles.modalSectionTitle}>👥 PESSOAS</Text>
+            <View style={styles.modalItem}>
+              <Text style={styles.modalItemName} numberOfLines={1}>Total a pagar a pessoas</Text>
+              <Text style={[styles.modalItemAmount, { color: '#a78bfa' }]}>{fmt(iOweTotal)}</Text>
+            </View>
           </View>
         )}
       </View>
@@ -480,12 +494,22 @@ export default function BillsScreen() {
     .sort((a, b) => b.grandTotal - a.grandTotal)
 
   const pending = regular.filter((b) => !b.isPaid)
-  const paid    = regular.filter((b) => b.isPaid)
+  // Only show paid bills from the current month
+  const paid = regular.filter((b) => {
+    if (!b.isPaid) return false
+    const d = new Date(b.dueDate)
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  })
 
   const totalPending = pending.reduce((s, b) => s + Number(b.amount), 0)
     + activeGroups.reduce((s, g) => s + Number(g.nextDue.amount), 0)
   const totalPaid = paid.reduce((s, b) => s + Number(b.amount), 0)
-    + allGroups.reduce((s, g) => s + g.paidCount * g.amount, 0)
+    + allGroups.reduce((s, g) => s + g.items
+        .filter(inst => inst.isPaid && (() => {
+          const d = new Date(inst.dueDate)
+          return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+        })())
+        .reduce((ss, inst) => ss + Number(inst.amount), 0), 0)
 
   const recurring        = recurringBillsData ?? []
   const activeRecurring  = recurring.filter((r) => r.isActive)
@@ -506,6 +530,8 @@ export default function BillsScreen() {
         .flatMap((g) => g.items)
         .filter((inst) => !inst.isPaid && inSameMonth(inst.dueDate, now))
         .reduce((s, inst) => s + Number(inst.amount), 0)
+
+  const grandTotal = totalThisMonth + overdueTotal + iOweTotal
 
   const people     = peopleData ?? []
   const iOwePeople = people.filter((p) => (p.iOweThem ?? 0) > 0)
@@ -578,11 +604,16 @@ export default function BillsScreen() {
                   <FadeIn delay={80}>
                   <View style={styles.summaryRow}>
                     <View style={styles.summaryCard}>
-                      <Text style={styles.summaryLabel}>Este mês</Text>
-                      <Text style={styles.summaryValue} numberOfLines={1}>{fmt(totalThisMonth)}</Text>
-                      <Text style={styles.summaryCount}>
-                        {pendingThisMonth.length} conta{pendingThisMonth.length !== 1 ? 's' : ''} pendente{pendingThisMonth.length !== 1 ? 's' : ''}
-                      </Text>
+                      <Text style={styles.summaryLabel}>Total a pagar</Text>
+                      <Text style={styles.summaryValue} numberOfLines={1}>{fmt(grandTotal)}</Text>
+
+                      {totalThisMonth > 0 && (
+                        <View style={styles.summarySub}>
+                          <Text style={styles.summarySubLabel}>📅 Contas do mês</Text>
+                          <Text style={styles.summarySubValue} numberOfLines={1}>{fmt(totalThisMonth)}</Text>
+                          <Text style={styles.summaryCount}>{pendingThisMonth.length} conta{pendingThisMonth.length !== 1 ? 's' : ''}</Text>
+                        </View>
+                      )}
 
                       {overdueTotal > 0 && (
                         <View style={styles.summarySub}>
@@ -602,7 +633,7 @@ export default function BillsScreen() {
                     </View>
 
                     <View style={styles.summaryCard}>
-                      <Text style={styles.summaryLabel}>Pagas</Text>
+                      <Text style={styles.summaryLabel}>Pagas este mês</Text>
                       <Text style={[styles.summaryValue, { color: COLORS.success }]} numberOfLines={1}>{fmt(totalPaid)}</Text>
                       <Text style={styles.summaryCount}>{paid.length} conta{paid.length !== 1 ? 's' : ''}</Text>
                     </View>
@@ -632,7 +663,9 @@ export default function BillsScreen() {
                     <Text style={styles.projectionTitle}>Projeção de gastos</Text>
                   </View>
                   <View style={styles.projectionRow}>
-                    {projection.map((m, idx) => (
+                    {projection.map((m, idx) => {
+                      const displayAmt = m.isCurrent ? m.amount + iOweTotal : m.amount
+                      return (
                       <TouchableOpacity
                         key={m.label}
                         style={[styles.projectionMonth, m.isCurrent && styles.projectionMonthCurrent]}
@@ -643,15 +676,17 @@ export default function BillsScreen() {
                           {m.isCurrent && <View style={styles.projectionDot} />}
                           <Text style={styles.projectionMonthLabel}>{m.label}</Text>
                         </View>
-                        <Text style={styles.projectionTotal}>-{fmt(m.amount)}</Text>
+                        <Text style={styles.projectionTotal}>-{fmt(displayAmt)}</Text>
                         {m.breakdown.fixed > 0 && <Text style={styles.projectionDetail}>🔁 {fmt(m.breakdown.fixed)} fixas</Text>}
                         {m.breakdown.avulso > 0 && <Text style={styles.projectionDetail}>💸 {fmt(m.breakdown.avulso)} avulso</Text>}
                         {m.breakdown.installment > 0 && <Text style={styles.projectionDetail}>📅 {fmt(m.breakdown.installment)} parcelas</Text>}
+                        {m.isCurrent && iOweTotal > 0 && <Text style={styles.projectionDetail}>👥 {fmt(iOweTotal)} pessoas</Text>}
                         <View style={styles.projectionTapHint}>
                           <Feather name="chevron-right" size={10} color={COLORS.muted2} />
                         </View>
                       </TouchableOpacity>
-                    ))}
+                      )
+                    })}
                   </View>
                   <Text style={styles.projectionFooter}>Toque em um mês para ver o detalhamento.</Text>
                 </View>
@@ -824,6 +859,7 @@ export default function BillsScreen() {
       )}
       <ProjectionModal
         month={projectionIdx !== null ? projection[projectionIdx] ?? null : null}
+        iOweTotal={iOweTotal}
         onClose={() => setProjectionIdx(null)}
       />
     </View>
