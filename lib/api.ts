@@ -879,9 +879,14 @@ export const billingApi = {
   portal: () =>
     request<{ data: { url: string } }>('/api/v1/billing/portal', { method: 'POST' }),
   verifyGooglePlay: (productId: string, purchaseToken: string) =>
-    request<{ data: { plan: string; expiresAt: string } }>('/api/v1/billing/google-play', {
+    request<{ data: { plan: string; expiresAt: string | null } }>('/api/v1/billing/google-play', {
       method: 'POST',
       body:   JSON.stringify({ productId, purchaseToken }),
+    }),
+  verifyApple: (jwsTransaction: string) =>
+    request<{ data: { plan: string; expiresAt: string | null } }>('/api/v1/billing/apple', {
+      method: 'POST',
+      body:   JSON.stringify({ jwsTransaction }),
     }),
 }
 

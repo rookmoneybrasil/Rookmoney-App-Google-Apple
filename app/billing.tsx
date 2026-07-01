@@ -9,7 +9,7 @@ import { COLORS } from '@/lib/constants'
 import { meApi, settingsApi, billingApi } from '@/lib/api'
 import { UsageBar } from '@/components/usage-bar'
 import { FadeIn } from '@/components/animated-entry'
-import { useGooglePlayIAP, isGooglePlay } from '@/lib/iap'
+import { useNativeIAP, isGooglePlay, isAppleIAP, isNativeIAP } from '@/lib/iap'
 
 const PRO_FEATURES: { lib: 'feather' | 'mci'; icon: string; label: string }[] = [
   { lib: 'mci',     icon: 'infinity',       label: 'Tudo ilimitado' },
@@ -34,7 +34,7 @@ const PRO_PLUS_FEATURES: { lib: 'feather' | 'mci'; icon: string; label: string }
 
 const FAQ = [
   { q: 'Posso cancelar quando quiser?', a: 'Sim, sem multa. Voce mantem o acesso ate o fim do periodo pago.' },
-  { q: 'Quais formas de pagamento?',    a: isGooglePlay ? 'Google Play — cartao, Pix, creditos da Play Store ou saldo Google Pay.' : 'Cartao de credito/debito e Pix (via Stripe).' },
+  { q: 'Quais formas de pagamento?',    a: isGooglePlay ? 'Google Play — cartao, Pix, creditos da Play Store ou saldo Google Pay.' : isAppleIAP ? 'App Store — cartao de credito/debito vinculado ao Apple ID.' : 'Cartao de credito/debito e Pix (via Stripe).' },
   { q: 'O que acontece se eu cancelar?', a: 'Sua conta migra para o plano Free automaticamente, com os limites do plano gratuito.' },
   { q: 'Qual a diferenca entre PRO e PRO+?', a: 'O PRO tem 30 mensagens/mes com Rookinho IA, 10 arquivos e 4 analises. O PRO+ oferece tudo ilimitado, incluindo Rookinho IA sem limite e funcoes avancadas.' },
   { q: 'O que e o Rookinho IA?',          a: 'O Rookinho e seu assistente financeiro com inteligencia artificial. Ele registra transacoes, cria metas, analisa seus gastos e da dicas personalizadas — tudo por chat.' },
@@ -106,12 +106,13 @@ export default function BillingScreen() {
     if (me?.plan) prevPlanRef.current = me.plan
   }, [me?.plan])
 
-  const { purchase: googlePlayPurchase, loading: iapLoading } = useGooglePlayIAP()
+  const { purchase: nativePurchase, loading: iapLoading } = useNativeIAP()
 
   const isPro                 = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
   const isProPlus             = me?.plan === 'PRO_PLUS'
   const hasStripeSubscription = !!settings?.stripeSubscriptionId
   const hasGooglePlaySub      = settings?.subscriptionSource === 'google_play'
+  const hasAppleSub           = settings?.subscriptionSource === 'apple'
   const cancelAtPeriodEnd     = settings?.stripeCancelAtPeriodEnd ?? false
   const currentPeriodEnd      = settings?.stripeCurrentPeriodEnd ?? null
 
@@ -125,10 +126,10 @@ export default function BillingScreen() {
   const planLabel = isProPlus ? 'PRO+' : isPro ? 'PRO' : 'Gratuito'
 
   async function handleCheckout(plan: 'PRO' | 'PRO_PLUS') {
-    if (isGooglePlay) {
+    if (isNativeIAP) {
       setLoadingPlan(plan)
       try {
-        await googlePlayPurchase(plan, annual)
+        await nativePurchase(plan, annual)
       } finally {
         setLoadingPlan(null)
       }
@@ -149,6 +150,10 @@ export default function BillingScreen() {
   async function handlePortal() {
     if (hasGooglePlaySub) {
       await Linking.openURL('https://play.google.com/store/account/subscriptions')
+      return
+    }
+    if (hasAppleSub) {
+      await Linking.openURL('itms-apps://apps.apple.com/account/subscriptions')
       return
     }
 
@@ -206,7 +211,7 @@ export default function BillingScreen() {
                   : 'Faca upgrade e desbloqueie tudo.'}
             </Text>
           </View>
-          {isPro && hasStripeSubscription && (
+          {isPro && (hasStripeSubscription || hasAppleSub || hasGooglePlaySub) && (
             <TouchableOpacity style={styles.manageHeaderBtn} onPress={handlePortal} disabled={loadingPort}>
               {loadingPort
                 ? <ActivityIndicator size="small" color={COLORS.muted} />
@@ -391,7 +396,9 @@ export default function BillingScreen() {
             <Text style={styles.cancelNote}>
               {isGooglePlay
                 ? 'Cancele quando quiser · Sem multa · Google Play'
-                : 'Cancele quando quiser · Sem multa · Cartao ou Pix'}
+                : isAppleIAP
+                  ? 'Cancele quando quiser · Sem multa · App Store'
+                  : 'Cancele quando quiser · Sem multa · Cartao ou Pix'}
             </Text>
           </View>
           </FadeIn>
@@ -405,13 +412,15 @@ export default function BillingScreen() {
               <Text style={styles.manageSubtitle}>
                 {hasGooglePlaySub
                   ? 'Gerenciado via Google Play'
-                  : hasStripeSubscription
-                    ? 'Tudo e gerenciado de forma segura via Stripe'
-                    : 'Plano ativado manualmente pelo administrador'}
+                  : hasAppleSub
+                    ? 'Gerenciado via App Store'
+                    : hasStripeSubscription
+                      ? 'Tudo e gerenciado de forma segura via Stripe'
+                      : 'Plano ativado manualmente pelo administrador'}
               </Text>
             </View>
 
-            {(hasStripeSubscription || hasGooglePlaySub) ? (
+            {(hasStripeSubscription || hasGooglePlaySub || hasAppleSub) ? (
               <>
                 <TouchableOpacity style={styles.manageRow} onPress={handlePortal} disabled={loadingPort} activeOpacity={0.7}>
                   <View style={[styles.manageRowIcon, { backgroundColor: COLORS.brandDim }]}>
