@@ -46,7 +46,7 @@ function TxItem({ item, onEdit, onDelete }: { item: Transaction; onEdit: () => v
       </View>
       <View style={styles.itemRight}>
         <Text style={[styles.amount, { color: isIncome ? COLORS.success : COLORS.danger }]}>
-          {isIncome ? '+' : '-'}{fmt(item.amount)}
+          {isIncome ? '+' : '-'}{fmt(Number(item.amount))}
         </Text>
         <TouchableOpacity onPress={showOptions} hitSlop={8} style={{ padding: 4 }}>
           <Feather name="more-vertical" size={16} color={COLORS.muted} />
@@ -72,7 +72,7 @@ export default function TransactionsScreen() {
   const [loadingMore,   setLoadingMore]   = useState(false)
 
   const monthStr   = currentMonth ? format(currentMonth, 'yyyy-MM') : undefined
-  const monthLabel = currentMonth ? format(currentMonth, "MMMM 'yy", { locale: ptBR }) : 'Todos'
+  const monthLabel = currentMonth ? format(currentMonth, 'MMMM yyyy', { locale: ptBR }) : 'Todos'
 
   const { isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['transactions', monthStr, typeFilter, catFilter],
@@ -147,8 +147,8 @@ export default function TransactionsScreen() {
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
-  const totalIncome  = filtered.filter((t) => t.type === 'INCOME').reduce((s, t) => s + t.amount, 0)
-  const totalExpense = filtered.filter((t) => t.type === 'EXPENSE').reduce((s, t) => s + t.amount, 0)
+  const totalIncome  = filtered.filter((t) => t.type === 'INCOME').reduce((s, t) => s + Number(t.amount), 0)
+  const totalExpense = filtered.filter((t) => t.type === 'EXPENSE').reduce((s, t) => s + Number(t.amount), 0)
 
   return (
     <View style={styles.screen}>
@@ -158,9 +158,7 @@ export default function TransactionsScreen() {
           <Feather name="arrow-left" size={22} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Transações</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/new-transaction')}>
-          <Feather name="plus" size={22} color="#fff" />
-        </TouchableOpacity>
+        <View style={{ width: 38 }} />
       </View>
 
       {/* Search */}
@@ -312,12 +310,6 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
   title:  { fontSize: 20, fontWeight: '700', color: COLORS.text },
-  addBtn: {
-    width: 38, height: 38, borderRadius: 11, backgroundColor: COLORS.brand,
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: COLORS.brand, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4,
-  },
-
   searchRow:   { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

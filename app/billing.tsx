@@ -386,9 +386,11 @@ export default function BillingScreen() {
               {loadingPlan === 'PRO_PLUS'
                 ? <ActivityIndicator color="#fff" />
                 : <Text style={styles.upgradeBtnText}>
-                    {isPro
-                      ? 'Upgrade para PRO+'
-                      : annual ? 'Assinar PRO+ anual' : 'Assinar PRO+ — R$34,90/mes'}
+                    {isPro && annual
+                      ? 'Upgrade para PRO+ anual'
+                      : isPro
+                        ? 'Upgrade para PRO+'
+                        : annual ? 'Assinar PRO+ anual' : 'Assinar PRO+ — R$34,90/mes'}
                   </Text>
               }
             </TouchableOpacity>
