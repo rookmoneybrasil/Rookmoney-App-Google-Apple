@@ -48,6 +48,12 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ name, email, password }),
     }).then(r => r.data),
+
+  apple: (identityToken: string, name?: string) =>
+    request<{ data: LoginResponse }>('/api/v1/auth/apple', {
+      method: 'POST',
+      body: JSON.stringify({ identityToken, name }),
+    }).then(r => r.data),
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────

@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Linking } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Linking, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import Svg, { Path } from 'react-native-svg'
 import { Link, useRouter } from 'expo-router'
 import * as ExpoLinking from 'expo-linking'
+import * as AppleAuthentication from 'expo-apple-authentication'
 import { COLORS, API_BASE_URL } from '@/lib/constants'
 import { authApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
@@ -48,6 +49,26 @@ export default function LoginScreen() {
     const redirect = ExpoLinking.createURL('auth/callback')
     const url = `https://rookmoney.com/api/auth/google?mobile=1&redirect=${encodeURIComponent(redirect)}`
     Linking.openURL(url)
+  }
+
+  async function handleAppleLogin() {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      })
+      const name = [credential.fullName?.givenName, credential.fullName?.familyName]
+        .filter(Boolean).join(' ') || undefined
+      const res = await authApi.apple(credential.identityToken!, name)
+      setAuth(res.token, res.user)
+      router.replace('/(tabs)')
+    } catch (e: any) {
+      if (e?.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Erro', 'Não foi possível entrar com Apple. Tente novamente.')
+      }
+    }
   }
 
   return (
@@ -132,6 +153,17 @@ export default function LoginScreen() {
             <Text style={styles.googleBtnText}>Continuar com Google</Text>
           </TouchableOpacity>
 
+          {/* Apple login — iOS only */}
+          {Platform.OS === 'ios' && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={14}
+              style={styles.appleBtn}
+              onPress={handleAppleLogin}
+            />
+          )}
+
           <View style={styles.footer}>
             <Text style={styles.footerText}>Não tem conta? </Text>
             <Link href="/(auth)/register" asChild>
@@ -191,9 +223,10 @@ const styles = StyleSheet.create({
   googleBtn: {
     height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 10, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border,
-    backgroundColor: COLORS.card2, marginBottom: 20,
+    backgroundColor: COLORS.card2, marginBottom: 12,
   },
   googleBtnText: { color: COLORS.text, fontWeight: '500', fontSize: 14 },
+  appleBtn: { height: 48, width: '100%', marginBottom: 20 },
 
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   footerText: { color: COLORS.muted, fontSize: 14 },

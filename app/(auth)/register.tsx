@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Linking } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Linking, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import Svg, { Path } from 'react-native-svg'
 import { Link, useRouter } from 'expo-router'
 import * as ExpoLinking from 'expo-linking'
+import * as AppleAuthentication from 'expo-apple-authentication'
 import { COLORS, API_BASE_URL } from '@/lib/constants'
 import { authApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
@@ -51,6 +52,26 @@ export default function RegisterScreen() {
     Linking.openURL(url)
   }
 
+  async function handleAppleLogin() {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      })
+      const name = [credential.fullName?.givenName, credential.fullName?.familyName]
+        .filter(Boolean).join(' ') || undefined
+      const res = await authApi.apple(credential.identityToken!, name)
+      setAuth(res.token, res.user)
+      router.replace('/(tabs)')
+    } catch (e: any) {
+      if (e?.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Erro', 'Não foi possível entrar com Apple. Tente novamente.')
+      }
+    }
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -81,6 +102,17 @@ export default function RegisterScreen() {
             <GoogleLogo size={18} />
             <Text style={styles.googleBtnText}>Cadastrar com Google</Text>
           </TouchableOpacity>
+
+          {/* Apple — iOS only */}
+          {Platform.OS === 'ios' && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={14}
+              style={styles.appleBtn}
+              onPress={handleAppleLogin}
+            />
+          )}
 
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
@@ -161,6 +193,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card2, marginBottom: 4,
   },
   googleBtnText: { color: COLORS.text, fontWeight: '500', fontSize: 14 },
+  appleBtn: { height: 48, width: '100%', marginTop: 12 },
   divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
   dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
   dividerText: { color: COLORS.muted, fontSize: 11, marginHorizontal: 10 },
