@@ -304,7 +304,7 @@ export default function BillingScreen() {
             </View>
             {annual && (
               <Text style={styles.annualNote}>
-                Voce economiza R${((proMonthly - proAnnual) * 12).toFixed(0)} por ano
+                R$ {(proAnnual * 12).toFixed(2).replace('.', ',')} cobrado anualmente · Economize R${((proMonthly - proAnnual) * 12).toFixed(0)}
               </Text>
             )}
 
@@ -360,7 +360,7 @@ export default function BillingScreen() {
             </View>
             {annual && (
               <Text style={styles.annualNote}>
-                Voce economiza R${((proPlusMonthly - proPlusAnnual) * 12).toFixed(0)} por ano
+                R$ {(proPlusAnnual * 12).toFixed(2).replace('.', ',')} cobrado anualmente · Economize R${((proPlusMonthly - proPlusAnnual) * 12).toFixed(0)}
               </Text>
             )}
 
