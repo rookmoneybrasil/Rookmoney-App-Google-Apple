@@ -7,6 +7,7 @@ import { Feather } from '@expo/vector-icons'
 import { format } from 'date-fns'
 import { COLORS } from '@/lib/constants'
 import { transactionsApi, categoriesApi, type Category } from '@/lib/api'
+import { DateInput } from '@/components/date-input'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
@@ -118,17 +119,7 @@ export default function NewTransactionModal() {
         {/* Date */}
         <View style={styles.field}>
           <Text style={styles.label}>Data</Text>
-          <View style={[styles.input, styles.dateField]}>
-            <Feather name="calendar" size={16} color={COLORS.muted} />
-            <TextInput
-              style={styles.dateInput}
-              value={date}
-              onChangeText={setDate}
-              placeholder="AAAA-MM-DD"
-              placeholderTextColor={COLORS.muted}
-              keyboardType="numeric"
-            />
-          </View>
+          <DateInput value={date} onChange={setDate} />
         </View>
 
         {/* Categories */}

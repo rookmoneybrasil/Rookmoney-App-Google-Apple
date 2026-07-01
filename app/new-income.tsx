@@ -6,12 +6,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
 import { incomeSourcesApi, categoriesApi, type Category } from '@/lib/api'
+import { DateInput } from '@/components/date-input'
 
 const TYPES = [
-  { value: 'EMPLOYMENT', label: 'CLT / Emprego', emoji: '💼' },
-  { value: 'FREELANCE',  label: 'Freelance',      emoji: '🧑‍💻' },
-  { value: 'RENTAL',     label: 'Aluguel',         emoji: '🏠' },
-  { value: 'OTHER',      label: 'Outro',           emoji: '💡' },
+  { value: 'EMPLOYMENT', label: 'CLT / PJ',   emoji: '💼' },
+  { value: 'FREELANCE',  label: 'Freelance',   emoji: '🧑‍💻' },
+  { value: 'RENTAL',     label: 'Aluguel',     emoji: '🏠' },
+  { value: 'OTHER',      label: 'Outro',       emoji: '💡' },
 ]
 
 const RECURRENCE_OPTIONS = [
@@ -23,20 +24,27 @@ export default function NewIncomeScreen() {
   const router = useRouter()
   const qc     = useQueryClient()
 
-  const [name, setName]           = useState('')
-  const [type, setType]           = useState('EMPLOYMENT')
-  const [amount, setAmount]       = useState('')
+  const [name, setName]             = useState('')
+  const [type, setType]             = useState('EMPLOYMENT')
+  const [amount, setAmount]         = useState('')
   const [isRecurring, setRecurring] = useState(true)
-  const [dayOfMonth, setDay]      = useState('')
-  const [startDate, setStartDate] = useState('')
+  const [dayOfMonth, setDay]        = useState('')
+  const [startDate, setStartDate]   = useState('')
   const [categoryId, setCategoryId] = useState('')
-  const [notes, setNotes]         = useState('')
-  const [showNotes, setShowNotes] = useState(false)
+  const [notes, setNotes]           = useState('')
+  const [showNotes, setShowNotes]   = useState(false)
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn:  () => categoriesApi.list().then((r) => r.data),
   })
+
+  const refetchAll = async () => {
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ['income-sources'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['dashboard'], type: 'active' }),
+    ])
+  }
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -61,11 +69,7 @@ export default function NewIncomeScreen() {
         categoryId:  categoryId || undefined,
       })
     },
-    onSuccess: () => {
-      qc.refetchQueries({ queryKey: ['income-sources'] })
-      qc.refetchQueries({ queryKey: ['dashboard'] })
-      router.back()
-    },
+    onSuccess: async () => { await refetchAll(); router.back() },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
@@ -75,11 +79,12 @@ export default function NewIncomeScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
           <Feather name="x" size={22} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Nova Renda</Text>
+        <Text style={styles.title}>Nova fonte de renda</Text>
         <View style={{ width: 36 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {/* Recurrence toggle */}
         <View style={styles.recRow}>
           {RECURRENCE_OPTIONS.map((opt) => (
             <TouchableOpacity
@@ -96,41 +101,49 @@ export default function NewIncomeScreen() {
           ))}
         </View>
 
+        {/* Name */}
         <Text style={styles.label}>Nome *</Text>
         <TextInput
           style={styles.input}
-          placeholder="Ex: Salário, Freela Design..."
+          placeholder="Ex.: Empresa X, Cliente Y"
           placeholderTextColor={COLORS.muted}
           value={name}
           onChangeText={setName}
         />
 
-        <Text style={styles.label}>Tipo de renda</Text>
-        <View style={styles.typeGrid}>
-          {TYPES.map((t) => (
-            <TouchableOpacity
-              key={t.value}
-              style={[styles.typeBtn, type === t.value && styles.typeBtnActive]}
-              onPress={() => setType(t.value)}
-            >
-              <Text style={styles.typeEmoji}>{t.emoji}</Text>
-              <Text style={[styles.typeLabel, type === t.value && { color: COLORS.brand }]}>
-                {t.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        {/* Type + Amount row */}
+        <View style={styles.row2}>
+          <View style={styles.col}>
+            <Text style={styles.label}>Tipo</Text>
+            <View style={styles.typeGrid}>
+              {TYPES.map((t) => (
+                <TouchableOpacity
+                  key={t.value}
+                  style={[styles.typeBtn, type === t.value && styles.typeBtnActive]}
+                  onPress={() => setType(t.value)}
+                >
+                  <Text style={styles.typeEmoji}>{t.emoji}</Text>
+                  <Text style={[styles.typeLabel, type === t.value && { color: COLORS.brand }]} numberOfLines={1}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          <View style={styles.col}>
+            <Text style={styles.label}>Valor (R$) *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0,00"
+              placeholderTextColor={COLORS.muted}
+              keyboardType="decimal-pad"
+              value={amount}
+              onChangeText={setAmount}
+            />
+          </View>
         </View>
 
-        <Text style={styles.label}>Valor (R$) *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="0,00"
-          placeholderTextColor={COLORS.muted}
-          keyboardType="decimal-pad"
-          value={amount}
-          onChangeText={setAmount}
-        />
-
+        {/* Recurring fields */}
         {isRecurring && (
           <>
             <View style={styles.row2}>
@@ -138,23 +151,20 @@ export default function NewIncomeScreen() {
                 <Text style={styles.label}>Dia do recebimento</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Ex: 5"
+                  placeholder="Ex.: 5"
                   placeholderTextColor={COLORS.muted}
                   keyboardType="number-pad"
                   value={dayOfMonth}
                   onChangeText={setDay}
+                  maxLength={2}
                 />
               </View>
               <View style={styles.col}>
                 <Text style={styles.label}>Primeiro pagamento</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="AAAA-MM-DD"
-                  placeholderTextColor={COLORS.muted}
+                <DateInput
                   value={startDate}
-                  onChangeText={setStartDate}
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={10}
+                  onChange={setStartDate}
+                  placeholder="Selecionar data"
                 />
               </View>
             </View>
@@ -162,7 +172,8 @@ export default function NewIncomeScreen() {
           </>
         )}
 
-        <Text style={styles.label}>Categoria</Text>
+        {/* Category */}
+        <Text style={styles.label}>Categoria {isRecurring ? '*' : ''}</Text>
         <View style={styles.cats}>
           {categories?.map((cat: Category) => (
             <TouchableOpacity
@@ -181,6 +192,7 @@ export default function NewIncomeScreen() {
           <Text style={styles.hint}>Necessária para registro automático mensal.</Text>
         )}
 
+        {/* Notes */}
         <TouchableOpacity style={styles.notesToggle} onPress={() => setShowNotes(v => !v)} activeOpacity={0.8}>
           <Feather name={showNotes ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.muted} />
           <Text style={styles.notesToggleText}>{showNotes ? 'Esconder observações' : 'Observações'}</Text>
@@ -204,8 +216,7 @@ export default function NewIncomeScreen() {
         >
           {mutation.isPending
             ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={styles.saveBtnText}>Adicionar Renda</Text>
-          }
+            : <Text style={styles.saveBtnText}>Adicionar</Text>}
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -245,15 +256,15 @@ const styles = StyleSheet.create({
   row2: { flexDirection: 'row', gap: 12 },
   col:  { flex: 1 },
 
-  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  typeGrid: { gap: 6 },
   typeBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: COLORS.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
-    borderWidth: 1, borderColor: COLORS.border, flex: 1, minWidth: '45%',
+    backgroundColor: COLORS.card, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9,
+    borderWidth: 1, borderColor: COLORS.border,
   },
   typeBtnActive: { borderColor: COLORS.brand, backgroundColor: COLORS.brandDim },
-  typeEmoji:     { fontSize: 18 },
-  typeLabel:     { fontSize: 13, color: COLORS.text, fontWeight: '500', flexShrink: 1 },
+  typeEmoji:     { fontSize: 16 },
+  typeLabel:     { fontSize: 12, color: COLORS.text, fontWeight: '500', flexShrink: 1 },
 
   cats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   cat: {

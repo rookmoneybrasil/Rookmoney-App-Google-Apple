@@ -168,8 +168,8 @@ export default function PersonDetailScreen() {
   let theyOweTotal = 0
   let iOweTotal    = 0
   for (const e of openEntries) {
-    const isOldRecurring = (e.installmentTotal ?? 0) >= 24
-    if (isOldRecurring && new Date(e.date) > cutoff) continue
+    const eDate = new Date(e.date)
+    if (eDate.getFullYear() !== now.getFullYear() || eDate.getMonth() !== now.getMonth()) continue
 
     if (e.installmentGroupId) {
       if (groupSeen.has(e.installmentGroupId)) continue

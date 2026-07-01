@@ -1,34 +1,42 @@
 import { useState } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, Alert, Switch } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { format } from 'date-fns'
 import { COLORS } from '@/lib/constants'
-import { billsApi, categoriesApi } from '@/lib/api'
+import { billsApi, recurringBillsApi, categoriesApi } from '@/lib/api'
 import { QUICK_BILL_SERVICES, getServiceBrand } from '@/lib/service-brands'
+import { DateInput } from '@/components/date-input'
+
+type Mode = 'avulso' | 'parcelado' | 'recorrente'
+
+const MODES: { key: Mode; label: string; icon: string }[] = [
+  { key: 'avulso',     label: 'Avulso',     icon: '💸' },
+  { key: 'parcelado',  label: 'Parcelado',  icon: '📅' },
+  { key: 'recorrente', label: 'Recorrente', icon: '🔁' },
+]
 
 export default function NewBillScreen() {
   const router  = useRouter()
   const qc      = useQueryClient()
   const params  = useLocalSearchParams<{ month?: string }>()
 
-  // If opened from a specific month view, default date to 1st of that month
   const defaultDate = params.month
     ? `${params.month}-01`
     : format(new Date(), 'yyyy-MM-dd')
 
-  const [name, setName]               = useState('')
-  const [amount, setAmount]           = useState('')
-  const [dueDate, setDueDate]         = useState(defaultDate)
-  const [isRecurring, setRecurring]   = useState(false)
-  const [categoryId, setCategoryId]   = useState<string | undefined>()
-  const [installments, setInstallments] = useState('')
+  const [mode, setMode]                 = useState<Mode>('avulso')
+  const [name, setName]                 = useState('')
+  const [amount, setAmount]             = useState('')
+  const [dueDate, setDueDate]           = useState(defaultDate)
+  const [dayOfMonth, setDayOfMonth]     = useState('1')
+  const [categoryId, setCategoryId]     = useState<string | undefined>()
+  const [installments, setInstallments] = useState('2')
   const [alreadyPaid, setAlreadyPaid]   = useState('0')
-  const [notes, setNotes]             = useState('')
-  const [showInstallments, setShowInstallments] = useState(false)
-  const [showNotes, setShowNotes]     = useState(false)
+  const [notes, setNotes]               = useState('')
+  const [showNotes, setShowNotes]       = useState(false)
   const [showServices, setShowServices] = useState(false)
   const detectedBrand = getServiceBrand(name)
 
@@ -37,41 +45,72 @@ export default function NewBillScreen() {
     queryFn:  () => categoriesApi.list().then(r => r.data),
   })
 
+  const refetchAll = async () => {
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ['bills'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['dashboard'], type: 'active' }),
+    ])
+  }
+
   const mutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const amt = parseFloat(amount.replace(',', '.'))
       if (!name.trim())           throw new Error('Nome é obrigatório')
       if (isNaN(amt) || amt <= 0) throw new Error('Valor inválido')
-      if (!dueDate.match(/^\d{4}-\d{2}-\d{2}$/)) throw new Error('Data inválida (use AAAA-MM-DD)')
+
+      if (mode === 'recorrente') {
+        const day = parseInt(dayOfMonth) || 1
+        if (day < 1 || day > 31) throw new Error('Dia inválido (1-31)')
+        await recurringBillsApi.create({
+          name: name.trim(),
+          amount: amt,
+          dayOfMonth: day,
+          categoryId: categoryId || null,
+          notes: notes.trim() || null,
+          generateNow: true,
+        })
+        return
+      }
 
       const inst = parseInt(installments) || 1
       const paid = parseInt(alreadyPaid) || 0
 
+      if (mode === 'parcelado') {
+        if (inst < 2) throw new Error('Mínimo 2 parcelas')
+        const remaining = inst - paid
+        return billsApi.create({
+          name:         name.trim(),
+          amount:       amt * remaining,
+          dueDate:      dueDate,
+          isRecurring:  false,
+          categoryId:   categoryId || undefined,
+          installments: inst,
+          alreadyPaid:  paid,
+          notes:        notes.trim() || undefined,
+        })
+      }
+
       return billsApi.create({
         name:        name.trim(),
         amount:      amt,
-        dueDate:     dueDate.trim(),
-        isRecurring: showInstallments ? false : isRecurring,
+        dueDate:     dueDate,
+        isRecurring: false,
         categoryId:  categoryId || undefined,
-        installments: showInstallments && inst > 1 ? inst : undefined,
-        alreadyPaid:  showInstallments && inst > 1 ? paid : undefined,
-        notes:        notes.trim() || undefined,
+        notes:       notes.trim() || undefined,
       })
     },
-    onSuccess: () => {
-      qc.refetchQueries({ queryKey: ['bills'] })
-      qc.refetchQueries({ queryKey: ['dashboard'] })
-      router.back()
-    },
+    onSuccess: async () => { await refetchAll(); router.back() },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
-  const numInst  = parseInt(installments) || 1
-  const numPaid  = Math.min(parseInt(alreadyPaid) || 0, numInst - 1)
+  const numInst   = Math.max(parseInt(installments) || 2, 2)
+  const numPaid   = Math.min(parseInt(alreadyPaid) || 0, numInst - 1)
   const remaining = numInst - numPaid
-  const perInst  = numInst > 1 && amount && remaining > 0
-    ? (parseFloat(amount.replace(',', '.')) / remaining).toFixed(2)
-    : null
+  const amt       = parseFloat(amount.replace(',', '.')) || 0
+
+  const submitLabel = mode === 'parcelado'
+    ? `Criar ${remaining} parcela${remaining > 1 ? 's' : ''}`
+    : mode === 'recorrente' ? 'Salvar conta fixa' : 'Adicionar'
 
   return (
     <View style={styles.screen}>
@@ -79,12 +118,26 @@ export default function NewBillScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
           <Feather name="x" size={22} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Nova Conta</Text>
+        <Text style={styles.title}>Nova conta a pagar</Text>
         <View style={{ width: 36 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Serviço rápido */}
+        {/* Mode tabs */}
+        <View style={styles.modeRow}>
+          {MODES.map(m => (
+            <TouchableOpacity
+              key={m.key}
+              style={[styles.modeBtn, mode === m.key && styles.modeBtnActive]}
+              onPress={() => setMode(m.key)}
+            >
+              <Text style={styles.modeEmoji}>{m.icon}</Text>
+              <Text style={[styles.modeLabel, mode === m.key && styles.modeLabelActive]}>{m.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Quick service */}
         <TouchableOpacity
           style={styles.serviceToggle}
           onPress={() => setShowServices(v => !v)}
@@ -115,8 +168,8 @@ export default function NewBillScreen() {
           </View>
         )}
 
-        {/* Nome */}
-        <Text style={styles.label}>Nome *</Text>
+        {/* Name */}
+        <Text style={styles.label}>Nome da conta *</Text>
         <View>
           <TextInput
             style={styles.input}
@@ -132,30 +185,106 @@ export default function NewBillScreen() {
           )}
         </View>
 
-        {/* Valor */}
-        <Text style={styles.label}>Valor total (R$) *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="0,00"
-          placeholderTextColor={COLORS.muted}
-          keyboardType="decimal-pad"
-          value={amount}
-          onChangeText={setAmount}
-        />
+        {/* Amount + Date/Day row */}
+        <View style={styles.row2}>
+          <View style={styles.col}>
+            <Text style={styles.label}>
+              {mode === 'parcelado' ? 'Valor por parcela (R$) *' : 'Valor (R$) *'}
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0,00"
+              placeholderTextColor={COLORS.muted}
+              keyboardType="decimal-pad"
+              value={amount}
+              onChangeText={setAmount}
+            />
+          </View>
+          <View style={styles.col}>
+            {mode === 'recorrente' ? (
+              <>
+                <Text style={styles.label}>Todo dia *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="1-31"
+                  placeholderTextColor={COLORS.muted}
+                  keyboardType="number-pad"
+                  value={dayOfMonth}
+                  onChangeText={setDayOfMonth}
+                  maxLength={2}
+                />
+              </>
+            ) : (
+              <>
+                <Text style={styles.label}>
+                  {mode === 'parcelado' ? 'Próximo vencimento *' : '1º vencimento *'}
+                </Text>
+                <DateInput value={dueDate} onChange={setDueDate} />
+              </>
+            )}
+          </View>
+        </View>
 
-        {/* Data */}
-        <Text style={styles.label}>Vencimento *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="AAAA-MM-DD"
-          placeholderTextColor={COLORS.muted}
-          value={dueDate}
-          onChangeText={setDueDate}
-          keyboardType="numeric"
-        />
-        <Text style={styles.hint}>Formato: AAAA-MM-DD (ex: {format(new Date(), 'yyyy-MM-dd')})</Text>
+        {/* Recorrente info */}
+        {mode === 'recorrente' && (
+          <View style={styles.infoBox}>
+            <Feather name="repeat" size={14} color={COLORS.brand} />
+            <Text style={styles.infoText}>
+              A conta será gerada automaticamente todo mês no dia {dayOfMonth || '1'}.
+              {amt > 0 && ` Valor: R$ ${amt.toFixed(2).replace('.', ',')} por mês.`}
+            </Text>
+          </View>
+        )}
 
-        {/* Categoria */}
+        {/* Parcelado options */}
+        {mode === 'parcelado' && (
+          <View style={styles.installBox}>
+            <View style={styles.row2}>
+              <View style={styles.col}>
+                <Text style={styles.label}>Total de parcelas</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="2"
+                  placeholderTextColor={COLORS.muted}
+                  keyboardType="number-pad"
+                  value={installments}
+                  onChangeText={(v) => {
+                    setInstallments(v)
+                    const n = parseInt(v) || 2
+                    if (numPaid >= n) setAlreadyPaid(String(n - 1))
+                  }}
+                />
+              </View>
+              <View style={styles.col}>
+                <Text style={styles.label}>Já pagas</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="0"
+                  placeholderTextColor={COLORS.muted}
+                  keyboardType="number-pad"
+                  value={alreadyPaid}
+                  onChangeText={setAlreadyPaid}
+                />
+              </View>
+            </View>
+            {amt > 0 && (
+              <View style={styles.installCalc}>
+                <Text style={styles.installCalcText}>
+                  <Text style={styles.installCalcBold}>{remaining} parcela{remaining > 1 ? 's' : ''}</Text>
+                  {' '}× R$ {amt.toFixed(2).replace('.', ',')} ={' '}
+                  <Text style={styles.installCalcTotal}>R$ {(amt * remaining).toFixed(2).replace('.', ',')}</Text>
+                </Text>
+                {numPaid > 0 && (
+                  <Text style={styles.installCalcSub}>
+                    {numPaid} parcela{numPaid > 1 ? 's' : ''} já paga{numPaid > 1 ? 's' : ''} não será{numPaid > 1 ? 'ão' : ''} cadastrada{numPaid > 1 ? 's' : ''}
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Category */}
         <Text style={[styles.label, { marginTop: 16 }]}>Categoria</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
           <TouchableOpacity
@@ -176,83 +305,7 @@ export default function NewBillScreen() {
           ))}
         </ScrollView>
 
-        {/* Parcelamento */}
-        <TouchableOpacity
-          style={styles.toggleRow}
-          onPress={() => setShowInstallments(v => !v)}
-          activeOpacity={0.8}
-        >
-          <View>
-            <Text style={styles.switchLabel}>Parcelado</Text>
-            <Text style={styles.switchSub}>Dividir em várias parcelas</Text>
-          </View>
-          <Switch
-            value={showInstallments}
-            onValueChange={setShowInstallments}
-            trackColor={{ false: COLORS.muted2, true: COLORS.brand }}
-            thumbColor="#fff"
-          />
-        </TouchableOpacity>
-
-        {showInstallments && (
-          <View style={styles.installBox}>
-            <View style={styles.installRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Total de parcelas</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Ex: 6"
-                  placeholderTextColor={COLORS.muted}
-                  keyboardType="number-pad"
-                  value={installments}
-                  onChangeText={setInstallments}
-                />
-              </View>
-              <View style={{ width: 12 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Já pagas</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="0"
-                  placeholderTextColor={COLORS.muted}
-                  keyboardType="number-pad"
-                  value={alreadyPaid}
-                  onChangeText={setAlreadyPaid}
-                />
-              </View>
-            </View>
-            {perInst && numInst > 1 && (
-              <View style={styles.installHint}>
-                <Feather name="info" size={13} color={COLORS.brand} />
-                <Text style={styles.installHintText}>
-                  {numInst - numPaid} parcelas de R$ {perInst} serão criadas
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Recorrente (só quando não é parcelado) */}
-        {!showInstallments && (
-          <TouchableOpacity
-            style={styles.toggleRow}
-            onPress={() => setRecurring(v => !v)}
-            activeOpacity={0.8}
-          >
-            <View>
-              <Text style={styles.switchLabel}>Conta recorrente</Text>
-              <Text style={styles.switchSub}>Se repete todo mês</Text>
-            </View>
-            <Switch
-              value={isRecurring}
-              onValueChange={setRecurring}
-              trackColor={{ false: COLORS.muted2, true: COLORS.brand }}
-              thumbColor="#fff"
-            />
-          </TouchableOpacity>
-        )}
-
-        {/* Observações */}
+        {/* Notes */}
         <TouchableOpacity
           style={styles.notesToggle}
           onPress={() => setShowNotes(v => !v)}
@@ -260,7 +313,7 @@ export default function NewBillScreen() {
         >
           <Feather name={showNotes ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.muted} />
           <Text style={styles.notesToggleText}>
-            {showNotes ? 'Esconder observações' : 'Adicionar observações'}
+            {showNotes ? 'Esconder observações' : 'Observações'}
           </Text>
         </TouchableOpacity>
 
@@ -280,9 +333,9 @@ export default function NewBillScreen() {
           onPress={() => mutation.mutate()}
           disabled={mutation.isPending}
         >
-          <Text style={styles.saveBtnText}>
-            {mutation.isPending ? 'Criando...' : 'Criar Conta'}
-          </Text>
+          {mutation.isPending
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.saveBtnText}>{submitLabel}</Text>}
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -301,6 +354,17 @@ const styles = StyleSheet.create({
 
   content: { padding: 20, paddingBottom: 60 },
 
+  modeRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  modeBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 12, borderRadius: 14,
+    backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border,
+  },
+  modeBtnActive: { borderColor: COLORS.brand + '80', backgroundColor: COLORS.brandDim },
+  modeEmoji:     { fontSize: 16 },
+  modeLabel:     { fontSize: 12, fontWeight: '600', color: COLORS.muted },
+  modeLabelActive: { color: COLORS.brand },
+
   serviceToggle: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: COLORS.brand + '12', borderWidth: 1, borderColor: COLORS.brand + '33',
@@ -314,8 +378,7 @@ const styles = StyleSheet.create({
   },
   servicePill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8,
-    borderWidth: 1,
+    paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, borderWidth: 1,
   },
   serviceBadge: { width: 18, height: 18, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
   serviceBadgeText: { fontSize: 8, fontWeight: '800' },
@@ -328,13 +391,32 @@ const styles = StyleSheet.create({
   brandBadgeText: { fontSize: 9, fontWeight: '800' as const },
 
   label: { fontSize: 12, color: COLORS.muted, marginBottom: 6, marginTop: 16 },
-  hint:  { fontSize: 11, color: COLORS.muted2, marginTop: 4 },
   input: {
     backgroundColor: COLORS.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
     color: COLORS.text, fontSize: 15, borderWidth: 1, borderColor: COLORS.border,
   },
 
-  catScroll:        { marginTop: 4, marginBottom: 4 },
+  row2: { flexDirection: 'row', gap: 12 },
+  col:  { flex: 1 },
+
+  infoBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 12,
+    backgroundColor: COLORS.brandDim, borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: COLORS.brand + '40',
+  },
+  infoText: { flex: 1, fontSize: 13, color: COLORS.brand, lineHeight: 19 },
+
+  installBox: {
+    backgroundColor: COLORS.card2, borderRadius: 12, padding: 14,
+    marginTop: 12, borderWidth: 1, borderColor: COLORS.border,
+  },
+  installCalc: { marginTop: 12 },
+  installCalcText: { fontSize: 13, color: COLORS.muted },
+  installCalcBold: { fontWeight: '600', color: COLORS.text },
+  installCalcTotal: { fontWeight: '700', color: COLORS.brand },
+  installCalcSub:  { fontSize: 11, color: COLORS.muted2, marginTop: 4 },
+
+  catScroll: { marginTop: 4, marginBottom: 4 },
   catPill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: COLORS.card, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border,
@@ -344,22 +426,6 @@ const styles = StyleSheet.create({
   catEmoji:         { fontSize: 14 },
   catPillText:      { fontSize: 13, color: COLORS.muted },
   catPillTextActive:{ color: COLORS.brand, fontWeight: '600' },
-
-  toggleRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: COLORS.card, borderRadius: 12, padding: 14,
-    marginTop: 16, borderWidth: 1, borderColor: COLORS.border,
-  },
-  switchLabel: { fontSize: 14, fontWeight: '500', color: COLORS.text },
-  switchSub:   { fontSize: 12, color: COLORS.muted, marginTop: 2 },
-
-  installBox: {
-    backgroundColor: COLORS.card2, borderRadius: 12, padding: 14,
-    marginTop: 8, borderWidth: 1, borderColor: COLORS.brand + '33',
-  },
-  installRow:     { flexDirection: 'row', alignItems: 'flex-end' },
-  installHint:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
-  installHintText:{ fontSize: 12, color: COLORS.brand, flex: 1 },
 
   notesToggle: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
