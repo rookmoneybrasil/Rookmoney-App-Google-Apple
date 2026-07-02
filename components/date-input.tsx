@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native'
+import { View, Modal, Pressable, TouchableOpacity, StyleSheet, Platform } from 'react-native'
 import { Text } from '@/components/text'
 import { Feather } from '@expo/vector-icons'
 import { format, parse } from 'date-fns'
@@ -18,43 +18,60 @@ interface Props {
   placeholder?: string
 }
 
+// Date picker that opens in a full-screen bottom-sheet modal.
+// (Rendering the picker inline below the field broke when the field sat in a
+// narrow 2-column row: the calendar/spinner overflowed the column and the year
+// column got clipped off-screen. A modal is full width, so all three wheels —
+// day, month AND year — are always visible.)
 export function DateInput({ value, onChange, placeholder = 'Selecionar data' }: Props) {
   const [show, setShow] = useState(false)
+  const [temp, setTemp] = useState<Date | null>(null)
 
   const dateObj = value ? parse(value, 'yyyy-MM-dd', new Date()) : new Date()
   const displayText = value
     ? format(dateObj, "dd 'de' MMM, yyyy", { locale: ptBR })
     : placeholder
 
+  function open() {
+    setTemp(dateObj)
+    setShow(true)
+  }
+  function confirm() {
+    if (temp) onChange(format(temp, 'yyyy-MM-dd'))
+    setShow(false)
+  }
+
   return (
     <>
-      <TouchableOpacity style={styles.input} onPress={() => setShow((s) => !s)} activeOpacity={0.7}>
+      <TouchableOpacity style={styles.input} onPress={open} activeOpacity={0.7}>
         <Feather name="calendar" size={16} color={COLORS.brand} />
         <Text style={[styles.text, !value && styles.placeholder]}>{displayText}</Text>
-        <Feather name={show ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.muted} />
+        <Feather name="chevron-down" size={14} color={COLORS.muted} />
       </TouchableOpacity>
 
-      {show && RNDateTimePicker && (
-        Platform.OS === 'ios' ? (
-          // Inline calendar (not spinner): the spinner cut off the year column,
-          // making it impossible to change the year. The inline calendar lets you
-          // tap the month/year header and pick any year.
-          <View style={styles.iosWrap}>
-            <RNDateTimePicker
-              value={dateObj}
-              mode="date"
-              display="inline"
-              locale="pt-BR"
-              themeVariant="dark"
-              accentColor={COLORS.brand}
-              style={{ alignSelf: 'stretch' }}
-              onChange={(_: any, selected?: Date) => { if (selected) onChange(format(selected, 'yyyy-MM-dd')) }}
-            />
-            <TouchableOpacity style={styles.doneBtn} onPress={() => setShow(false)} activeOpacity={0.8}>
-              <Text style={styles.doneText}>Concluir</Text>
-            </TouchableOpacity>
+      {RNDateTimePicker && (Platform.OS === 'ios' ? (
+        <Modal visible={show} transparent animationType="fade" onRequestClose={() => setShow(false)}>
+          <View style={styles.backdrop}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShow(false)} />
+            <View style={styles.sheet}>
+              <RNDateTimePicker
+                value={temp ?? dateObj}
+                mode="date"
+                display="spinner"
+                locale="pt-BR"
+                themeVariant="dark"
+                textColor={COLORS.text}
+                style={styles.spinner}
+                onChange={(_: any, selected?: Date) => { if (selected) setTemp(selected) }}
+              />
+              <TouchableOpacity style={styles.doneBtn} onPress={confirm} activeOpacity={0.85}>
+                <Text style={styles.doneText}>Concluir</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        ) : (
+        </Modal>
+      ) : (
+        show && (
           <RNDateTimePicker
             value={dateObj}
             mode="date"
@@ -65,7 +82,7 @@ export function DateInput({ value, onChange, placeholder = 'Selecionar data' }: 
             }}
           />
         )
-      )}
+      ))}
     </>
   )
 }
@@ -90,23 +107,34 @@ const styles = StyleSheet.create({
   placeholder: {
     color: COLORS.muted,
   },
-  iosWrap: {
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
     backgroundColor: COLORS.card,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+    paddingBottom: 28,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
     borderColor: COLORS.border,
-    marginTop: 8,
-    paddingHorizontal: 8,
-    paddingTop: 4,
-    paddingBottom: 4,
+  },
+  spinner: {
+    alignSelf: 'stretch',
+    height: 210,
   },
   doneBtn: {
-    alignSelf: 'flex-end',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    backgroundColor: COLORS.brand,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
   },
   doneText: {
-    color: COLORS.brand,
+    color: '#fff',
     fontWeight: '700',
     fontSize: 15,
   },
