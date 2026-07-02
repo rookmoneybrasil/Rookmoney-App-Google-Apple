@@ -201,8 +201,12 @@ export default function PersonDetailScreen() {
     const d = addMonths(now, i)
     const label = format(d, "MMM/yy", { locale: ptBR })
 
+    // Current month (i === 0) also absorbs overdue (past-due unpaid) so the
+    // projection matches "Você deve"; future months keep exact-month matching.
+    const dMonthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
     const dueEntries = openEntries.filter(e => {
       const eDate = new Date(e.date)
+      if (i === 0) return eDate <= dMonthEnd
       return eDate.getFullYear() === d.getFullYear() && eDate.getMonth() === d.getMonth()
     })
 
@@ -211,7 +215,9 @@ export default function PersonDetailScreen() {
     const seenGroups = new Set<string>()
 
     for (const e of dueEntries) {
-      if (e.installmentGroupId) {
+      // Dedup installments only for future months; each overdue parcela in the
+      // current month is genuinely still owed → count them all.
+      if (e.installmentGroupId && i > 0) {
         if (seenGroups.has(e.installmentGroupId)) continue
         seenGroups.add(e.installmentGroupId)
       }
