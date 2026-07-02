@@ -164,17 +164,13 @@ export default function PersonDetailScreen() {
   const openEntries    = allEntries.filter(e => !e.isSettled)
   const settledEntries = allEntries.filter(e =>  e.isSettled)
 
-  const groupSeen = new Set<string>()
   let theyOweTotal = 0
   let iOweTotal    = 0
+  // Everything owed up to the end of the current month (overdue + this month),
+  // singles and installments alike — keeps "Você deve", a projeção e o
+  // compartilhar consistentes (antes contava só o mês exato → totais diferentes).
   for (const e of openEntries) {
-    const eDate = new Date(e.date)
-    if (eDate.getFullYear() !== now.getFullYear() || eDate.getMonth() !== now.getMonth()) continue
-
-    if (e.installmentGroupId) {
-      if (groupSeen.has(e.installmentGroupId)) continue
-      groupSeen.add(e.installmentGroupId)
-    }
+    if (new Date(e.date) > monthEnd) continue
 
     if (e.type === 'THEY_OWE_ME') theyOweTotal += Number(e.amount)
     else                           iOweTotal    += Number(e.amount)
@@ -262,19 +258,19 @@ export default function PersonDetailScreen() {
     const shareIOwe: ShareItem[] = []
     const shareTheyOwe: ShareItem[] = []
 
-    // Recurring templates
+    // Recurring templates — só os ainda devidos (pula pagos)
     for (const r of recurringList) {
       const entry = recurringEntryMap.get(r.id)
-      const settled = entry?.isSettled ?? false
+      if (entry?.isSettled) continue
       const bucket = r.type === 'I_OWE_THEM' ? shareIOwe : shareTheyOwe
-      bucket.push({ desc: `${r.description} (recorrente, dia ${r.dayOfMonth})`, amount: Number(r.amount), settled })
+      bucket.push({ desc: `${r.description} (recorrente, dia ${r.dayOfMonth})`, amount: Number(r.amount), settled: false })
     }
 
-    // Single entries this month (skip those covered by recurring)
+    // Avulsos não-pagos devidos até o fim do mês (vencidos + do mês)
     const recurringDescs = new Set(recurringList.map(r => `${r.description}|${r.type}`))
     const allSingles = allEntries.filter(e => {
       const d = new Date(e.date)
-      return !e.installmentGroupId && d >= monthStart && d <= monthEnd
+      return !e.installmentGroupId && !e.isSettled && d <= monthEnd
     })
     for (const e of allSingles) {
       if (recurringDescs.has(`${e.description}|${e.type}`)) continue
@@ -282,12 +278,9 @@ export default function PersonDetailScreen() {
       bucket.push({ desc: e.description, amount: Number(e.amount), settled: e.isSettled })
     }
 
-    // Installment entries due this month
+    // Parcelas não-pagas devidas até o fim do mês (vencidas + do mês)
     for (const [, grp] of allGroupMap.entries()) {
-      const due = grp.find(e => {
-        const d = new Date(e.date)
-        return d >= monthStart && d <= monthEnd
-      })
+      const due = grp.find(e => !e.isSettled && new Date(e.date) <= monthEnd)
       if (!due) continue
       const total = due.installmentTotal ?? grp.length
       const current = due.installmentCurrent ?? 1
