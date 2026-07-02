@@ -106,7 +106,7 @@ export default function BillingScreen() {
     if (me?.plan) prevPlanRef.current = me.plan
   }, [me?.plan])
 
-  const { purchase: nativePurchase, loading: iapLoading } = useNativeIAP()
+  const { purchase: nativePurchase, restore: nativeRestore, loading: iapLoading } = useNativeIAP()
 
   const isPro                 = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
   const isProPlus             = me?.plan === 'PRO_PLUS'
@@ -493,6 +493,20 @@ export default function BillingScreen() {
         </View>
         </FadeIn>
 
+        {/* Restaurar compras — exigido pela App Store (3.1.1) e útil ao reinstalar/trocar aparelho */}
+        {isNativeIAP && (
+          <TouchableOpacity
+            style={styles.restoreBtn}
+            onPress={() => nativeRestore()}
+            disabled={iapLoading}
+            activeOpacity={0.7}
+          >
+            {iapLoading
+              ? <ActivityIndicator size="small" color={COLORS.muted} />
+              : <Text style={styles.restoreBtnText}>Restaurar compras</Text>}
+          </TouchableOpacity>
+        )}
+
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
@@ -661,6 +675,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: COLORS.border,
     padding: 16,
   },
+  restoreBtn:     { alignSelf: 'center', marginTop: 16, paddingVertical: 10, paddingHorizontal: 20 },
+  restoreBtnText: { fontSize: 13, color: COLORS.muted, fontWeight: '600', textDecorationLine: 'underline' },
   faqTitle:    { fontSize: 13, fontWeight: '600', color: COLORS.text, marginBottom: 4 },
   faqDivider:  { height: 1, backgroundColor: COLORS.border },
   faqRow: {

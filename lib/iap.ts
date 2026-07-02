@@ -117,7 +117,54 @@ export function useNativeIAP() {
     }, queryClient, setLoading)
   }, [ensureConnected, queryClient])
 
-  return { purchase, loading, ready, ensureConnected }
+  // Restore purchases — required by App Store (Guideline 3.1.1) and needed when
+  // a user reinstalls / switches devices. Re-verifies active purchases with the
+  // server so the plan is reactivated. (Purchase.productId is the SKU here — note
+  // the fetched Product uses `id` instead, per react-native-iap v15.)
+  const restore = useCallback(async (): Promise<boolean> => {
+    const iap = getIAP()
+    if (!iap) {
+      Alert.alert('Erro', isAppleIAP ? 'App Store indisponível neste dispositivo.' : 'Google Play indisponível neste dispositivo.')
+      return false
+    }
+    if (!connectedRef.current) {
+      const ok = await ensureConnected()
+      if (!ok) { Alert.alert('Erro', 'Não foi possível conectar à loja.'); return false }
+    }
+    setLoading(true)
+    try {
+      const purchases: any[] = await iap.getAvailablePurchases()
+      const active = Array.isArray(purchases) ? purchases : []
+      let restored = false
+      for (const p of active) {
+        const token = (p.purchaseToken ?? p.jwsRepresentationIOS ?? p.jwsRepresentation) as string | undefined
+        if (!token) continue
+        try {
+          if (isAppleIAP) await billingApi.verifyApple(token)
+          else if (isGooglePlay) await billingApi.verifyGooglePlay(p.productId, token)
+          restored = true
+        } catch (err) {
+          console.warn('[IAP] restore verify failed:', err)
+        }
+      }
+      await queryClient.refetchQueries({ queryKey: ['me'] })
+      await queryClient.refetchQueries({ queryKey: ['settings-prefs'] })
+      Alert.alert(
+        restored ? 'Compras restauradas' : 'Nenhuma assinatura ativa',
+        restored
+          ? 'Sua assinatura foi restaurada com sucesso.'
+          : 'Não encontramos assinaturas ativas nesta conta da loja.',
+      )
+      return restored
+    } catch (err: any) {
+      Alert.alert('Erro', err?.message ?? 'Falha ao restaurar compras.')
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }, [ensureConnected, queryClient])
+
+  return { purchase, restore, loading, ready, ensureConnected }
 }
 
 // backward-compat alias
