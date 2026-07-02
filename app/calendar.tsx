@@ -142,8 +142,8 @@ export default function CalendarScreen() {
     .filter(e => e.status === 'expected' && (e.type === 'income' || e.type === 'recurring'))
     .reduce((s, e) => s + Number(e.amount), 0) ?? 0
 
-  const negTotal = selectedEvents.filter(e => e.status !== 'expected').reduce((s, e) => s + e.amount, 0)
-  const posTotal = selectedEvents.filter(e => e.status === 'expected').reduce((s, e) => s + e.amount, 0)
+  const negTotal = selectedEvents.filter(e => e.status !== 'expected').reduce((s, e) => s + Number(e.amount), 0)
+  const posTotal = selectedEvents.filter(e => e.status === 'expected').reduce((s, e) => s + Number(e.amount), 0)
 
   return (
     <View style={styles.screen}>

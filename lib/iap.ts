@@ -137,21 +137,25 @@ async function executeNativePurchase(
         successSub.remove()
         errorSub.remove()
 
-        // iOS uses jwsRepresentation (StoreKit 2); Android uses purchaseToken
-        const jwsTransaction  = purchaseData.jwsRepresentation as string | undefined
-        const purchaseToken   = purchaseData.purchaseToken     as string | undefined
+        // react-native-iap v15 UNIFIED the token: purchaseData.purchaseToken holds
+        // the iOS StoreKit 2 JWS OR the Android purchaseToken. The old
+        // `jwsRepresentation` field was removed, so reading it left iOS purchases
+        // unverified (user charged, plan never activated). Fallbacks kept for safety.
+        const token = (purchaseData.purchaseToken
+          ?? purchaseData.jwsRepresentationIOS
+          ?? purchaseData.jwsRepresentation) as string | undefined
 
-        if (!jwsTransaction && !purchaseToken) {
+        if (!token) {
           setLoading(false)
           resolve(false)
           return
         }
 
         try {
-          if (isAppleIAP && jwsTransaction) {
-            await billingApi.verifyApple(jwsTransaction)
-          } else if (isGooglePlay && purchaseToken) {
-            await billingApi.verifyGooglePlay(sku, purchaseToken)
+          if (isAppleIAP) {
+            await billingApi.verifyApple(token)
+          } else if (isGooglePlay) {
+            await billingApi.verifyGooglePlay(sku, token)
           }
 
           await iap.finishTransaction({ purchase: purchaseData, isConsumable: false })

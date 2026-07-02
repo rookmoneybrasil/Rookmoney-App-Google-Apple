@@ -261,7 +261,7 @@ export default function PersonDetailScreen() {
       const entry = recurringEntryMap.get(r.id)
       const settled = entry?.isSettled ?? false
       const bucket = r.type === 'I_OWE_THEM' ? shareIOwe : shareTheyOwe
-      bucket.push({ desc: `${r.description} (recorrente, dia ${r.dayOfMonth})`, amount: r.amount, settled })
+      bucket.push({ desc: `${r.description} (recorrente, dia ${r.dayOfMonth})`, amount: Number(r.amount), settled })
     }
 
     // Single entries this month (skip those covered by recurring)
@@ -273,7 +273,7 @@ export default function PersonDetailScreen() {
     for (const e of allSingles) {
       if (recurringDescs.has(`${e.description}|${e.type}`)) continue
       const bucket = e.type === 'I_OWE_THEM' ? shareIOwe : shareTheyOwe
-      bucket.push({ desc: e.description, amount: e.amount, settled: e.isSettled })
+      bucket.push({ desc: e.description, amount: Number(e.amount), settled: e.isSettled })
     }
 
     // Installment entries due this month
@@ -289,7 +289,7 @@ export default function PersonDetailScreen() {
       const bucket = due.type === 'I_OWE_THEM' ? shareIOwe : shareTheyOwe
       bucket.push({
         desc: `${due.description} (parcela ${current}/${total}, faltam ${remaining})`,
-        amount: due.amount,
+        amount: Number(due.amount),
         settled: due.isSettled,
       })
     }
