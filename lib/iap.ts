@@ -87,8 +87,16 @@ export function useNativeIAP() {
         }
       }
 
-      const sub = subsRef.current.find((s: any) => s.productId === sku)
-      const offerToken = sub?.subscriptionOfferDetails?.[0]?.offerToken
+      // react-native-iap v15 renamed the fetched-product fields: the SKU is now
+      // `id` (not `productId`) and offers are under `subscriptionOffers` (or the
+      // deprecated `subscriptionOfferDetailsAndroid`). Using the old names made
+      // `find`/`offerToken` return undefined → "Produto indisponível" on Android
+      // even with active subscriptions. Match all shapes to stay version-safe.
+      const sub = subsRef.current.find((s: any) => s.id === sku || s.productId === sku)
+      const offerToken =
+        sub?.subscriptionOffers?.[0]?.offerToken ??
+        sub?.subscriptionOfferDetailsAndroid?.[0]?.offerToken ??
+        sub?.subscriptionOfferDetails?.[0]?.offerToken
       if (!sub || !offerToken) {
         Alert.alert('Produto indisponível', 'O produto ainda não está disponível na sua conta. Aguarde alguns minutos e tente novamente.')
         return false
