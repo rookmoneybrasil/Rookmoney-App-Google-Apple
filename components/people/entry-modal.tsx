@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Modal, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { DateInput } from '@/components/date-input'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { COLORS } from '@/lib/constants'
@@ -191,14 +192,7 @@ export function EntryModal({ visible, personId, personName, onClose }: Props) {
               <View style={{ width: 12 }} />
               <View style={{ flex: 1 }}>
                 <Text style={s.label}>{mode === 'parcelado' ? 'Próxima parcela' : '1ª data'}</Text>
-                <TextInput
-                  style={s.input}
-                  value={date}
-                  onChangeText={setDate}
-                  placeholder="AAAA-MM-DD"
-                  placeholderTextColor={COLORS.muted}
-                  keyboardType="numeric"
-                />
+                <DateInput value={date} onChange={setDate} placeholder="Selecionar data" />
               </View>
             </View>
             <Text style={s.hint}>Formato: AAAA-MM-DD</Text>

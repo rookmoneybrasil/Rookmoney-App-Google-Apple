@@ -465,8 +465,17 @@ export default function GoalsScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => goalsApi.delete(id),
-    onSuccess: async () => { await refetchAll() },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ['goals', 'all'] })
+      const prev = qc.getQueryData<{ id: string }[]>(['goals', 'all'])
+      if (prev) qc.setQueryData(['goals', 'all'], prev.filter((g) => g.id !== id))
+      return { prev }
+    },
+    onError: (e: Error, _id, ctx?: { prev?: { id: string }[] }) => {
+      if (ctx?.prev) qc.setQueryData(['goals', 'all'], ctx.prev)
+      Alert.alert('Erro', e.message)
+    },
+    onSettled: () => refetchAll(),
   })
 
   function handleDelete(goal: Goal) {

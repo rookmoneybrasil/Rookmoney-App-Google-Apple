@@ -93,26 +93,34 @@ export default function RecurringScreen() {
     queryFn:  () => recurringApi.list().then((r) => r.data),
   })
 
+  // Optimistic: patch the cached list instantly, roll back on error, reconcile onSettled.
+  type Rec = { id: string; isActive: boolean }
+  const patchRec = async (fn: (l: Rec[]) => Rec[]) => {
+    await qc.cancelQueries({ queryKey: ['recurring'] })
+    const prev = qc.getQueryData<Rec[]>(['recurring'])
+    if (prev) qc.setQueryData<Rec[]>(['recurring'], fn(prev))
+    return { prev }
+  }
+  const reconcileRec = () => {
+    qc.refetchQueries({ queryKey: ['recurring'] })
+    qc.refetchQueries({ queryKey: ['transactions'] })
+    qc.refetchQueries({ queryKey: ['dashboard'] })
+  }
+  const rollbackRec = (ctx?: { prev?: Rec[] }) => { if (ctx?.prev) qc.setQueryData(['recurring'], ctx.prev) }
+
   const toggleMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       recurringApi.toggle(id, isActive),
-    onSuccess: () => {
-      hapticLight()
-      qc.refetchQueries({ queryKey: ['recurring'] })
-      qc.refetchQueries({ queryKey: ['transactions'] })
-      qc.refetchQueries({ queryKey: ['dashboard'] })
-    },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: ({ id }) => { hapticLight(); return patchRec((l) => l.map((r) => r.id === id ? { ...r, isActive: !r.isActive } : r)) },
+    onError: (e: Error, _v, ctx) => { rollbackRec(ctx); Alert.alert('Erro', e.message) },
+    onSettled: reconcileRec,
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => recurringApi.delete(id),
-    onSuccess: () => {
-      qc.refetchQueries({ queryKey: ['recurring'] })
-      qc.refetchQueries({ queryKey: ['transactions'] })
-      qc.refetchQueries({ queryKey: ['dashboard'] })
-    },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: (id: string) => { hapticLight(); return patchRec((l) => l.filter((r) => r.id !== id)) },
+    onError: (e: Error, _id, ctx) => { rollbackRec(ctx); Alert.alert('Erro', e.message) },
+    onSettled: reconcileRec,
   })
 
   const active   = data?.filter((r) => r.isActive) ?? []

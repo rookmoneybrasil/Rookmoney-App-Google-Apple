@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, Alert, Switch, ActivityIndicator } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { DateInput } from '@/components/date-input'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
@@ -123,14 +124,7 @@ export default function EditBillScreen() {
         />
 
         <Text style={styles.label}>Vencimento *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="AAAA-MM-DD"
-          placeholderTextColor={COLORS.muted}
-          value={dueDate}
-          onChangeText={setDueDate}
-          keyboardType="numeric"
-        />
+        <DateInput value={dueDate} onChange={setDueDate} placeholder="Selecionar vencimento" />
 
         <Text style={[styles.label, { marginTop: 16 }]}>Categoria</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>

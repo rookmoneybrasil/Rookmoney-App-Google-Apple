@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { DateInput } from '@/components/date-input'
 import { useRouter } from 'expo-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
@@ -109,14 +110,8 @@ export default function NewGoalScreen() {
           </View>
         </View>
 
-        <Text style={styles.label}>Prazo (AAAA-MM-DD, opcional)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="2026-12-31"
-          placeholderTextColor={COLORS.muted}
-          value={deadline}
-          onChangeText={setDeadline}
-        />
+        <Text style={styles.label}>Prazo (opcional)</Text>
+        <DateInput value={deadline} onChange={setDeadline} placeholder="Selecionar prazo" />
 
         <Text style={styles.label}>Cor</Text>
         <View style={styles.colorRow}>

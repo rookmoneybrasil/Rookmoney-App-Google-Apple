@@ -145,11 +145,20 @@ export default function BudgetScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => budgetsApi.delete(id),
-    onSuccess:  () => {
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ['budgets', monthStr] })
+      const prev = qc.getQueryData<{ id: string }[]>(['budgets', monthStr])
+      if (prev) qc.setQueryData(['budgets', monthStr], prev.filter((b) => b.id !== id))
+      return { prev }
+    },
+    onError: (e: Error, _id, ctx?: { prev?: { id: string }[] }) => {
+      if (ctx?.prev) qc.setQueryData(['budgets', monthStr], ctx.prev)
+      Alert.alert('Erro', e.message)
+    },
+    onSettled: () => {
       qc.refetchQueries({ queryKey: ['budgets'] })
       qc.refetchQueries({ queryKey: ['dashboard'] })
     },
-    onError:    (e: Error) => Alert.alert('Erro', e.message),
   })
 
   const budgets = data ?? []

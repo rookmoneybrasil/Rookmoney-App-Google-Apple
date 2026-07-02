@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, Alert, Switch, ActivityIndicator } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { DateInput } from '@/components/date-input'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
@@ -170,16 +171,8 @@ export default function EditIncomeScreen() {
               value={dayOfMonth}
               onChangeText={setDay}
             />
-            <Text style={styles.label}>Data de início (opcional, AAAA-MM-DD)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: 2026-01-01"
-              placeholderTextColor={COLORS.muted}
-              value={startDate}
-              onChangeText={setStartDate}
-              keyboardType="numbers-and-punctuation"
-              maxLength={10}
-            />
+            <Text style={styles.label}>Data de início (opcional)</Text>
+            <DateInput value={startDate} onChange={setStartDate} placeholder="Selecionar data de início" />
           </>
         )}
 

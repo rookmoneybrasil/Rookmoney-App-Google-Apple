@@ -437,36 +437,64 @@ export default function BillsScreen() {
       qc.refetchQueries({ queryKey: ['dashboard'], type: 'active' }),
     ])
   }
+  // Optimistic helpers: snapshot the cached list, apply the change instantly,
+  // roll back on error, and reconcile with the server onSettled. Paridade com
+  // a UI otimista do dashboard web (01/07).
+  const patchBills = async (fn: (list: Bill[]) => Bill[]) => {
+    await qc.cancelQueries({ queryKey: ['bills'] })
+    const prev = qc.getQueryData<Bill[]>(['bills'])
+    if (prev) qc.setQueryData<Bill[]>(['bills'], fn(prev))
+    return { prev }
+  }
+  const patchRecurring = async (fn: (list: RecurringBill[]) => RecurringBill[]) => {
+    await qc.cancelQueries({ queryKey: ['recurringBills'] })
+    const prev = qc.getQueryData<RecurringBill[]>(['recurringBills'])
+    if (prev) qc.setQueryData<RecurringBill[]>(['recurringBills'], fn(prev))
+    return { prev }
+  }
+  const rollbackBills = (ctx?: { prev?: Bill[] }) => { if (ctx?.prev) qc.setQueryData(['bills'], ctx.prev) }
+  const rollbackRecurring = (ctx?: { prev?: RecurringBill[] }) => { if (ctx?.prev) qc.setQueryData(['recurringBills'], ctx.prev) }
+
   const payMutation = useMutation({
     mutationFn: (id: string) => billsApi.pay(id),
-    onSuccess: async () => { hapticSuccess(); await refetchAll() },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: (id: string) => { hapticSuccess(); return patchBills((l) => l.map((b) => b.id === id ? { ...b, isPaid: true } : b)) },
+    onError: (e: Error, _id, ctx) => { rollbackBills(ctx); Alert.alert('Erro', e.message) },
+    onSettled: () => refetchAll(),
   })
   const unpayMutation = useMutation({
     mutationFn: (id: string) => billsApi.unpay(id),
-    onSuccess: async () => { hapticLight(); await refetchAll() },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: (id: string) => { hapticLight(); return patchBills((l) => l.map((b) => b.id === id ? { ...b, isPaid: false } : b)) },
+    onError: (e: Error, _id, ctx) => { rollbackBills(ctx); Alert.alert('Erro', e.message) },
+    onSettled: () => refetchAll(),
   })
   const deleteMutation = useMutation({
     mutationFn: (id: string) => billsApi.delete(id),
-    onSuccess: async () => { hapticLight(); await refetchAll() },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: (id: string) => { hapticLight(); return patchBills((l) => l.filter((b) => b.id !== id)) },
+    onError: (e: Error, _id, ctx) => { rollbackBills(ctx); Alert.alert('Erro', e.message) },
+    onSettled: () => refetchAll(),
   })
   const toggleRecurringMutation = useMutation({
     mutationFn: (item: RecurringBill) => recurringBillsApi.update(item.id, { isActive: !item.isActive }),
-    onSuccess: async () => { hapticLight(); await refetchAll() },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: (item: RecurringBill) => { hapticLight(); return patchRecurring((l) => l.map((r) => r.id === item.id ? { ...r, isActive: !r.isActive } : r)) },
+    onError: (e: Error, _item, ctx) => { rollbackRecurring(ctx); Alert.alert('Erro', e.message) },
+    onSettled: () => refetchAll(),
   })
   const deleteRecurringMutation = useMutation({
     mutationFn: (id: string) => recurringBillsApi.delete(id),
-    onSuccess: async () => { hapticLight(); await refetchAll() },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: (id: string) => { hapticLight(); return patchRecurring((l) => l.filter((r) => r.id !== id)) },
+    onError: (e: Error, _id, ctx) => { rollbackRecurring(ctx); Alert.alert('Erro', e.message) },
+    onSettled: () => refetchAll(),
   })
   const deleteGroupMutation = useMutation({
     mutationFn: (group: InstallmentGroup) =>
       Promise.all(group.items.map((inst) => billsApi.delete(inst.id))),
-    onSuccess: async () => { hapticSuccess(); await refetchAll() },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: (group: InstallmentGroup) => {
+      hapticSuccess()
+      const ids = new Set(group.items.map((i) => i.id))
+      return patchBills((l) => l.filter((b) => !ids.has(b.id)))
+    },
+    onError: (e: Error, _group, ctx) => { rollbackBills(ctx); Alert.alert('Erro', e.message) },
+    onSettled: () => refetchAll(),
   })
 
   const now   = new Date()

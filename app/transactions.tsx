@@ -140,11 +140,21 @@ export default function TransactionsScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => transactionsApi.delete(id),
-    onSuccess:  () => {
+    // Optimistic: this screen renders from the local `allItems` list, so remove
+    // the row instantly and restore it if the request fails.
+    onMutate: (id: string) => {
+      const prev = allItems
+      setAllItems((list) => list.filter((t) => t.id !== id))
+      return { prev }
+    },
+    onError: (e: Error, _id, ctx?: { prev?: Transaction[] }) => {
+      if (ctx?.prev) setAllItems(ctx.prev)
+      Alert.alert('Erro', e.message)
+    },
+    onSettled: () => {
       qc.refetchQueries({ queryKey: ['transactions'] })
       qc.refetchQueries({ queryKey: ['dashboard'] })
     },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
   const totalIncome  = filtered.filter((t) => t.type === 'INCOME').reduce((s, t) => s + Number(t.amount), 0)

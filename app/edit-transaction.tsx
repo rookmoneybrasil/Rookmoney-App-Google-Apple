@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { View, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { DateInput } from '@/components/date-input'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
-import { format } from 'date-fns'
 import { COLORS } from '@/lib/constants'
 import { transactionsApi, categoriesApi, type Transaction, type Category } from '@/lib/api'
 
@@ -156,14 +156,8 @@ export default function EditTransactionScreen() {
 
         {/* Date */}
         <View style={styles.field}>
-          <Text style={styles.label}>Data (AAAA-MM-DD)</Text>
-          <TextInput
-            style={styles.input}
-            value={date}
-            onChangeText={setDate}
-            placeholder={format(new Date(), 'yyyy-MM-dd')}
-            placeholderTextColor={COLORS.muted}
-          />
+          <Text style={styles.label}>Data</Text>
+          <DateInput value={date} onChange={setDate} placeholder="Selecionar data" />
         </View>
 
         {/* Categories */}

@@ -619,8 +619,8 @@ export const settingsApi = {
       method: 'PATCH',
       body:   JSON.stringify({}),
     }),
-  delete: () =>
-    request<{ data: { message: string } }>('/api/v1/settings', { method: 'DELETE' }),
+  delete: (body?: { reason?: string; feedback?: string }) =>
+    request<{ data: { message: string } }>('/api/v1/settings', { method: 'DELETE', body: JSON.stringify(body ?? {}) }),
 }
 
 // ── Calendar ──────────────────────────────────────────────────────────

@@ -112,8 +112,17 @@ export default function PeopleTab() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => peopleApi.delete(id),
-    onSuccess: async () => { await refetchAll() },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ['people'] })
+      const prev = qc.getQueryData<{ id: string }[]>(['people'])
+      if (prev) qc.setQueryData(['people'], prev.filter((p) => p.id !== id))
+      return { prev }
+    },
+    onError: (e: Error, _id, ctx?: { prev?: { id: string }[] }) => {
+      if (ctx?.prev) qc.setQueryData(['people'], ctx.prev)
+      Alert.alert('Erro', e.message)
+    },
+    onSettled: () => refetchAll(),
   })
 
   const allPeople = useMemo(() => data ?? [], [data])

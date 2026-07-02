@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Modal, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { DateInput } from '@/components/date-input'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { format } from 'date-fns'
@@ -136,14 +137,7 @@ export function EditEntryModal({ visible, entry, personId, isGroup, groupSize, o
               <View style={{ width: 12 }} />
               <View style={{ flex: 1 }}>
                 <Text style={s.label}>{isGroup ? 'Data da próxima' : 'Data'}</Text>
-                <TextInput
-                  style={s.input}
-                  value={date}
-                  onChangeText={setDate}
-                  placeholder="AAAA-MM-DD"
-                  placeholderTextColor={COLORS.muted}
-                  keyboardType="numeric"
-                />
+                <DateInput value={date} onChange={setDate} placeholder="Selecionar data" />
               </View>
             </View>
             <Text style={s.hint}>Formato: AAAA-MM-DD</Text>

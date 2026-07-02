@@ -288,6 +288,123 @@ function ChangePasswordSheet({ onClose }: { onClose: () => void }) {
   )
 }
 
+// ── Formulário de cancelamento de conta ──────────────────────────────────────
+
+const DELETE_REASONS = [
+  'Não uso mais / não preciso',
+  'Está muito caro',
+  'Faltam funcionalidades que preciso',
+  'Encontrei um app melhor',
+  'Tive problemas técnicos / bugs',
+  'Prefiro não dizer',
+  'Outro motivo',
+]
+
+function DeleteAccountSheet({ plan, subscriptionSource, pending, onClose, onConfirm }: {
+  plan?: string | null
+  subscriptionSource?: string | null
+  pending: boolean
+  onClose: () => void
+  onConfirm: (reason: string, feedback?: string) => void
+}) {
+  const [reason, setReason]     = useState('')
+  const [feedback, setFeedback] = useState('')
+  const [agreed, setAgreed]     = useState(false)
+
+  const paid      = plan === 'PRO' || plan === 'PRO_PLUS'
+  const isStore   = subscriptionSource === 'google_play' || subscriptionSource === 'apple'
+  const storeName = subscriptionSource === 'apple' ? 'App Store' : 'Play Store'
+  const canSubmit = !!reason && agreed && !pending
+
+  return (
+    <View style={[styles.sheet, { maxHeight: '90%' }]}>
+      <View style={styles.sheetHandle} />
+      <Text style={[styles.sheetTitle, { color: COLORS.danger }]}>Cancelar e excluir conta</Text>
+
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={{ fontSize: 13, color: COLORS.muted, lineHeight: 19, marginBottom: 14 }}>
+          Esta ação é <Text style={{ color: COLORS.text, fontWeight: '700' }}>permanente e irreversível</Text>. Todos os
+          seus dados serão apagados e não poderão ser recuperados.
+        </Text>
+
+        {paid && !isStore && (
+          <View style={dstyles.notice}>
+            <Text style={dstyles.noticeText}>
+              Sua assinatura <Text style={{ color: COLORS.text, fontWeight: '700' }}>{plan}</Text> será cancelada
+              automaticamente antes da exclusão. Você não será cobrado novamente.
+            </Text>
+          </View>
+        )}
+        {paid && isStore && (
+          <View style={[dstyles.notice, { backgroundColor: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.35)' }]}>
+            <Feather name="alert-triangle" size={15} color={COLORS.warning} />
+            <Text style={[dstyles.noticeText, { color: COLORS.text }]}>
+              Sua assinatura foi contratada pela <Text style={{ fontWeight: '700' }}>{storeName}</Text>. Excluir a conta
+              aqui não cancela a cobrança — cancele também a assinatura na {storeName}, senão você continuará sendo cobrado.
+            </Text>
+          </View>
+        )}
+
+        <Text style={styles.label}>Por que está saindo? *</Text>
+        {DELETE_REASONS.map((r) => (
+          <TouchableOpacity key={r} style={dstyles.reasonRow} activeOpacity={0.7} onPress={() => setReason(r)}>
+            <View style={[dstyles.radio, reason === r && dstyles.radioOn]}>
+              {reason === r && <View style={dstyles.radioDot} />}
+            </View>
+            <Text style={[dstyles.reasonText, reason === r && { color: COLORS.text }]}>{r}</Text>
+          </TouchableOpacity>
+        ))}
+
+        <Text style={styles.label}>Quer nos contar mais? (opcional)</Text>
+        <TextInput
+          style={[styles.input, { minHeight: 70, textAlignVertical: 'top' }]}
+          value={feedback}
+          onChangeText={setFeedback}
+          placeholder="Seu feedback nos ajuda a melhorar."
+          placeholderTextColor={COLORS.muted}
+          multiline
+          maxLength={1000}
+        />
+
+        <TouchableOpacity style={dstyles.consentRow} activeOpacity={0.7} onPress={() => setAgreed((v) => !v)}>
+          <Switch value={agreed} onValueChange={setAgreed} trackColor={{ true: COLORS.danger }} />
+          <Text style={dstyles.consentText}>
+            Entendo que esta ação é permanente, que {paid && !isStore ? 'minha assinatura será cancelada e ' : ''}
+            todos os meus dados serão excluídos e <Text style={{ color: COLORS.text, fontWeight: '700' }}>não poderão ser recuperados</Text>.
+          </Text>
+        </TouchableOpacity>
+
+        <View style={{ flexDirection: 'row', gap: 12, marginTop: 20, marginBottom: 8 }}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={pending}>
+            <Text style={styles.cancelBtnText}>Manter conta</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.saveBtn, { backgroundColor: COLORS.danger }, !canSubmit && { opacity: 0.5 }]}
+            onPress={() => canSubmit && onConfirm(reason, feedback.trim() || undefined)}
+            disabled={!canSubmit}
+          >
+            {pending
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Text style={styles.saveBtnText}>Cancelar e excluir</Text>}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
+  )
+}
+
+const dstyles = StyleSheet.create({
+  notice:     { flexDirection: 'row', gap: 8, alignItems: 'flex-start', backgroundColor: COLORS.brandDim + '55', borderColor: 'rgba(59,130,246,0.3)', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 14 },
+  noticeText: { flex: 1, fontSize: 12, color: COLORS.muted, lineHeight: 18 },
+  reasonRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9 },
+  radio:      { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: COLORS.muted2, alignItems: 'center', justifyContent: 'center' },
+  radioOn:    { borderColor: COLORS.danger },
+  radioDot:   { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.danger },
+  reasonText: { fontSize: 14, color: COLORS.muted, flex: 1 },
+  consentRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, backgroundColor: 'rgba(239,68,68,0.05)', borderColor: 'rgba(239,68,68,0.2)', borderWidth: 1, borderRadius: 12, padding: 12 },
+  consentText:{ flex: 1, fontSize: 12, color: COLORS.muted, lineHeight: 18 },
+})
+
 // ── Tela principal ──────────────────────────────────────────────────────────
 
 export default function SettingsScreen() {
@@ -300,6 +417,7 @@ export default function SettingsScreen() {
   const [changingPassword, setChangingPassword] = useState(false)
   const [whatsappInput,    setWhatsappInput]    = useState('')
   const [exporting,        setExporting]        = useState(false)
+  const [deleting,         setDeleting]         = useState(false)
 
   const [notifBillReminder,  setNotifBillReminder]  = useState<boolean | null>(null)
   const [notifCategoryLimit, setNotifCategoryLimit] = useState<boolean | null>(null)
@@ -374,13 +492,15 @@ export default function SettingsScreen() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: settingsApi.delete,
+    mutationFn: (body: { reason?: string; feedback?: string }) => settingsApi.delete(body),
     onSuccess: () => {
+      setDeleting(false)
       qc.clear()
       clearAuth()
       router.replace('/(auth)/login')
     },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    // e.g. 503 → cancelamento do plano falhou, conta NÃO foi excluída
+    onError: (e: Error) => Alert.alert('Não foi possível excluir', e.message),
   })
 
   function toggleNotif(key: 'notifBillReminder' | 'notifCategoryLimit' | 'notifMonthlyEmail', val: boolean) {
@@ -464,18 +584,7 @@ export default function SettingsScreen() {
   }
 
   function handleDeleteAccount() {
-    Alert.alert(
-      'Excluir conta',
-      'Esta ação é irreversível. Todos os seus dados serão removidos permanentemente.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir minha conta',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(),
-        },
-      ]
-    )
+    setDeleting(true)
   }
 
   const displayWhatsapp = settings?.whatsappPhone
@@ -1001,6 +1110,19 @@ export default function SettingsScreen() {
         <View style={styles.overlay}>
           <TouchableOpacity style={styles.overlayBg} onPress={() => setChangingPassword(false)} />
           <ChangePasswordSheet onClose={() => setChangingPassword(false)} />
+        </View>
+      )}
+
+      {deleting && (
+        <View style={styles.overlay}>
+          <TouchableOpacity style={styles.overlayBg} onPress={() => !deleteMutation.isPending && setDeleting(false)} />
+          <DeleteAccountSheet
+            plan={user?.plan}
+            subscriptionSource={settings?.subscriptionSource}
+            pending={deleteMutation.isPending}
+            onClose={() => setDeleting(false)}
+            onConfirm={(reason, feedback) => deleteMutation.mutate({ reason, feedback })}
+          />
         </View>
       )}
     </View>
