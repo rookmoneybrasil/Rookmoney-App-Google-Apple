@@ -19,9 +19,17 @@ async function request<T>(
   // 204 No Content (DELETE) — no body to parse
   if (res.status === 204) return undefined as T
 
-  const data = await res.json()
+  // Guard against non-JSON bodies (e.g. Railway 502/503 HTML pages) — otherwise
+  // res.json() throws a cryptic "JSON Parse error" instead of a clean message.
+  const data = await res.json().catch(() => null)
   if (!res.ok) {
-    throw new Error(data?.error ?? `HTTP ${res.status}`)
+    // Session expired / token revoked (server bumps tokenVersion on password
+    // change or after 30d) → log out so the root layout redirects to login,
+    // instead of leaving the user stuck with errors on every screen.
+    if (res.status === 401) {
+      useAuthStore.getState().clearAuth()
+    }
+    throw new Error((data as { error?: string } | null)?.error ?? `HTTP ${res.status}`)
   }
   return data as T
 }
