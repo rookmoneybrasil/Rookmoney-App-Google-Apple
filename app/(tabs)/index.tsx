@@ -257,7 +257,7 @@ export default function DashboardScreen() {
   const setPeopleBadge  = useBadgeStore((s) => s.setPeopleBadge)
   const setOverdueBadge = useBadgeStore((s) => s.setOverdueBadge)
 
-  const { data, isLoading, refetch, isRefetching } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['dashboard'],
     queryFn:  () => dashboardApi.get().then((r) => r.data),
   })
@@ -404,6 +404,14 @@ export default function DashboardScreen() {
 
       {isLoading ? (
         <DashboardSkeleton />
+      ) : isError && !data ? (
+        <View style={styles.empty}>
+          <Feather name="wifi-off" size={28} color={COLORS.muted} />
+          <Text style={styles.emptyText}>Não foi possível carregar. Verifique sua conexão.</Text>
+          <TouchableOpacity style={styles.emptyBtn} onPress={() => refetch()}>
+            <Text style={styles.emptyBtnText}>Tentar novamente</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <>
           {/* ── VISÃO DO MÊS ─────────────────────────────────────────── */}

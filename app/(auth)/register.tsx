@@ -32,7 +32,11 @@ export default function RegisterScreen() {
 
   async function handleRegister() {
     if (!name || !email || !password) { setError('Preencha todos os campos.'); return }
+    // Match the API password policy so the user gets instant feedback instead of
+    // a server round-trip rejection (api/auth/register: 8+ chars, número, especial).
     if (password.length < 8)          { setError('Senha mínima de 8 caracteres.'); return }
+    if (!/[0-9]/.test(password))      { setError('A senha precisa de pelo menos um número.'); return }
+    if (!/[^a-zA-Z0-9]/.test(password)) { setError('A senha precisa de pelo menos um caractere especial.'); return }
     setError('')
     setLoading(true)
     try {
