@@ -6,6 +6,7 @@ import {
 import { type ImageSourcePropType } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Text, TextInput } from '@/components/text'
+import { DateInput } from '@/components/date-input'
 import { useRouter } from 'expo-router'
 import { useMutation } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
@@ -327,15 +328,7 @@ export default function OnboardingScreen() {
                 </View>
                 <View style={styles.col}>
                   <Text style={styles.label}>Primeiro pagamento</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="AAAA-MM-DD"
-                    placeholderTextColor={COLORS.muted}
-                    value={incomeStartDate}
-                    onChangeText={setIncomeStartDate}
-                    keyboardType="numbers-and-punctuation"
-                    maxLength={10}
-                  />
+                  <DateInput value={incomeStartDate} onChange={setIncomeStartDate} placeholder="Selecionar data" />
                 </View>
               </View>
             )}
@@ -365,15 +358,7 @@ export default function OnboardingScreen() {
             />
 
             <Text style={styles.label}>Vencimento *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={`AAAA-MM-DD (ex: ${todayStr()})`}
-              placeholderTextColor={COLORS.muted}
-              value={billDueDate}
-              onChangeText={setBillDueDate}
-              keyboardType="numbers-and-punctuation"
-              maxLength={10}
-            />
+            <DateInput value={billDueDate} onChange={setBillDueDate} placeholder="Selecionar vencimento" />
 
             {/* Parcelado */}
             <TouchableOpacity style={styles.toggleRow} onPress={() => setShowBillInst(v => !v)} activeOpacity={0.8}>
