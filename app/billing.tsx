@@ -106,7 +106,11 @@ export default function BillingScreen() {
     if (me?.plan) prevPlanRef.current = me.plan
   }, [me?.plan])
 
-  const { purchase: nativePurchase, restore: nativeRestore, loading: iapLoading } = useNativeIAP()
+  const { purchase: nativePurchase, restore: nativeRestore, loading: iapLoading, ensureConnected } = useNativeIAP()
+
+  // Pre-warm the store connection so the first "Assinar" tap is instant
+  // (products already fetched) instead of doing initConnection + fetchProducts then.
+  useEffect(() => { if (isNativeIAP) ensureConnected() }, [ensureConnected])
 
   const isPro                 = me?.plan === 'PRO' || me?.plan === 'PRO_PLUS'
   const isProPlus             = me?.plan === 'PRO_PLUS'
