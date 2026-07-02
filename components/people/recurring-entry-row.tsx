@@ -41,21 +41,31 @@ export function RecurringEntryRow({ item, personId, monthEntryId, paidThisMonth,
         await peopleApi.settleEntry(entry.data.id)
       }
     },
-    onSuccess: () => {
-      setPaid(p => !p)
+    // Optimistic: flip the paid state instantly, roll back if the request fails.
+    onMutate: () => { const prev = paid; setPaid((p) => !p); return { prev } },
+    onError: (e: Error, _v, ctx?: { prev: boolean }) => { if (ctx) setPaid(ctx.prev); Alert.alert('Erro', e.message) },
+    onSettled: () => {
       qc.refetchQueries({ queryKey: ['person', personId] })
       qc.refetchQueries({ queryKey: ['people'] })
     },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
   const stopMutation = useMutation({
     mutationFn: () => personRecurringApi.delete(item.id),
-    onSuccess: () => {
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ['personRecurring', personId] })
+      const prev = qc.getQueryData<{ id: string }[]>(['personRecurring', personId])
+      if (prev) qc.setQueryData(['personRecurring', personId], prev.filter((r) => r.id !== item.id))
+      return { prev }
+    },
+    onError: (e: Error, _v, ctx?: { prev?: { id: string }[] }) => {
+      if (ctx?.prev) qc.setQueryData(['personRecurring', personId], ctx.prev)
+      Alert.alert('Erro', e.message)
+    },
+    onSettled: () => {
       qc.refetchQueries({ queryKey: ['personRecurring', personId] })
       qc.refetchQueries({ queryKey: ['person', personId] })
     },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
   function confirmStop() {

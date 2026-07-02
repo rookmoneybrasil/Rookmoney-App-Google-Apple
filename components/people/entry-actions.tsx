@@ -14,22 +14,33 @@ interface Props {
 export function EntryActions({ entryId, personId, isSettled }: Props) {
   const qc = useQueryClient()
 
+  // Optimistically patch the nested entries[] of the ['person', id] object,
+  // roll back on error, reconcile onSettled. Settling flips isSettled (moves the
+  // row between the "abertos"/"acertados" sections instantly); delete removes it.
+  const patchEntries = async (fn: (entries: any[]) => any[]) => {
+    await qc.cancelQueries({ queryKey: ['person', personId] })
+    const prev = qc.getQueryData<any>(['person', personId])
+    if (prev?.entries) qc.setQueryData(['person', personId], { ...prev, entries: fn(prev.entries) })
+    return { prev }
+  }
+  const rollback = (ctx?: { prev?: any }) => { if (ctx?.prev) qc.setQueryData(['person', personId], ctx.prev) }
+  const reconcile = () => {
+    qc.refetchQueries({ queryKey: ['person', personId] })
+    qc.refetchQueries({ queryKey: ['people'] })
+  }
+
   const settleMutation = useMutation({
     mutationFn: () => isSettled ? peopleApi.unsettleEntry(entryId) : peopleApi.settleEntry(entryId),
-    onSuccess: () => {
-      qc.refetchQueries({ queryKey: ['person', personId] })
-      qc.refetchQueries({ queryKey: ['people'] })
-    },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: () => patchEntries((es) => es.map((e) => e.id === entryId ? { ...e, isSettled: !isSettled } : e)),
+    onError: (e: Error, _v, ctx) => { rollback(ctx); Alert.alert('Erro', e.message) },
+    onSettled: reconcile,
   })
 
   const deleteMutation = useMutation({
     mutationFn: () => peopleApi.deleteEntry(entryId),
-    onSuccess: () => {
-      qc.refetchQueries({ queryKey: ['person', personId] })
-      qc.refetchQueries({ queryKey: ['people'] })
-    },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: () => patchEntries((es) => es.filter((e) => e.id !== entryId)),
+    onError: (e: Error, _v, ctx) => { rollback(ctx); Alert.alert('Erro', e.message) },
+    onSettled: reconcile,
   })
 
   function confirmDelete() {

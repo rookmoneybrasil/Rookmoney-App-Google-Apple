@@ -60,8 +60,17 @@ export default function CategoriesScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => categoriesApi.delete(id),
-    onSuccess:  () => qc.refetchQueries({ queryKey: ['categories'] }),
-    onError:    (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ['categories'] })
+      const prev = qc.getQueryData<{ id: string }[]>(['categories'])
+      if (prev) qc.setQueryData(['categories'], prev.filter((c) => c.id !== id))
+      return { prev }
+    },
+    onError: (e: Error, _id, ctx?: { prev?: { id: string }[] }) => {
+      if (ctx?.prev) qc.setQueryData(['categories'], ctx.prev)
+      Alert.alert('Erro', e.message)
+    },
+    onSettled: () => qc.refetchQueries({ queryKey: ['categories'] }),
   })
 
   function confirmDelete(cat: Category) {

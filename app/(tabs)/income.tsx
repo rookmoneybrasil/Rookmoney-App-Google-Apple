@@ -464,8 +464,17 @@ export default function IncomeScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => incomeSourcesApi.delete(id),
-    onSuccess: async () => { await refetchAll() },
-    onError:    (e: Error) => Alert.alert('Erro', e.message),
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ['income-sources'] })
+      const prev = qc.getQueryData<{ id: string }[]>(['income-sources'])
+      if (prev) qc.setQueryData(['income-sources'], prev.filter((s) => s.id !== id))
+      return { prev }
+    },
+    onError: (e: Error, _id, ctx?: { prev?: { id: string }[] }) => {
+      if (ctx?.prev) qc.setQueryData(['income-sources'], ctx.prev)
+      Alert.alert('Erro', e.message)
+    },
+    onSettled: () => refetchAll(),
   })
 
   const receiveMutation = useMutation({
