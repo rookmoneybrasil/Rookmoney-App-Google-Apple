@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { ThemeProvider, DarkTheme, type Theme } from '@react-navigation/native'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query'
 import * as Linking from 'expo-linking'
 import * as SplashScreen from 'expo-splash-screen'
 import {
@@ -22,7 +22,7 @@ import { COLORS } from '@/lib/constants'
 import { AnimatedSplash } from '@/components/animated-splash'
 import { UpsellModal } from '@/components/upsell-modal'
 import { loadHapticsPreference } from '@/lib/haptics'
-import { Platform } from 'react-native'
+import { Platform, AppState, type AppStateStatus } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { pushTokenApi } from '@/lib/api'
 import { AchievementToastProvider } from '@/components/achievement-toast'
@@ -68,6 +68,18 @@ async function registerPushToken() {
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
 })
+
+// React Query's refetch-on-focus only fires on in-app navigation focus
+// (useFocusEffect) by default on native — it has no concept of the OS
+// backgrounding/foregrounding the whole app. So data paid/edited on web while
+// the RN app sat backgrounded (not navigated away from within its own stack)
+// stayed stale indefinitely after resuming, even on screens with a
+// useFocusEffect refetch (e.g. person-detail) since that event never fired.
+// Wiring AppState into focusManager makes every query refetch on app resume,
+// app-wide, instead of patching individual screens one at a time.
+function onAppStateChange(status: AppStateStatus) {
+  if (Platform.OS !== 'web') focusManager.setFocused(status === 'active')
+}
 
 const navTheme: Theme = {
   ...DarkTheme,
@@ -170,6 +182,11 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync()
   }, [fontsLoaded])
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', onAppStateChange)
+    return () => sub.remove()
+  }, [])
 
   if (!fontsLoaded) return null
 
