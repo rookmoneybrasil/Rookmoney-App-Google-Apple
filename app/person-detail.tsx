@@ -145,7 +145,12 @@ export default function PersonDetailScreen() {
   }
 
   const allEntries   = data?.entries ?? []
+  // recurringList (from personRecurringApi.list) now includes BOTH active and
+  // paused templates — needed so a paused one still shows up (with "Pausada")
+  // instead of vanishing. Every balance/projection/share-text calculation
+  // must use activeRecurringList — a paused template isn't an ongoing debt.
   const recurringList = recurring ?? []
+  const activeRecurringList = recurringList.filter(r => r.isActive)
 
   const now        = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -157,7 +162,7 @@ export default function PersonDetailScreen() {
   // template would match and wrongly suppress this month's not-yet-generated
   // amount.
   const recurringEntryMap = new Map<string, PersonEntry>()
-  for (const r of recurringList) {
+  for (const r of activeRecurringList) {
     const match = allEntries.find(e =>
       e.recurringEntryId === r.id &&
       new Date(e.date) >= monthStart && new Date(e.date) <= monthEnd
@@ -184,7 +189,7 @@ export default function PersonDetailScreen() {
 
   let recurringTheyOwe = 0
   let recurringIOwe    = 0
-  for (const r of recurringList) {
+  for (const r of activeRecurringList) {
     if (recurringEntryMap.has(r.id)) continue
     if (r.type === 'THEY_OWE_ME') recurringTheyOwe += Number(r.amount)
     else                           recurringIOwe    += Number(r.amount)
@@ -230,7 +235,7 @@ export default function PersonDetailScreen() {
     const dStart = new Date(d.getFullYear(), d.getMonth(), 1)
     const dEnd   = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
 
-    for (const r of recurringList) {
+    for (const r of activeRecurringList) {
       // Match ANY entry (settled or not) via the FK — settled means paid
       // (nothing to add), unsettled means it's already counted via
       // dueEntries above. Filtering to unsettled-only made a paid recurring
@@ -266,21 +271,24 @@ export default function PersonDetailScreen() {
     const shareTheyOwe: ShareItem[] = []
 
     // Recurring templates — só os ainda devidos (pula pagos)
-    for (const r of recurringList) {
+    for (const r of activeRecurringList) {
       const entry = recurringEntryMap.get(r.id)
       if (entry?.isSettled) continue
       const bucket = r.type === 'I_OWE_THEM' ? shareIOwe : shareTheyOwe
       bucket.push({ desc: `${r.description} (recorrente, dia ${r.dayOfMonth})`, amount: Number(r.amount), settled: false })
     }
 
-    // Avulsos não-pagos devidos até o fim do mês (vencidos + do mês)
-    const recurringDescs = new Set(recurringList.map(r => `${r.description}|${r.type}`))
+    // Avulsos não-pagos devidos até o fim do mês (vencidos + do mês) — pula só
+    // a entrada do mês atual de cada recorrente (já coberta acima), por ID via
+    // recurringEntryMap, não por descrição+tipo (isso escondia meses atrasados
+    // extras do mesmo recorrente).
+    const currentMonthRecurringEntryIds = new Set(Array.from(recurringEntryMap.values()).map(e => e.id))
     const allSingles = allEntries.filter(e => {
       const d = new Date(e.date)
       return !e.installmentGroupId && !e.isSettled && d <= monthEnd
     })
     for (const e of allSingles) {
-      if (recurringDescs.has(`${e.description}|${e.type}`)) continue
+      if (currentMonthRecurringEntryIds.has(e.id)) continue
       const bucket = e.type === 'I_OWE_THEM' ? shareIOwe : shareTheyOwe
       bucket.push({ desc: e.description, amount: Number(e.amount), settled: e.isSettled })
     }
@@ -506,7 +514,7 @@ export default function PersonDetailScreen() {
           {/* Recorrentes ativos */}
           {recurringList.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitleUpper}>Recorrentes ativos</Text>
+              <Text style={styles.sectionTitleUpper}>Recorrentes</Text>
               <View style={styles.infoBox}>
                 <Text style={styles.infoBoxText}>
                   🔁 <Text style={styles.infoBoxStrong}>Como funciona:</Text> cada recorrente gera automaticamente uma conta pendente no dia configurado, todo mês. Acerte pelo bloco <Text style={styles.infoBoxStrong}>Pendentes</Text> abaixo. Meses não pagos acumulam em Pendentes.
