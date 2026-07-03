@@ -231,11 +231,12 @@ export default function PersonDetailScreen() {
     const dEnd   = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
 
     for (const r of recurringList) {
+      // Match ANY entry (settled or not) via the FK — settled means paid
+      // (nothing to add), unsettled means it's already counted via
+      // dueEntries above. Filtering to unsettled-only made a paid recurring
+      // entry look like it was never generated, double-counting it.
       const alreadyHasEntry = allEntries.some(e =>
-        !e.isSettled &&
-        e.description === r.description &&
-        e.type        === r.type &&
-        !e.installmentGroupId &&
+        e.recurringEntryId === r.id &&
         new Date(e.date) >= dStart &&
         new Date(e.date) <= dEnd
       )
@@ -323,7 +324,7 @@ export default function PersonDetailScreen() {
       lines.push('')
     }
 
-    lines.push('— Enviado pelo Rook Money — rookmoney.com')
+    lines.push('— Enviado pelo Rook Money — https://rookmoney.com')
     return lines.join('\n')
   }
 
