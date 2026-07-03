@@ -707,6 +707,7 @@ export interface PersonEntry {
   isSettled:           boolean
   settledAt?:          string | null
   settledTransactionId?: string | null
+  recurringEntryId?:   string | null
   installmentTotal:    number | null
   installmentCurrent:  number | null
   installmentGroupId?: string | null

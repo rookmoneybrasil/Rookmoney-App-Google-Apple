@@ -151,16 +151,11 @@ export default function PersonDetailScreen() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
 
-  // Map: recurringId → entry this month (settled or not)
+  // Map: recurringId → entry this month (settled or not). Matched via the
+  // recurringEntryId FK instead of a description/type/date heuristic.
   const recurringEntryMap = new Map<string, PersonEntry>()
   for (const r of recurringList) {
-    const match = allEntries.find(e =>
-      e.description === r.description &&
-      e.type        === r.type &&
-      !e.installmentGroupId &&
-      new Date(e.date) >= monthStart &&
-      new Date(e.date) <= monthEnd
-    )
+    const match = allEntries.find(e => e.recurringEntryId === r.id)
     if (match) recurringEntryMap.set(r.id, match)
   }
 
@@ -505,23 +500,18 @@ export default function PersonDetailScreen() {
               <Text style={styles.sectionTitleUpper}>Recorrentes ativos</Text>
               <View style={styles.infoBox}>
                 <Text style={styles.infoBoxText}>
-                  🔁 <Text style={styles.infoBoxStrong}>Como funciona:</Text> cada recorrente gera automaticamente uma conta pendente no dia configurado, todo mês. Toque em <Text style={styles.infoBoxStrong}>Pago</Text> para quitar o mês atual, ou acerte pelo bloco <Text style={styles.infoBoxStrong}>Pendentes</Text> abaixo. Meses não pagos acumulam em Pendentes.
+                  🔁 <Text style={styles.infoBoxStrong}>Como funciona:</Text> cada recorrente gera automaticamente uma conta pendente no dia configurado, todo mês. Acerte pelo bloco <Text style={styles.infoBoxStrong}>Pendentes</Text> abaixo. Meses não pagos acumulam em Pendentes.
                 </Text>
               </View>
               <View style={styles.list}>
-                {recurringList.map(item => {
-                  const monthEntry = recurringEntryMap.get(item.id)
-                  return (
-                    <RecurringEntryRow
-                      key={item.id}
-                      item={item}
-                      personId={id}
-                      monthEntryId={monthEntry?.id ?? null}
-                      paidThisMonth={monthEntry?.isSettled ?? false}
-                      onEdit={() => setEditingRecurring(item)}
-                    />
-                  )
-                })}
+                {recurringList.map(item => (
+                  <RecurringEntryRow
+                    key={item.id}
+                    item={item}
+                    personId={id}
+                    onEdit={() => setEditingRecurring(item)}
+                  />
+                ))}
               </View>
             </View>
           )}

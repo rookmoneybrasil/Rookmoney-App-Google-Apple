@@ -1,53 +1,37 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { View, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { Text } from '@/components/text'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
-import { peopleApi, personRecurringApi, type PersonEntryRecurring } from '@/lib/api'
+import { personRecurringApi, type PersonEntryRecurring } from '@/lib/api'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
 
 interface Props {
-  item:           PersonEntryRecurring
-  personId:       string
-  monthEntryId:   string | null
-  paidThisMonth:  boolean
-  onEdit:         () => void
+  item:     PersonEntryRecurring
+  personId: string
+  onEdit:   () => void
 }
 
-export function RecurringEntryRow({ item, personId, monthEntryId, paidThisMonth, onEdit }: Props) {
+// Standardized to match the Contas Fixas recurring row: the template only
+// toggles active/paused, edits, or deletes — it does NOT have a "Pago"
+// action. The month's actual generated entry (with its own pay button)
+// already appears in the regular entries list on this screen, so a pay
+// button here would just be a redundant second way to do the same thing.
+export function RecurringEntryRow({ item, personId, onEdit }: Props) {
   const qc = useQueryClient()
-  const [paid, setPaid] = useState(paidThisMonth)
   const isTheyOwe = item.type === 'THEY_OWE_ME'
-
-  useEffect(() => { setPaid(paidThisMonth) }, [paidThisMonth])
+  const [toggling, setToggling] = useState(false)
 
   const toggleMutation = useMutation({
-    mutationFn: async () => {
-      if (paid) {
-        if (monthEntryId) await peopleApi.unsettleEntry(monthEntryId)
-      } else if (monthEntryId) {
-        await peopleApi.settleEntry(monthEntryId)
-      } else {
-        const entry = await peopleApi.addEntry(personId, {
-          type:        item.type,
-          description: item.description,
-          amount:      item.amount,
-          date:        new Date().toISOString().split('T')[0],
-          categoryId:  item.categoryId ?? undefined,
-        })
-        await peopleApi.settleEntry(entry.data.id)
-      }
-    },
-    // Optimistic: flip the paid state instantly, roll back if the request fails.
-    onMutate: () => { const prev = paid; setPaid((p) => !p); return { prev } },
-    onError: (e: Error, _v, ctx?: { prev: boolean }) => { if (ctx) setPaid(ctx.prev); Alert.alert('Erro', e.message) },
+    mutationFn: () => personRecurringApi.update(item.id, { isActive: !item.isActive }),
     onSettled: () => {
-      qc.refetchQueries({ queryKey: ['person', personId] })
-      qc.refetchQueries({ queryKey: ['people'] })
+      setToggling(false)
+      qc.refetchQueries({ queryKey: ['personRecurring', personId] })
     },
+    onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
   const stopMutation = useMutation({
@@ -69,26 +53,26 @@ export function RecurringEntryRow({ item, personId, monthEntryId, paidThisMonth,
   })
 
   function confirmStop() {
-    Alert.alert('Parar recorrência', `Parar "${item.description}"? Lançamentos já gerados não serão apagados.`, [
+    Alert.alert('Remover recorrência', `Remover "${item.description}"? Lançamentos já gerados não serão apagados.`, [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Parar', style: 'destructive', onPress: () => stopMutation.mutate() },
+      { text: 'Remover', style: 'destructive', onPress: () => stopMutation.mutate() },
     ])
   }
 
   return (
-    <View style={[styles.card, paid ? styles.cardPaid : styles.cardPending]}>
-      <View style={[styles.icon, paid ? styles.iconPaid : styles.iconPending]}>
-        <Feather name={paid ? 'check-circle' : 'refresh-cw'} size={15} color={paid ? COLORS.success : COLORS.brand} />
+    <View style={[styles.card, item.isActive ? styles.cardActive : styles.cardPaused]}>
+      <View style={[styles.icon, item.isActive ? styles.iconActive : styles.iconPaused]}>
+        <Feather name="refresh-cw" size={15} color={item.isActive ? COLORS.brand : COLORS.muted} />
       </View>
 
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={styles.titleRow}>
-          <Text style={[styles.title, paid && styles.titlePaid]} numberOfLines={1}>{item.description}</Text>
-          <View style={[styles.badge, paid ? styles.badgeSuccess : styles.badgeWarning]}>
-            <Text style={[styles.badgeText, paid ? styles.badgeTextSuccess : styles.badgeTextWarning]}>
-              {paid ? 'Pago' : 'Pendente'}
-            </Text>
-          </View>
+          <Text style={[styles.title, !item.isActive && styles.titlePaused]} numberOfLines={1}>{item.description}</Text>
+          {!item.isActive && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Pausada</Text>
+            </View>
+          )}
         </View>
         <Text style={styles.subtitle} numberOfLines={1}>
           <Text style={{ color: isTheyOwe ? COLORS.success : COLORS.danger }}>
@@ -100,17 +84,19 @@ export function RecurringEntryRow({ item, personId, monthEntryId, paidThisMonth,
       </View>
 
       <View style={styles.actions}>
+        <TouchableOpacity
+          style={styles.iconBtn}
+          onPress={() => { setToggling(true); toggleMutation.mutate() }}
+          disabled={toggling}
+        >
+          <Feather
+            name={item.isActive ? 'toggle-right' : 'toggle-left'}
+            size={18}
+            color={item.isActive ? COLORS.success : COLORS.muted}
+          />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.iconBtn} onPress={onEdit}>
           <Feather name="edit-2" size={14} color={COLORS.muted} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.toggleBtn, paid ? styles.toggleBtnUndo : styles.toggleBtnPay]}
-          onPress={() => toggleMutation.mutate()}
-          disabled={toggleMutation.isPending}
-        >
-          <Text style={[styles.toggleBtnText, paid ? styles.toggleBtnTextUndo : styles.toggleBtnTextPay]}>
-            {toggleMutation.isPending ? '...' : paid ? 'Desfazer' : 'Pago'}
-          </Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.iconBtn} onPress={confirmStop} disabled={stopMutation.isPending}>
           <Feather name="x" size={14} color={COLORS.muted} />
@@ -125,21 +111,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 10,
     borderRadius: 14, borderWidth: 1, padding: 12,
   },
-  cardPending: { backgroundColor: COLORS.brand + '14', borderColor: COLORS.brand + '33' },
-  cardPaid:    { backgroundColor: COLORS.success + '0d', borderColor: COLORS.success + '33' },
+  cardActive: { backgroundColor: COLORS.brand + '14', borderColor: COLORS.brand + '33' },
+  cardPaused: { backgroundColor: COLORS.card2, borderColor: COLORS.border, opacity: 0.6 },
   icon: { width: 32, height: 32, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
-  iconPending: { backgroundColor: COLORS.brand + '22' },
-  iconPaid:    { backgroundColor: COLORS.success + '22' },
+  iconActive: { backgroundColor: COLORS.brand + '22' },
+  iconPaused: { backgroundColor: COLORS.card2 },
 
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   title: { fontSize: 13, fontWeight: '600', color: COLORS.text, flexShrink: 1 },
-  titlePaid: { textDecorationLine: 'line-through', color: COLORS.muted },
-  badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, borderWidth: 1, flexShrink: 0 },
-  badgeSuccess: { backgroundColor: COLORS.success + '1a', borderColor: COLORS.success + '40' },
-  badgeWarning: { backgroundColor: COLORS.warning + '1a', borderColor: COLORS.warning + '40' },
-  badgeText: { fontSize: 9, fontWeight: '700' },
-  badgeTextSuccess: { color: COLORS.success },
-  badgeTextWarning: { color: COLORS.warning },
+  titlePaused: { color: COLORS.muted },
+  badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.card2, flexShrink: 0 },
+  badgeText: { fontSize: 9, fontWeight: '700', color: COLORS.muted },
   subtitle: { fontSize: 11, color: COLORS.muted, marginTop: 2 },
 
   actions: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
@@ -147,10 +129,4 @@ const styles = StyleSheet.create({
     width: 28, height: 28, borderRadius: 8, justifyContent: 'center', alignItems: 'center',
     backgroundColor: COLORS.card2,
   },
-  toggleBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  toggleBtnPay:  { backgroundColor: COLORS.success + '1a' },
-  toggleBtnUndo: { backgroundColor: COLORS.card2 },
-  toggleBtnText: { fontSize: 11, fontWeight: '700' },
-  toggleBtnTextPay:  { color: COLORS.success },
-  toggleBtnTextUndo: { color: COLORS.muted },
 })
