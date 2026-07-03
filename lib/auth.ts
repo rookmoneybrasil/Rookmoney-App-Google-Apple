@@ -54,9 +54,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   ready:  false,
 
   setAuth: (token, user) => {
-    storage.set(TOKEN_KEY, token)
-    storage.set(USER_KEY, JSON.stringify(user))
-    set({ token, user })
+    set({ token, user }) // in-memory first for instant UI
+    storage.set(TOKEN_KEY, token).catch((e) => console.warn('[auth] token persist failed:', e))
+    storage.set(USER_KEY, JSON.stringify(user)).catch((e) => console.warn('[auth] user persist failed:', e))
   },
 
   clearAuth: () => {
@@ -75,15 +75,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   hydrate: async () => {
+    // Read token and user INDEPENDENTLY. A failure reading or JSON-parsing the
+    // (larger, profile-image-carrying) user must never wipe the token — otherwise
+    // iOS logs the user out on every launch. The token is the source of truth for
+    // auth; user data is re-fetched from /me anyway.
+    let token: string | null = null
+    let user: AuthUser | null = null
+    try { token = await storage.get(TOKEN_KEY) } catch (e) { console.warn('[auth] token read failed:', e) }
     try {
-      const [token, userJson] = await Promise.all([
-        storage.get(TOKEN_KEY),
-        storage.get(USER_KEY),
-      ])
-      const user = userJson ? JSON.parse(userJson) as AuthUser : null
-      set({ token, user, ready: true })
-    } catch {
-      set({ ready: true })
-    }
+      const userJson = await storage.get(USER_KEY)
+      user = userJson ? (JSON.parse(userJson) as AuthUser) : null
+    } catch (e) { console.warn('[auth] user read failed:', e) }
+    set({ token, user, ready: true })
   },
 }))
