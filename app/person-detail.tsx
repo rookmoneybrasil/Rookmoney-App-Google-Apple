@@ -324,15 +324,18 @@ export default function PersonDetailScreen() {
       lines.push('')
     }
 
-    lines.push('— Enviado pelo Rook Money — https://rookmoney.com/?utm_source=whatsapp')
+    lines.push('— Enviado pelo Rook Money')
     return lines.join('\n')
   }
 
   async function handleShare() {
     const text = buildShareText()
     if (!text) return
+    // Generated fresh on every tap so WhatsApp never reuses a cached
+    // preview from a previous share of the same URL.
+    const shareUrl = `https://rookmoney.com/?ref=${Date.now()}`
     try {
-      await Share.share({ message: text })
+      await Share.share({ message: `${text} — ${shareUrl}` })
     } catch {
       // user cancelled
     }
