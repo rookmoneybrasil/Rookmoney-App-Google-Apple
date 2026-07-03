@@ -374,7 +374,6 @@ export default function PersonDetailScreen() {
     .filter(([gid]) => doneGroupIds.has(gid))
     .map(([, g]) => g.sort((a, b) => (a.installmentCurrent ?? 0) - (b.installmentCurrent ?? 0)))
 
-  const pendingCount = singleOpen.length + activeGroups.length
   const settledCount = singleSettled.length + doneGroups.length
 
   function onRefresh() {
@@ -523,28 +522,40 @@ export default function PersonDetailScreen() {
             </View>
           )}
 
-          {/* Pendentes */}
+          {/* Pendentes — avulsos e recorrentes gerados (parceladas ficam numa seção própria abaixo, igual web) */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Feather name="clock" size={15} color={COLORS.muted} />
-              <Text style={styles.sectionTitle}>Pendentes ({pendingCount})</Text>
+              <Text style={styles.sectionTitle}>Pendentes ({singleOpen.length})</Text>
             </View>
 
-            {pendingCount === 0 ? (
+            {singleOpen.length === 0 ? (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyBoxText}>Nenhum lançamento pendente</Text>
               </View>
             ) : (
               <View style={styles.list}>
-                {activeGroups.map(grp => (
-                  <InstallmentGroup key={grp[0].installmentGroupId} personId={id} entries={grp} />
-                ))}
                 {singleOpen.map(entry => (
                   <EntryCard key={entry.id} entry={entry} personId={id} />
                 ))}
               </View>
             )}
           </View>
+
+          {/* Parceladas */}
+          {activeGroups.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Feather name="layers" size={15} color={COLORS.brand} />
+                <Text style={styles.sectionTitle}>Parceladas</Text>
+              </View>
+              <View style={styles.list}>
+                {activeGroups.map(grp => (
+                  <InstallmentGroup key={grp[0].installmentGroupId} personId={id} entries={grp} />
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* Acertados */}
           {settledCount > 0 && (
