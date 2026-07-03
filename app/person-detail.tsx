@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl, Share } from 'react-native'
 import { Text } from '@/components/text'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { format, addMonths } from 'date-fns'
@@ -113,6 +113,11 @@ export default function PersonDetailScreen() {
     queryFn:  () => personRecurringApi.list(id).then(r => r.data),
     enabled:  !!id,
   })
+
+  // Re-fetch when the screen regains focus (voltar pro app / navegar de volta) —
+  // sem isso a tela ficava com dado velho (ex: pagou no web, no app continuava
+  // mostrando o recorrente como Pendente / "Você deve" errado).
+  useFocusEffect(useCallback(() => { refetch(); refetchRecurring() }, [refetch, refetchRecurring]))
 
   const refetchAll = async () => {
     await Promise.all([

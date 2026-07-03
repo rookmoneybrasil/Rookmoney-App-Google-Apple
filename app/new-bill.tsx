@@ -374,7 +374,10 @@ const styles = StyleSheet.create({
   serviceGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 6,
     backgroundColor: COLORS.card2, borderRadius: 12, padding: 10,
-    borderWidth: 1, borderColor: COLORS.border, marginBottom: 4, maxHeight: 160,
+    borderWidth: 1, borderColor: COLORS.border, marginBottom: 4,
+    // NÃO usar maxHeight aqui: com flexWrap os pills passam da altura e vazam por
+    // cima dos campos abaixo (o container reserva só maxHeight no layout, mas os
+    // pills renderizam fora). Sem maxHeight, o grid empurra o conteúdo (form é ScrollView).
   },
   servicePill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
