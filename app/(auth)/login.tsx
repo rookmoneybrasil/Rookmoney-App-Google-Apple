@@ -111,7 +111,7 @@ export default function LoginScreen() {
           <View style={styles.field}>
             <View style={styles.labelRow}>
               <Text style={styles.label}>Senha</Text>
-              <TouchableOpacity onPress={() => Linking.openURL('https://app.rookmoney.com/forgot-password')}>
+              <TouchableOpacity onPress={() => Linking.openURL('https://rookmoney.com/forgot-password')}>
                 <Text style={styles.forgotLink}>Esqueci a senha</Text>
               </TouchableOpacity>
             </View>

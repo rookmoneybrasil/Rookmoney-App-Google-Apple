@@ -1084,7 +1084,7 @@ export default function SettingsScreen() {
               <Text style={styles.logoutText}>Atualizações</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.logoutBtn} onPress={() => Linking.openURL('https://app.rookmoney.com')}>
+            <TouchableOpacity style={styles.logoutBtn} onPress={() => Linking.openURL('https://rookmoney.com')}>
               <Feather name="globe" size={14} color={COLORS.muted} />
               <Text style={styles.logoutText}>Abrir versão web</Text>
             </TouchableOpacity>

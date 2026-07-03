@@ -324,7 +324,7 @@ export default function PersonDetailScreen() {
       lines.push('')
     }
 
-    lines.push('— Enviado pelo Rook Money — https://rookmoney.com')
+    lines.push('— Enviado pelo Rook Money — https://rookmoney.com/?utm_source=whatsapp')
     return lines.join('\n')
   }
 
