@@ -1,10 +1,15 @@
 import { API_BASE_URL } from './constants'
-import { useAuthStore } from './auth'
+import { useAuthStore, waitUntilReady } from './auth'
 
 async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  // Never fire a request while hydrate() is still restoring the token from the
+  // Keychain — otherwise it goes out unauthenticated, gets a 401, and the 401
+  // handler below wipes the real token that was about to be restored. See the
+  // comment on waitUntilReady() in lib/auth.ts.
+  await waitUntilReady()
   const token = useAuthStore.getState().token
 
   const res = await fetch(`${API_BASE_URL}${path}`, {

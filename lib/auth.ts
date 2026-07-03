@@ -89,3 +89,23 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ token, user, ready: true })
   },
 }))
+
+// AuthGate (which calls hydrate()) mounts as a sibling of the root <Stack>, not
+// a wrapper around it — so screens like the dashboard tab mount and fire their
+// queries immediately, before hydrate() has finished reading the Keychain. Any
+// request that goes out with token still null gets a 401, and the 401 handler
+// in lib/api.ts calls clearAuth() — which deletes the token from the Keychain,
+// not just memory. Since the local Keychain read is fast but the network round
+// trip is slower, hydrate() usually restores the real token first, and the
+// stale unauthenticated request's 401 arrives after and wipes it right back
+// out — logging the user out (permanently, not just in-memory) on every cold
+// start. Fix: every request must wait for hydrate() to finish before reading
+// the token, so no request is ever sent while hydration is still in flight.
+export function waitUntilReady(): Promise<void> {
+  if (useAuthStore.getState().ready) return Promise.resolve()
+  return new Promise((resolve) => {
+    const unsub = useAuthStore.subscribe((s) => {
+      if (s.ready) { unsub(); resolve() }
+    })
+  })
+}
