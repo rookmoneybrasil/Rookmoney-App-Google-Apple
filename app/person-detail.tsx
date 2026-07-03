@@ -152,10 +152,16 @@ export default function PersonDetailScreen() {
   const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
 
   // Map: recurringId → entry this month (settled or not). Matched via the
-  // recurringEntryId FK instead of a description/type/date heuristic.
+  // recurringEntryId FK instead of a description/type/date heuristic — scoped
+  // to the current month, otherwise a past (already-settled) entry for this
+  // template would match and wrongly suppress this month's not-yet-generated
+  // amount.
   const recurringEntryMap = new Map<string, PersonEntry>()
   for (const r of recurringList) {
-    const match = allEntries.find(e => e.recurringEntryId === r.id)
+    const match = allEntries.find(e =>
+      e.recurringEntryId === r.id &&
+      new Date(e.date) >= monthStart && new Date(e.date) <= monthEnd
+    )
     if (match) recurringEntryMap.set(r.id, match)
   }
 
