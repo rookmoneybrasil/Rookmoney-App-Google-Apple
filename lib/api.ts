@@ -779,6 +779,7 @@ export interface PersonEntryRecurring {
   dayOfMonth:  number
   isActive:    boolean
   lastMonth:   string | null
+  startMonth:  string | null
   notes:       string | null
   categoryId:  string | null
   category?: { id: string; name: string; icon: string; color: string } | null

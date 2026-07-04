@@ -153,8 +153,12 @@ export default function PersonDetailScreen() {
   const activeRecurringList = recurringList.filter(r => r.isActive)
 
   const now        = new Date()
+  const yearMonth  = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+  // Template com startMonth futuro ("1ª data" num mês adiante) ainda não
+  // começou — fora de todo cálculo do mês atual.
+  const isStarted = (r: PersonEntryRecurring) => !r.startMonth || yearMonth >= r.startMonth
 
   // Map: recurringId → entry this month (settled or not). Matched via the
   // recurringEntryId FK instead of a description/type/date heuristic — scoped
@@ -190,6 +194,7 @@ export default function PersonDetailScreen() {
   let recurringTheyOwe = 0
   let recurringIOwe    = 0
   for (const r of activeRecurringList) {
+    if (!isStarted(r)) continue // "1ª data" futura — ainda não é dívida deste mês
     if (recurringEntryMap.has(r.id)) continue
     if (r.type === 'THEY_OWE_ME') recurringTheyOwe += Number(r.amount)
     else                           recurringIOwe    += Number(r.amount)
@@ -234,8 +239,10 @@ export default function PersonDetailScreen() {
 
     const dStart = new Date(d.getFullYear(), d.getMonth(), 1)
     const dEnd   = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
+    const dKey   = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 
     for (const r of activeRecurringList) {
+      if (r.startMonth && dKey < r.startMonth) continue // ainda não começou neste mês projetado
       // Match ANY entry (settled or not) via the FK — settled means paid
       // (nothing to add), unsettled means it's already counted via
       // dueEntries above. Filtering to unsettled-only made a paid recurring
@@ -272,6 +279,7 @@ export default function PersonDetailScreen() {
 
     // Recurring templates — só os ainda devidos (pula pagos)
     for (const r of activeRecurringList) {
+      if (!isStarted(r)) continue // "1ª data" futura — ainda não é dívida
       const entry = recurringEntryMap.get(r.id)
       if (entry?.isSettled) continue
       const bucket = r.type === 'I_OWE_THEM' ? shareIOwe : shareTheyOwe
