@@ -6,6 +6,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
 import { recurringBillsApi, categoriesApi } from '@/lib/api'
+import { DateInput } from '@/components/date-input'
+import { format } from 'date-fns'
 
 export default function NewRecurringBillScreen() {
   const router = useRouter()
@@ -14,6 +16,7 @@ export default function NewRecurringBillScreen() {
   const [name, setName]             = useState('')
   const [amount, setAmount]         = useState('')
   const [dayOfMonth, setDayOfMonth] = useState('1')
+  const [firstDate, setFirstDate]   = useState(format(new Date(), 'yyyy-MM-dd'))
   const [categoryId, setCategoryId] = useState<string | undefined>()
   const [notes, setNotes]           = useState('')
   const [showNotes, setShowNotes]   = useState(false)
@@ -37,7 +40,7 @@ export default function NewRecurringBillScreen() {
         dayOfMonth:  day,
         categoryId:  categoryId || null,
         notes:       notes.trim() || null,
-        generateNow: true,
+        firstDate:   firstDate || undefined, // mês da 1ª data → startMonth; se for este mês e passada, gera já
       })
     },
     onSuccess: () => {
@@ -101,6 +104,9 @@ export default function NewRecurringBillScreen() {
             />
           </View>
         </View>
+
+        <Text style={[styles.label, { marginTop: 16 }]}>1ª data (quando começa) *</Text>
+        <DateInput value={firstDate} onChange={setFirstDate} />
 
         <Text style={[styles.label, { marginTop: 16 }]}>Categoria</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>

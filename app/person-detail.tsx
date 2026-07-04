@@ -174,6 +174,29 @@ export default function PersonDetailScreen() {
     if (match) recurringEntryMap.set(r.id, match)
   }
 
+  // For the recurring CARD: this month's generated entry per template (ativo OU
+  // pausado), pago ou não. Alimenta o botão Pagar/"Pago" e esconde essa entrada
+  // dos Pendentes (agora aparece via o cartão). Meses anteriores não pagos
+  // continuam em Pendentes como avulsas.
+  const monthEntryByRecurringId = new Map<string, PersonEntry>()
+  for (const r of recurringList) {
+    const match = allEntries.find(e =>
+      e.recurringEntryId === r.id &&
+      new Date(e.date) >= monthStart && new Date(e.date) <= monthEnd
+    )
+    if (match) monthEntryByRecurringId.set(r.id, match)
+  }
+  const monthRecurringEntryIds = new Set(Array.from(monthEntryByRecurringId.values()).map(e => e.id))
+  // Entrada do mês de um template PAUSADO não conta (pausar para o mês atual);
+  // atrasos de meses anteriores continuam contando mesmo pausado.
+  const activeRecurringIds = new Set(activeRecurringList.map(r => r.id))
+  const pausedMonthEntryIds = new Set(
+    recurringList
+      .filter(r => !activeRecurringIds.has(r.id))
+      .map(r => monthEntryByRecurringId.get(r.id)?.id)
+      .filter((id): id is string => Boolean(id))
+  )
+
   const cutoff = new Date(now.getTime() + 45 * 24 * 60 * 60 * 1000)
 
   const openEntries    = allEntries.filter(e => !e.isSettled)
@@ -185,6 +208,7 @@ export default function PersonDetailScreen() {
   // singles and installments alike — keeps "Você deve", a projeção e o
   // compartilhar consistentes (antes contava só o mês exato → totais diferentes).
   for (const e of openEntries) {
+    if (pausedMonthEntryIds.has(e.id)) continue // entrada do mês de recorrente pausado não conta
     if (new Date(e.date) > monthEnd) continue
 
     if (e.type === 'THEY_OWE_ME') theyOweTotal += Number(e.amount)
@@ -371,7 +395,7 @@ export default function PersonDetailScreen() {
       .catch(() => {})
   }, [hasOldRecurring, id, qc])
 
-  const singleOpen    = openEntries.filter(e => !e.installmentGroupId)
+  const singleOpen    = openEntries.filter(e => !e.installmentGroupId && !monthRecurringEntryIds.has(e.id))
   const singleSettled = settledEntries.filter(e => !e.installmentGroupId)
 
   const openGroupIds = new Set(openEntries.filter(e => e.installmentGroupId).map(e => e.installmentGroupId as string))
@@ -525,18 +549,22 @@ export default function PersonDetailScreen() {
               <Text style={styles.sectionTitleUpper}>Recorrentes</Text>
               <View style={styles.infoBox}>
                 <Text style={styles.infoBoxText}>
-                  🔁 <Text style={styles.infoBoxStrong}>Como funciona:</Text> cada recorrente gera automaticamente uma conta pendente no dia configurado, todo mês. Acerte pelo bloco <Text style={styles.infoBoxStrong}>Pendentes</Text> abaixo. Meses não pagos acumulam em Pendentes.
+                  🔁 <Text style={styles.infoBoxStrong}>Recorrentes</Text> se pagam no próprio cartão, todo mês. Ao pagar, trava até o dia 1 do mês que vem. Meses não pagos acumulam em <Text style={styles.infoBoxStrong}>Pendentes</Text>.
                 </Text>
               </View>
               <View style={styles.list}>
-                {recurringList.map(item => (
-                  <RecurringEntryRow
-                    key={item.id}
-                    item={item}
-                    personId={id}
-                    onEdit={() => setEditingRecurring(item)}
-                  />
-                ))}
+                {recurringList.map(item => {
+                  const me = monthEntryByRecurringId.get(item.id)
+                  return (
+                    <RecurringEntryRow
+                      key={item.id}
+                      item={item}
+                      personId={id}
+                      monthRow={me ? { id: me.id, paid: me.isSettled } : undefined}
+                      onEdit={() => setEditingRecurring(item)}
+                    />
+                  )
+                })}
               </View>
             </View>
           )}

@@ -56,12 +56,21 @@ function Badge({ label, color, dot }: { label: string; color: string; dot?: bool
   )
 }
 
-function RecurringRow({ item, onToggle, onEdit, onDelete }: {
+function RecurringRow({ item, monthRow, onToggle, onEdit, onDelete, onPay }: {
   item: RecurringBill
+  monthRow?: { id: string; paid: boolean }
   onToggle: () => void
   onEdit: () => void
   onDelete: () => void
+  onPay?: () => void
 }) {
+  const now       = new Date()
+  const curMonth  = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const scheduled = !!item.startMonth && curMonth < item.startMonth
+  const paid      = monthRow?.paid ?? false
+  const scheduledLabel = item.startMonth
+    ? new Date(Number(item.startMonth.split('-')[0]), Number(item.startMonth.split('-')[1]) - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+    : ''
   return (
     <PressableScale
       style={[styles.row, item.isActive ? styles.rowRecurring : styles.rowPaused]}
@@ -81,6 +90,8 @@ function RecurringRow({ item, onToggle, onEdit, onDelete }: {
         <View style={styles.rowNameWrap}>
           <Text style={[styles.rowName, !item.isActive && { color: COLORS.muted }]} numberOfLines={1}>{item.name}</Text>
           {!item.isActive && <Badge label="Pausada" color={COLORS.muted} />}
+          {item.isActive && scheduled && <Badge label={scheduledLabel} color={COLORS.muted} />}
+          {item.isActive && !scheduled && paid && <Badge label="Pago" color={COLORS.success} />}
         </View>
         <Text style={styles.rowSubtitle}>
           <Text style={styles.rowAmountNeg}>-{fmt(Number(item.amount))}/mês</Text>
@@ -88,6 +99,16 @@ function RecurringRow({ item, onToggle, onEdit, onDelete }: {
           {item.category ? ` · ${item.category.icon} ${item.category.name}` : ''}
         </Text>
       </View>
+      {item.isActive && !scheduled && monthRow && (
+        <TouchableOpacity
+          onPress={onPay}
+          hitSlop={8}
+          style={[styles.recPayBtn, paid && { backgroundColor: 'transparent', borderColor: 'transparent' }]}
+        >
+          <Feather name="check" size={13} color={COLORS.success} />
+          <Text style={styles.recPayText}>{paid ? 'Pago' : 'Pagar'}</Text>
+        </TouchableOpacity>
+      )}
       <TouchableOpacity
         onPress={() => Alert.alert('Opções', item.name, [
           { text: 'Editar', onPress: onEdit },
@@ -531,7 +552,29 @@ export default function BillsScreen() {
     .filter((g) => g.paidCount === g.total)
     .sort((a, b) => b.grandTotal - a.grandTotal)
 
-  const pending = regular.filter((b) => !b.isPaid)
+  const recurring        = recurringBillsData ?? []
+  const activeRecurring  = recurring.filter((r) => r.isActive)
+  const pausedRecurring  = recurring.filter((r) => !r.isActive)
+  const monthlyFixed     = activeRecurring.reduce((s, r) => s + Number(r.amount), 0)
+  const activeRecurringIds = new Set(activeRecurring.map((r) => r.id))
+
+  // This month's generated Bill per recurring template — powers the Pay button
+  // on the recurring card, and is hidden from the Pendentes list (surfaced via
+  // the card now). Past-month unpaid recurring bills stay in Pendentes (overdue).
+  const recurringBillMap = new Map<string, Bill>()
+  for (const b of regular) {
+    if (!b.recurringBillId) continue
+    const d = new Date(b.dueDate)
+    if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) recurringBillMap.set(b.recurringBillId, b)
+  }
+  const curMonthRecurringBillIds = new Set(Array.from(recurringBillMap.values()).map((b) => b.id))
+  // Paused template's current-month bill must not count nor show.
+  const pausedCurMonthBillIds = new Set(
+    Array.from(recurringBillMap.entries()).filter(([rid]) => !activeRecurringIds.has(rid)).map(([, b]) => b.id)
+  )
+
+  const pending = regular.filter((b) => !b.isPaid && !pausedCurMonthBillIds.has(b.id))
+  const pendingVisible = pending.filter((b) => !curMonthRecurringBillIds.has(b.id))
   // Current month paid bills
   const paid = regular.filter((b) => {
     if (!b.isPaid) return false
@@ -554,11 +597,6 @@ export default function BillsScreen() {
           return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
         })())
         .reduce((ss, inst) => ss + Number(inst.amount), 0), 0)
-
-  const recurring        = recurringBillsData ?? []
-  const activeRecurring  = recurring.filter((r) => r.isActive)
-  const pausedRecurring  = recurring.filter((r) => !r.isActive)
-  const monthlyFixed     = activeRecurring.reduce((s, r) => s + Number(r.amount), 0)
 
   const people     = peopleData ?? []
   const iOwePeople = people.filter((p) => (p.iOweThem ?? 0) > 0)
@@ -598,8 +636,10 @@ export default function BillsScreen() {
     const installmentBills  = activeGroups.flatMap((g) => g.items).filter((inst) => !inst.isPaid && inSameMonth(inst.dueDate, d))
     const installmentAmount = installmentBills.reduce((s, inst) => s + Number(inst.amount), 0)
 
+    const monthKey    = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const startedFixed = activeRecurring.filter((r) => !r.startMonth || monthKey >= r.startMonth)
     const fixedBills  = i === 0 ? pending.filter((b) => !!b.recurringBillId && inSameMonth(b.dueDate, d)) : []
-    const fixedAmount = i === 0 ? fixedBills.reduce((s, b) => s + Number(b.amount), 0) : monthlyFixed
+    const fixedAmount = i === 0 ? fixedBills.reduce((s, b) => s + Number(b.amount), 0) : startedFixed.reduce((s, r) => s + Number(r.amount), 0)
 
     return {
       label,
@@ -611,7 +651,7 @@ export default function BillsScreen() {
   })
 
   const loading = isLoading || recurringLoading || peopleLoading
-  const totalPendingCount = pending.length + activeGroups.length
+  const totalPendingCount = pendingVisible.length + activeGroups.length
 
   return (
     <View style={styles.screen}>
@@ -761,7 +801,7 @@ export default function BillsScreen() {
                 </View>
                 <View style={[styles.infoBox, styles.infoBoxBrand]}>
                   <Text style={styles.infoBoxText}>
-                    🔁 <Text style={styles.infoBoxStrong}>Fixas</Text> se repetem todo mês no dia configurado — cadastre uma vez e elas aparecem automaticamente.
+                    🔁 <Text style={styles.infoBoxStrong}>Fixas</Text> se pagam no próprio cartão, todo mês. Ao pagar, trava até o dia 1 do mês que vem. Meses não pagos acumulam em <Text style={styles.infoBoxStrong}>Pendentes</Text>.
                   </Text>
                 </View>
                 {recurring.length === 0 ? (
@@ -770,15 +810,20 @@ export default function BillsScreen() {
                   </View>
                 ) : (
                   <>
-                    {[...activeRecurring, ...pausedRecurring].map((r) => (
-                      <RecurringRow
-                        key={r.id}
-                        item={r}
-                        onToggle={() => toggleRecurringMutation.mutate(r)}
-                        onEdit={() => router.push(`/edit-recurring-bill?id=${r.id}`)}
-                        onDelete={() => deleteRecurringMutation.mutate(r.id)}
-                      />
-                    ))}
+                    {[...activeRecurring, ...pausedRecurring].map((r) => {
+                      const mb = recurringBillMap.get(r.id)
+                      return (
+                        <RecurringRow
+                          key={r.id}
+                          item={r}
+                          monthRow={mb ? { id: mb.id, paid: mb.isPaid } : undefined}
+                          onPay={() => mb && (mb.isPaid ? unpayMutation.mutate(mb.id) : payMutation.mutate(mb.id))}
+                          onToggle={() => toggleRecurringMutation.mutate(r)}
+                          onEdit={() => router.push(`/edit-recurring-bill?id=${r.id}`)}
+                          onDelete={() => deleteRecurringMutation.mutate(r.id)}
+                        />
+                      )
+                    })}
                   </>
                 )}
               </View>
@@ -794,15 +839,15 @@ export default function BillsScreen() {
                 </View>
                 <View style={styles.infoBox}>
                   <Text style={styles.infoBoxText}>
-                    💸 <Text style={styles.infoBoxStrong}>Pendentes</Text> são boletos avulsos e as parcelas geradas pelas contas fixas — marque como pago quando quitar.
+                    💸 <Text style={styles.infoBoxStrong}>Pendentes</Text> são boletos avulsos e meses de contas fixas que ficaram atrasados — marque como pago quando quitar.
                   </Text>
                 </View>
-                {pending.length === 0 ? (
+                {pendingVisible.length === 0 ? (
                   <View style={styles.emptySection}>
                     <Text style={styles.emptySectionTextSuccess}>Nenhuma conta pendente 🎉</Text>
                   </View>
                 ) : (
-                  pending.map((bill) => (
+                  pendingVisible.map((bill) => (
                     <PendingRow
                       key={bill.id}
                       item={bill}
@@ -1075,6 +1120,8 @@ const styles = StyleSheet.create({
   },
   rowRecurring: { backgroundColor: COLORS.brand + '0d', borderColor: COLORS.brand + '26' },
   rowPaused:    { backgroundColor: COLORS.card, borderColor: COLORS.border, opacity: 0.5 },
+  recPayBtn:    { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 9, height: 30, borderRadius: 9, borderWidth: 1, borderColor: COLORS.success + '4d', backgroundColor: COLORS.success + '22' },
+  recPayText:   { fontSize: 12, fontWeight: '700', color: COLORS.success },
   rowDefault:   { backgroundColor: COLORS.card, borderColor: COLORS.border },
   rowUrgent:    { backgroundColor: COLORS.warning + '0d', borderColor: COLORS.warning + '26' },
   rowOverdue:   { backgroundColor: COLORS.danger + '0d', borderColor: COLORS.danger + '26' },

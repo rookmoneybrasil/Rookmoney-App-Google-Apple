@@ -272,6 +272,7 @@ export interface RecurringBill {
   dayOfMonth:     number
   isActive:       boolean
   lastAutoMonth:  string | null
+  startMonth:     string | null
   notes:          string | null
   categoryId:     string | null
   category?: { id: string; name: string; icon: string; color: string } | null
@@ -284,6 +285,7 @@ export interface RecurringBillInput {
   categoryId?: string | null
   notes?:      string | null
   generateNow?: boolean
+  firstDate?:  string
 }
 
 export const recurringBillsApi = {
