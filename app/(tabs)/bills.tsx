@@ -588,7 +588,9 @@ export default function BillsScreen() {
     return !(d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth())
   }).sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime())
 
-  const totalPending = pending.reduce((s, b) => s + Number(b.amount), 0)
+  // pendingVisible so the "Pendentes" total matches the rows listed there (the
+  // current-month recurring bill is on its card + in grandTotal, not here).
+  const totalPending = pendingVisible.reduce((s, b) => s + Number(b.amount), 0)
     + activeGroups.reduce((s, g) => s + Number(g.nextDue.amount), 0)
   const totalPaid = paid.reduce((s, b) => s + Number(b.amount), 0)
     + allGroups.reduce((s, g) => s + g.items
