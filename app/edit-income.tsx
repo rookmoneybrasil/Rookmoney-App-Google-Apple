@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, Alert, Switch, ActivityIndicator } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { CurrencyInput } from '@/components/currency-input'
 import { DateInput } from '@/components/date-input'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -138,13 +139,11 @@ export default function EditIncomeScreen() {
         />
 
         <Text style={styles.label}>Valor (R$) *</Text>
-        <TextInput
+        <CurrencyInput
           style={styles.input}
           placeholder="0,00"
-          placeholderTextColor={COLORS.muted}
-          keyboardType="decimal-pad"
           value={amount}
-          onChangeText={setAmount}
+          onChangeValue={setAmount}
         />
 
         <View style={styles.switchRow}>

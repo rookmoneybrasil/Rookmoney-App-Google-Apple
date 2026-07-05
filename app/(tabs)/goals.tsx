@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { CurrencyInput } from '@/components/currency-input'
 import { PressableScale } from '@/components/pressable-scale'
 import { AnimatedProgress } from '@/components/animated-progress'
 import { triggerConfetti } from '@/components/confetti'
@@ -114,13 +115,11 @@ function EditGoalSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <Text style={styles.label}>Valor alvo (R$) *</Text>
-          <TextInput
+          <CurrencyInput
             style={styles.input}
             placeholder="0,00"
-            placeholderTextColor={COLORS.muted}
-            keyboardType="decimal-pad"
             value={target}
-            onChangeText={setTarget}
+            onChangeValue={setTarget}
           />
         </View>
         <View style={{ flex: 1 }}>
@@ -363,13 +362,11 @@ function ContributeSheet({ goal, onClose }: { goal: Goal; onClose: () => void })
       </View>
 
       <Text style={styles.label}>Valor (R$)</Text>
-      <TextInput
+      <CurrencyInput
         style={styles.input}
         placeholder="0,00"
-        placeholderTextColor={COLORS.muted}
-        keyboardType="decimal-pad"
         value={amount}
-        onChangeText={setAmount}
+        onChangeValue={setAmount}
       />
 
       {mode === 'contribute' && (

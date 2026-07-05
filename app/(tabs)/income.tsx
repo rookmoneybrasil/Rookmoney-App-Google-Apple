@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { CurrencyInput } from '@/components/currency-input'
 import { PressableScale } from '@/components/pressable-scale'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { Feather } from '@expo/vector-icons'
@@ -215,13 +216,11 @@ function ReceiptModal({ visible, source, categories, onClose, onConfirm, loading
             </View>
 
             <Text style={styles.label}>Valor (R$)</Text>
-            <TextInput
+            <CurrencyInput
               style={styles.modalInput}
               value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
+              onChangeValue={setAmount}
               placeholder="0,00"
-              placeholderTextColor={COLORS.muted}
             />
 
             <Text style={styles.label}>Data do recebimento</Text>

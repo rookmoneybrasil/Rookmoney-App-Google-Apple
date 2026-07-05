@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Modal, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { CurrencyInput } from '@/components/currency-input'
 import { DateInput } from '@/components/date-input'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
@@ -180,13 +181,11 @@ export function EntryModal({ visible, personId, personName, onClose }: Props) {
                 <Text style={s.label}>
                   {mode === 'recorrente' ? 'Valor/mês (R$)' : mode === 'parcelado' ? 'Valor por parcela (R$)' : 'Valor (R$)'}
                 </Text>
-                <TextInput
+                <CurrencyInput
                   style={s.input}
                   value={amount}
-                  onChangeText={setAmount}
+                  onChangeValue={setAmount}
                   placeholder="0,00"
-                  placeholderTextColor={COLORS.muted}
-                  keyboardType="decimal-pad"
                 />
               </View>
               <View style={{ width: 12 }} />

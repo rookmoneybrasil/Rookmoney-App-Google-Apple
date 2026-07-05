@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Modal, TouchableOpacity, ScrollView, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { CurrencyInput } from '@/components/currency-input'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { COLORS } from '@/lib/constants'
 import { personRecurringApi, categoriesApi, type PersonEntryRecurring } from '@/lib/api'
@@ -86,13 +87,11 @@ export function EditRecurringModal({ visible, item, personId, onClose }: Props) 
             <View style={s.row}>
               <View style={{ flex: 1 }}>
                 <Text style={s.label}>Valor (R$)</Text>
-                <TextInput
+                <CurrencyInput
                   style={s.input}
                   value={amount}
-                  onChangeText={setAmount}
+                  onChangeValue={setAmount}
                   placeholder="0,00"
-                  placeholderTextColor={COLORS.muted}
-                  keyboardType="decimal-pad"
                 />
               </View>
               <View style={{ width: 12 }} />

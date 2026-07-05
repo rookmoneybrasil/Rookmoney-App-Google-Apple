@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { CurrencyInput } from '@/components/currency-input'
 import { PressableScale } from '@/components/pressable-scale'
 import { AnimatedProgress } from '@/components/animated-progress'
 import { useRouter } from 'expo-router'
@@ -46,13 +47,11 @@ function EditBudgetSheet({ budget, onClose }: { budget: Budget; onClose: () => v
       <Text style={styles.sheetSub}>Gasto atual: {fmt(budget.spent)}</Text>
 
       <Text style={styles.sheetLabel}>Novo valor (R$)</Text>
-      <TextInput
+      <CurrencyInput
         style={styles.sheetInput}
         value={amount}
-        onChangeText={setAmount}
+        onChangeValue={setAmount}
         placeholder="0,00"
-        placeholderTextColor={COLORS.muted}
-        keyboardType="decimal-pad"
         autoFocus
       />
 

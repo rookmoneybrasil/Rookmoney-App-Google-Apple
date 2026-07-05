@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { CurrencyInput } from '@/components/currency-input'
 import { DateInput } from '@/components/date-input'
 import { useRouter } from 'expo-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -88,24 +89,20 @@ export default function NewGoalScreen() {
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>Valor alvo (R$) *</Text>
-            <TextInput
+            <CurrencyInput
               style={styles.input}
               placeholder="0,00"
-              placeholderTextColor={COLORS.muted}
-              keyboardType="decimal-pad"
               value={target}
-              onChangeText={setTarget}
+              onChangeValue={setTarget}
             />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>Já tenho (R$)</Text>
-            <TextInput
+            <CurrencyInput
               style={styles.input}
               placeholder="0,00"
-              placeholderTextColor={COLORS.muted}
-              keyboardType="decimal-pad"
               value={current}
-              onChangeText={setCurrent}
+              onChangeValue={setCurrent}
             />
           </View>
         </View>

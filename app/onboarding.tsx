@@ -6,6 +6,7 @@ import {
 import { type ImageSourcePropType } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Text, TextInput } from '@/components/text'
+import { CurrencyInput } from '@/components/currency-input'
 import { DateInput } from '@/components/date-input'
 import { useRouter } from 'expo-router'
 import { useMutation } from '@tanstack/react-query'
@@ -304,13 +305,11 @@ export default function OnboardingScreen() {
             </View>
 
             <Text style={styles.label}>Valor (R$) *</Text>
-            <TextInput
+            <CurrencyInput
               style={styles.input}
               placeholder="0,00"
-              placeholderTextColor={COLORS.muted}
-              keyboardType="decimal-pad"
               value={incomeAmount}
-              onChangeText={setIncomeAmount}
+              onChangeValue={setIncomeAmount}
             />
 
             {incomeIsRecurring && (
@@ -348,13 +347,11 @@ export default function OnboardingScreen() {
             />
 
             <Text style={styles.label}>Valor total (R$) *</Text>
-            <TextInput
+            <CurrencyInput
               style={styles.input}
               placeholder="0,00"
-              placeholderTextColor={COLORS.muted}
-              keyboardType="decimal-pad"
               value={billAmount}
-              onChangeText={setBillAmount}
+              onChangeValue={setBillAmount}
             />
 
             <Text style={styles.label}>Vencimento *</Text>
@@ -434,13 +431,11 @@ export default function OnboardingScreen() {
             />
 
             <Text style={styles.label}>Valor alvo (R$) *</Text>
-            <TextInput
+            <CurrencyInput
               style={styles.input}
               placeholder="10.000,00"
-              placeholderTextColor={COLORS.muted}
-              keyboardType="decimal-pad"
               value={goalAmount}
-              onChangeText={setGoalAmount}
+              onChangeValue={setGoalAmount}
             />
           </>
         )}

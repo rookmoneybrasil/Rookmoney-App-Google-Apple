@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { View, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { CurrencyInput } from '@/components/currency-input'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
@@ -93,13 +94,11 @@ export default function NewTransactionModal() {
         {/* Amount */}
         <View style={styles.amountBox}>
           <Text style={styles.currency}>R$</Text>
-          <TextInput
+          <CurrencyInput
             style={styles.amountInput}
             value={amount}
-            onChangeText={setAmount}
+            onChangeValue={setAmount}
             placeholder="0,00"
-            placeholderTextColor={COLORS.muted}
-            keyboardType="decimal-pad"
             autoFocus
           />
         </View>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { CurrencyInput } from '@/components/currency-input'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
@@ -140,13 +141,11 @@ export default function EditRecurringScreen() {
         />
 
         <Text style={styles.label}>Valor (R$) *</Text>
-        <TextInput
+        <CurrencyInput
           style={styles.input}
           placeholder="0,00"
-          placeholderTextColor={COLORS.muted}
-          keyboardType="decimal-pad"
           value={amount}
-          onChangeText={setAmount}
+          onChangeValue={setAmount}
         />
 
         <Text style={styles.label}>Frequência</Text>

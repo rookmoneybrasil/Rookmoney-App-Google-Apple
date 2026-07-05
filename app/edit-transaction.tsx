@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { CurrencyInput } from '@/components/currency-input'
 import { DateInput } from '@/components/date-input'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -132,13 +133,11 @@ export default function EditTransactionScreen() {
         {/* Amount */}
         <View style={styles.amountBox}>
           <Text style={styles.currency}>R$</Text>
-          <TextInput
+          <CurrencyInput
             style={styles.amountInput}
             value={amount}
-            onChangeText={setAmount}
+            onChangeValue={setAmount}
             placeholder="0,00"
-            placeholderTextColor={COLORS.muted}
-            keyboardType="decimal-pad"
           />
         </View>
 

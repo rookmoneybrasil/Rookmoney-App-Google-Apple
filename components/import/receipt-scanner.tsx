@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { View, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native'
 import { Text, TextInput } from '@/components/text'
+import { CurrencyInput } from '@/components/currency-input'
 import { Feather } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { COLORS } from '@/lib/constants'
@@ -242,13 +243,11 @@ export function ReceiptScanner({ categories }: Props) {
                 <Text style={styles.label}>Valor</Text>
                 <View style={styles.amountBox}>
                   <Text style={styles.currency}>R$</Text>
-                  <TextInput
+                  <CurrencyInput
                     style={styles.amountInput}
                     value={editForm.amount}
-                    onChangeText={(v) => setEditForm((f) => f && { ...f, amount: v })}
+                    onChangeValue={(v) => setEditForm((f) => f && { ...f, amount: v })}
                     placeholder="0,00"
-                    placeholderTextColor={COLORS.muted}
-                    keyboardType="decimal-pad"
                   />
                 </View>
               </View>
