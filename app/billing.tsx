@@ -499,16 +499,22 @@ export default function BillingScreen() {
 
         {/* Restaurar compras — exigido pela App Store (3.1.1) e útil ao reinstalar/trocar aparelho */}
         {isNativeIAP && (
-          <TouchableOpacity
-            style={styles.restoreBtn}
-            onPress={() => nativeRestore()}
-            disabled={iapLoading}
-            activeOpacity={0.7}
-          >
-            {iapLoading
-              ? <ActivityIndicator size="small" color={COLORS.muted} />
-              : <Text style={styles.restoreBtnText}>Restaurar compras</Text>}
-          </TouchableOpacity>
+          <View style={styles.restoreWrap}>
+            <TouchableOpacity
+              style={styles.restoreBtn}
+              onPress={() => nativeRestore()}
+              disabled={iapLoading}
+              activeOpacity={0.7}
+            >
+              {iapLoading
+                ? <ActivityIndicator size="small" color={COLORS.muted} />
+                : <Text style={styles.restoreBtnText}>Restaurar compras</Text>}
+            </TouchableOpacity>
+            <Text style={styles.restoreHint}>
+              Já assinou o PRO ou PRO+ antes? Se trocou de celular ou reinstalou o app,
+              toque acima para reativar sua assinatura nesta conta.
+            </Text>
+          </View>
         )}
 
         <View style={{ height: 40 }} />
@@ -679,8 +685,10 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: COLORS.border,
     padding: 16,
   },
-  restoreBtn:     { alignSelf: 'center', marginTop: 16, paddingVertical: 10, paddingHorizontal: 20 },
+  restoreWrap:    { alignItems: 'center', marginTop: 16 },
+  restoreBtn:     { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 20 },
   restoreBtnText: { fontSize: 13, color: COLORS.muted, fontWeight: '600', textDecorationLine: 'underline' },
+  restoreHint:    { fontSize: 11, color: COLORS.muted2, textAlign: 'center', lineHeight: 16, maxWidth: 300, marginTop: 2 },
   faqTitle:    { fontSize: 13, fontWeight: '600', color: COLORS.text, marginBottom: 4 },
   faqDivider:  { height: 1, backgroundColor: COLORS.border },
   faqRow: {
