@@ -10,6 +10,7 @@ import { meApi, settingsApi, billingApi } from '@/lib/api'
 import { UsageBar } from '@/components/usage-bar'
 import { FadeIn } from '@/components/animated-entry'
 import { useNativeIAP, isGooglePlay, isAppleIAP, isNativeIAP } from '@/lib/iap'
+import { useWelcomePro } from '@/lib/welcome-pro'
 
 const PRO_FEATURES: { lib: 'feather' | 'mci'; icon: string; label: string }[] = [
   { lib: 'mci',     icon: 'infinity',       label: 'Tudo ilimitado' },
@@ -64,26 +65,8 @@ export default function BillingScreen() {
           const fresh = queryClient.getQueryData<any>(['me'])
           const newPlan = fresh?.plan
           if (prev === 'FREE' && (newPlan === 'PRO' || newPlan === 'PRO_PLUS')) {
-            const label = newPlan === 'PRO_PLUS' ? 'PRO+' : 'PRO'
-            const perks = newPlan === 'PRO_PLUS'
-              ? 'Rookinho IA ilimitado, analises ilimitadas, arquivos ilimitados, scanner ilimitado, Rookinho no WhatsApp e suporte prioritario.'
-              : 'Tudo ilimitado, Rookinho IA (30 msgs/mes), relatorios, projecao, orcamento e importacao CSV.'
-            if (newPlan === 'PRO_PLUS') {
-              Alert.alert(
-                `Bem-vindo ao ${label}!`,
-                `Voce desbloqueou:\n\n${perks}\n\nVincule seu WhatsApp em Configuracoes para conversar com o Rookinho direto no WhatsApp!`,
-                [
-                  { text: 'Vincular agora', onPress: () => router.push('/settings') },
-                  { text: 'Depois' },
-                ],
-              )
-            } else {
-              Alert.alert(
-                `Bem-vindo ao ${label}!`,
-                `Voce desbloqueou:\n\n${perks}`,
-                [{ text: 'Comecar a usar' }],
-              )
-            }
+            // Popup de boas-vindas com Rookinho + vantagens (montado no _layout)
+            useWelcomePro.getState().show(newPlan)
           }
         } catch {}
       }

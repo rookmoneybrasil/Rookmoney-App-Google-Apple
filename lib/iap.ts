@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { Platform, Alert } from 'react-native'
 import { useQueryClient } from '@tanstack/react-query'
 import { billingApi } from './api'
+import { useWelcomePro } from './welcome-pro'
 
 export const APPLE_SKUS = {
   PRO_MONTHLY:      'rook_pro_monthly',
@@ -209,20 +210,8 @@ async function executeNativePurchase(
           await queryClient.refetchQueries({ queryKey: ['me'] })
           await queryClient.refetchQueries({ queryKey: ['settings-prefs'] })
 
-          const label = plan === 'PRO_PLUS' ? 'PRO+' : 'PRO'
-          if (plan === 'PRO_PLUS') {
-            Alert.alert(
-              `Bem-vindo ao ${label}!`,
-              'Rookinho IA ilimitado, análises ilimitadas, arquivos ilimitados, scanner ilimitado, Rookinho no WhatsApp e suporte prioritário.',
-              [{ text: 'Começar a usar' }],
-            )
-          } else {
-            Alert.alert(
-              `Bem-vindo ao ${label}!`,
-              'Tudo ilimitado, Rookinho IA (30 msgs/mês), relatórios, projeção, orçamento e importação CSV.',
-              [{ text: 'Começar a usar' }],
-            )
-          }
+          // Popup de boas-vindas com Rookinho + vantagens (montado no _layout)
+          useWelcomePro.getState().show(plan)
           resolve(true)
         } catch (err: any) {
           console.error('[IAP] verify error:', err)

@@ -21,6 +21,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { COLORS } from '@/lib/constants'
 import { AnimatedSplash } from '@/components/animated-splash'
 import { UpsellModal } from '@/components/upsell-modal'
+import { WelcomeProModal } from '@/components/welcome-pro-modal'
 import { loadHapticsPreference } from '@/lib/haptics'
 import { Platform, AppState, type AppStateStatus } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
@@ -254,6 +255,7 @@ export default function RootLayout() {
         <AchievementToastProvider />
         <ConfettiProvider />
         <UpsellModal />
+        <WelcomeProModal />
         {showSplash && <AnimatedSplash onFinish={() => setShowSplash(false)} />}
       </ThemeProvider>
     </QueryClientProvider>

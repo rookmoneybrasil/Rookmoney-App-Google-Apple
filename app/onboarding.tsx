@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   View, StyleSheet, TouchableOpacity, ScrollView,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ImageBackground, Switch,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ImageBackground,
 } from 'react-native'
 import { type ImageSourcePropType } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -12,8 +12,10 @@ import { useRouter } from 'expo-router'
 import { useMutation } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
-import { settingsApi, incomeSourcesApi, billsApi, goalsApi } from '@/lib/api'
+import { settingsApi, incomeSourcesApi, goalsApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/auth'
+import { useBillForm } from '@/components/bills/use-bill-form'
+import { BillFormFields } from '@/components/bills/bill-form-fields'
 
 const BG_IMAGES: Record<number, ImageSourcePropType> = {
   0: require('../assets/onboarding/bg-usando-app.png'),
@@ -50,14 +52,8 @@ export default function OnboardingScreen() {
   const [incomeDay,        setIncomeDay]        = useState('')
   const [incomeStartDate,  setIncomeStartDate]  = useState('')
 
-  // Step 2 — Bill
-  const [billName,             setBillName]         = useState('')
-  const [billAmount,           setBillAmount]       = useState('')
-  const [billDueDate,          setBillDueDate]      = useState(todayStr())
-  const [billIsRecurring,      setBillRecurring]    = useState(false)
-  const [showBillInstallments, setShowBillInst]     = useState(false)
-  const [billInstallments,     setBillInstallments] = useState('')
-  const [billAlreadyPaid,      setBillAlreadyPaid]  = useState('0')
+  // Step 2 — Bill (shared with the regular "Nova conta a pagar" form)
+  const billForm = useBillForm({ defaultDueDate: todayStr(), onSuccess: () => setStep(3) })
 
   // Step 3 — Goal
   const [goalName,   setGoalName]   = useState('')
@@ -95,27 +91,6 @@ export default function OnboardingScreen() {
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
-  const billMutation = useMutation({
-    mutationFn: () => {
-      const amt  = parseFloat(billAmount.replace(',', '.'))
-      if (!billName.trim())       throw new Error('Nome é obrigatório')
-      if (isNaN(amt) || amt <= 0) throw new Error('Valor inválido')
-      if (!billDueDate.match(/^\d{4}-\d{2}-\d{2}$/)) throw new Error('Data inválida (AAAA-MM-DD)')
-      const inst = parseInt(billInstallments) || 1
-      const paid = parseInt(billAlreadyPaid)  || 0
-      return billsApi.create({
-        name:         billName.trim(),
-        amount:       amt,
-        dueDate:      billDueDate,
-        isRecurring:  showBillInstallments ? false : billIsRecurring,
-        installments: showBillInstallments && inst > 1 ? inst : undefined,
-        alreadyPaid:  showBillInstallments && inst > 1 ? paid : undefined,
-      })
-    },
-    onSuccess: () => setStep(3),
-    onError: (e: Error) => Alert.alert('Erro', e.message),
-  })
-
   const goalMutation = useMutation({
     mutationFn: () => {
       const amt = parseFloat(goalAmount.replace(',', '.'))
@@ -126,13 +101,6 @@ export default function OnboardingScreen() {
     onSuccess: () => setStep(4),
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
-
-  const numInst  = parseInt(billInstallments) || 1
-  const numPaid  = parseInt(billAlreadyPaid)  || 0
-  const remaining = numInst - numPaid
-  const perInst  = numInst > 1 && remaining > 0 && billAmount
-    ? (parseFloat(billAmount.replace(',', '.')) / remaining).toFixed(2)
-    : null
 
   // ── Welcome ──────────────────────────────────────────────────────────────
   if (step === 0) {
@@ -230,7 +198,7 @@ export default function OnboardingScreen() {
     3: { color: COLORS.brand,   emoji: '🎯', tag: 'PASSO 3', title: 'Crie sua primeira meta',        desc: 'Um objetivo financeiro para focar sua energia.' },
   }[step as 1|2|3]!
 
-  const activeMutation = step === 1 ? incomeMutation : step === 2 ? billMutation : goalMutation
+  const activeMutation = step === 1 ? incomeMutation : step === 2 ? billForm.mutation : goalMutation
 
   return (
     <ImageBackground source={BG_IMAGES[step]} style={styles.screen} resizeMode="cover">
@@ -334,76 +302,8 @@ export default function OnboardingScreen() {
           </>
         )}
 
-        {/* ── Step 2: Bill ── */}
-        {step === 2 && (
-          <>
-            <Text style={styles.label}>Nome *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: Netflix, Aluguel, Água..."
-              placeholderTextColor={COLORS.muted}
-              value={billName}
-              onChangeText={setBillName}
-            />
-
-            <Text style={styles.label}>Valor total (R$) *</Text>
-            <CurrencyInput
-              style={styles.input}
-              placeholder="0,00"
-              value={billAmount}
-              onChangeValue={setBillAmount}
-            />
-
-            <Text style={styles.label}>Vencimento *</Text>
-            <DateInput value={billDueDate} onChange={setBillDueDate} placeholder="Selecionar vencimento" />
-
-            {/* Parcelado */}
-            <TouchableOpacity style={styles.toggleRow} onPress={() => setShowBillInst(v => !v)} activeOpacity={0.8}>
-              <View>
-                <Text style={styles.switchLabel}>Parcelado</Text>
-                <Text style={styles.switchSub}>Dividir em várias parcelas</Text>
-              </View>
-              <Switch value={showBillInstallments} onValueChange={setShowBillInst}
-                trackColor={{ false: COLORS.muted2, true: COLORS.brand }} thumbColor="#fff" />
-            </TouchableOpacity>
-
-            {showBillInstallments && (
-              <View style={styles.installBox}>
-                <View style={styles.installRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Total de parcelas</Text>
-                    <TextInput style={styles.input} placeholder="Ex: 6" placeholderTextColor={COLORS.muted}
-                      keyboardType="number-pad" value={billInstallments} onChangeText={setBillInstallments} />
-                  </View>
-                  <View style={{ width: 12 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Já pagas</Text>
-                    <TextInput style={styles.input} placeholder="0" placeholderTextColor={COLORS.muted}
-                      keyboardType="number-pad" value={billAlreadyPaid} onChangeText={setBillAlreadyPaid} />
-                  </View>
-                </View>
-                {perInst && numInst > 1 && (
-                  <View style={styles.installHint}>
-                    <Feather name="info" size={13} color={COLORS.brand} />
-                    <Text style={styles.installHintText}>{numInst - numPaid} parcelas de R$ {perInst} serão criadas</Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* Recorrente (só se não parcelado) */}
-            {!showBillInstallments && (
-              <TouchableOpacity style={styles.toggleRow} onPress={() => setBillRecurring(v => !v)} activeOpacity={0.8}>
-                <View>
-                  <Text style={styles.switchLabel}>Conta recorrente</Text>
-                  <Text style={styles.switchSub}>Se repete todo mês</Text>
-                </View>
-                <Switch value={billIsRecurring} onValueChange={setBillRecurring}
-                  trackColor={{ false: COLORS.muted2, true: COLORS.brand }} thumbColor="#fff" />
-              </TouchableOpacity>
-            )}
-          </>
-        )}
+        {/* ── Step 2: Bill (mesmo form do "Nova conta a pagar") ── */}
+        {step === 2 && <BillFormFields form={billForm} />}
 
         {/* ── Step 3: Goal ── */}
         {step === 3 && (
@@ -460,7 +360,9 @@ export default function OnboardingScreen() {
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <Text style={styles.primaryBtnText}>{step === 3 ? 'Criar meta' : 'Adicionar'}</Text>
+                <Text style={styles.primaryBtnText}>
+                  {step === 3 ? 'Criar meta' : step === 2 ? billForm.submitLabel : 'Adicionar'}
+                </Text>
                 <Feather name="arrow-right" size={16} color="#fff" />
               </>
             )}
@@ -586,15 +488,6 @@ const styles = StyleSheet.create({
 
   row2: { flexDirection: 'row', gap: 12 },
   col:  { flex: 1 },
-
-  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.card, borderRadius: 12, padding: 14, marginTop: 12, borderWidth: 1, borderColor: COLORS.border },
-  switchLabel: { fontSize: 14, fontWeight: '500', color: COLORS.text },
-  switchSub:   { fontSize: 12, color: COLORS.muted, marginTop: 2 },
-
-  installBox:     { backgroundColor: COLORS.card, borderRadius: 12, padding: 14, marginTop: 8, borderWidth: 1, borderColor: COLORS.brand + '33' },
-  installRow:     { flexDirection: 'row', alignItems: 'flex-end' },
-  installHint:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
-  installHintText:{ fontSize: 12, color: COLORS.brand, flex: 1 },
 
   skipBtn: {
     flex: 1, height: 50, borderRadius: 12,
