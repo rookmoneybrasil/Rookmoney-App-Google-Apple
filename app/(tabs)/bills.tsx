@@ -458,6 +458,20 @@ export default function BillsScreen() {
       qc.refetchQueries({ queryKey: ['dashboard'], type: 'active' }),
     ])
   }
+  // Re-entry guard: React Query's onMutate runs synchronously, but a fast
+  // double-tap still fires .mutate() twice before either resolves — the API
+  // now defends itself (atomic claim), but guarding here avoids the wasted
+  // duplicate request in the first place. Paridade com o busyIds do web.
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set())
+  const setBusy = (id: string, busy: boolean) => {
+    setBusyIds((prev) => {
+      const next = new Set(prev)
+      busy ? next.add(id) : next.delete(id)
+      return next
+    })
+  }
+  const guarded = (id: string, fn: () => void) => { if (!busyIds.has(id)) fn() }
+
   // Optimistic helpers: snapshot the cached list, apply the change instantly,
   // roll back on error, and reconcile with the server onSettled. Paridade com
   // a UI otimista do dashboard web (01/07).
@@ -478,44 +492,45 @@ export default function BillsScreen() {
 
   const payMutation = useMutation({
     mutationFn: (id: string) => billsApi.pay(id),
-    onMutate: (id: string) => { hapticSuccess(); return patchBills((l) => l.map((b) => b.id === id ? { ...b, isPaid: true } : b)) },
+    onMutate: (id: string) => { hapticSuccess(); setBusy(id, true); return patchBills((l) => l.map((b) => b.id === id ? { ...b, isPaid: true } : b)) },
     onError: (e: Error, _id, ctx) => { rollbackBills(ctx); Alert.alert('Erro', e.message) },
-    onSettled: () => refetchAll(),
+    onSettled: (_d, _e, id) => { setBusy(id, false); refetchAll() },
   })
   const unpayMutation = useMutation({
     mutationFn: (id: string) => billsApi.unpay(id),
-    onMutate: (id: string) => { hapticLight(); return patchBills((l) => l.map((b) => b.id === id ? { ...b, isPaid: false } : b)) },
+    onMutate: (id: string) => { hapticLight(); setBusy(id, true); return patchBills((l) => l.map((b) => b.id === id ? { ...b, isPaid: false } : b)) },
     onError: (e: Error, _id, ctx) => { rollbackBills(ctx); Alert.alert('Erro', e.message) },
-    onSettled: () => refetchAll(),
+    onSettled: (_d, _e, id) => { setBusy(id, false); refetchAll() },
   })
   const deleteMutation = useMutation({
     mutationFn: (id: string) => billsApi.delete(id),
-    onMutate: (id: string) => { hapticLight(); return patchBills((l) => l.filter((b) => b.id !== id)) },
+    onMutate: (id: string) => { hapticLight(); setBusy(id, true); return patchBills((l) => l.filter((b) => b.id !== id)) },
     onError: (e: Error, _id, ctx) => { rollbackBills(ctx); Alert.alert('Erro', e.message) },
-    onSettled: () => refetchAll(),
+    onSettled: (_d, _e, id) => { setBusy(id, false); refetchAll() },
   })
   const toggleRecurringMutation = useMutation({
     mutationFn: (item: RecurringBill) => recurringBillsApi.update(item.id, { isActive: !item.isActive }),
-    onMutate: (item: RecurringBill) => { hapticLight(); return patchRecurring((l) => l.map((r) => r.id === item.id ? { ...r, isActive: !r.isActive } : r)) },
+    onMutate: (item: RecurringBill) => { hapticLight(); setBusy(item.id, true); return patchRecurring((l) => l.map((r) => r.id === item.id ? { ...r, isActive: !r.isActive } : r)) },
     onError: (e: Error, _item, ctx) => { rollbackRecurring(ctx); Alert.alert('Erro', e.message) },
-    onSettled: () => refetchAll(),
+    onSettled: (_d, _e, item) => { setBusy(item.id, false); refetchAll() },
   })
   const deleteRecurringMutation = useMutation({
     mutationFn: (id: string) => recurringBillsApi.delete(id),
-    onMutate: (id: string) => { hapticLight(); return patchRecurring((l) => l.filter((r) => r.id !== id)) },
+    onMutate: (id: string) => { hapticLight(); setBusy(id, true); return patchRecurring((l) => l.filter((r) => r.id !== id)) },
     onError: (e: Error, _id, ctx) => { rollbackRecurring(ctx); Alert.alert('Erro', e.message) },
-    onSettled: () => refetchAll(),
+    onSettled: (_d, _e, id) => { setBusy(id, false); refetchAll() },
   })
   const deleteGroupMutation = useMutation({
     mutationFn: (group: InstallmentGroup) =>
       Promise.all(group.items.map((inst) => billsApi.delete(inst.id))),
     onMutate: (group: InstallmentGroup) => {
       hapticSuccess()
+      setBusy(group.groupId, true)
       const ids = new Set(group.items.map((i) => i.id))
       return patchBills((l) => l.filter((b) => !ids.has(b.id)))
     },
     onError: (e: Error, _group, ctx) => { rollbackBills(ctx); Alert.alert('Erro', e.message) },
-    onSettled: () => refetchAll(),
+    onSettled: (_d, _e, group) => { setBusy(group.groupId, false); refetchAll() },
   })
 
   const now   = new Date()
@@ -826,10 +841,10 @@ export default function BillsScreen() {
                           key={r.id}
                           item={r}
                           monthRow={mb ? { id: mb.id, paid: mb.isPaid } : undefined}
-                          onPay={() => mb && (mb.isPaid ? unpayMutation.mutate(mb.id) : payMutation.mutate(mb.id))}
-                          onToggle={() => toggleRecurringMutation.mutate(r)}
+                          onPay={() => mb && guarded(mb.id, () => mb.isPaid ? unpayMutation.mutate(mb.id) : payMutation.mutate(mb.id))}
+                          onToggle={() => guarded(r.id, () => toggleRecurringMutation.mutate(r))}
                           onEdit={() => router.push(`/edit-recurring-bill?id=${r.id}`)}
-                          onDelete={() => deleteRecurringMutation.mutate(r.id)}
+                          onDelete={() => guarded(r.id, () => deleteRecurringMutation.mutate(r.id))}
                         />
                       )
                     })}
@@ -860,11 +875,11 @@ export default function BillsScreen() {
                     <PendingRow
                       key={bill.id}
                       item={bill}
-                      onPay={() => payMutation.mutate(bill.id)}
+                      onPay={() => guarded(bill.id, () => payMutation.mutate(bill.id))}
                       onEdit={() => router.push(`/edit-bill?id=${bill.id}`)}
                       onDelete={() => Alert.alert('Excluir conta', `Excluir "${bill.name}"?`, [
                         { text: 'Cancelar', style: 'cancel' },
-                        { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate(bill.id) },
+                        { text: 'Excluir', style: 'destructive', onPress: () => guarded(bill.id, () => deleteMutation.mutate(bill.id)) },
                       ])}
                     />
                   ))
@@ -885,8 +900,8 @@ export default function BillsScreen() {
                       <InstallmentGroupCard
                         key={group.groupId}
                         group={group}
-                        onPay={(id) => payMutation.mutate(id)}
-                        onDeleteGroup={() => deleteGroupMutation.mutate(group)}
+                        onPay={(id) => guarded(id, () => payMutation.mutate(id))}
+                        onDeleteGroup={() => guarded(group.groupId, () => deleteGroupMutation.mutate(group))}
                         onEdit={() => router.push({
                           pathname: '/edit-installment-group',
                           params: {
@@ -919,11 +934,11 @@ export default function BillsScreen() {
                       <PaidRow
                         key={bill.id}
                         item={bill}
-                        onUnpay={() => unpayMutation.mutate(bill.id)}
+                        onUnpay={() => guarded(bill.id, () => unpayMutation.mutate(bill.id))}
                         onEdit={() => router.push(`/edit-bill?id=${bill.id}`)}
                         onDelete={() => Alert.alert('Excluir conta', `Excluir "${bill.name}"?`, [
                           { text: 'Cancelar', style: 'cancel' },
-                          { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate(bill.id) },
+                          { text: 'Excluir', style: 'destructive', onPress: () => guarded(bill.id, () => deleteMutation.mutate(bill.id)) },
                         ])}
                       />
                     ))}
@@ -945,10 +960,10 @@ export default function BillsScreen() {
                       <PaidRow
                         key={bill.id}
                         item={bill}
-                        onUnpay={() => unpayMutation.mutate(bill.id)}
+                        onUnpay={() => guarded(bill.id, () => unpayMutation.mutate(bill.id))}
                         onDelete={() => Alert.alert('Excluir conta', `Excluir "${bill.name}"?`, [
                           { text: 'Cancelar', style: 'cancel' },
-                          { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate(bill.id) },
+                          { text: 'Excluir', style: 'destructive', onPress: () => guarded(bill.id, () => deleteMutation.mutate(bill.id)) },
                         ])}
                       />
                     ))}
