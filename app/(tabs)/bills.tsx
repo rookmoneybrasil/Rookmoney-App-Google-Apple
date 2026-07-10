@@ -537,9 +537,14 @@ export default function BillsScreen() {
     .filter(([, items]) => items.length > 0)
     .map(([groupId, items]) => {
       const sorted     = [...items].sort((a, b) => (a.installmentCurrent ?? 0) - (b.installmentCurrent ?? 0))
-      const paidCount  = items.filter((b) => b.isPaid).length
-      const first      = items[0]
+      const first      = sorted[0]
       const total      = first.installmentTotal ?? items.length
+      // Parcelas marcadas "já paga" na criação nunca viram Bill (só as restantes
+      // são criadas) — sem somar isso aqui, o grupo nunca chega a paidCount===total
+      // e fica preso em "Parceladas" pra sempre, mesmo pagando todo o resto.
+      const alreadyPaid = Math.max(0, (first.installmentCurrent ?? 1) - 1)
+      const paidInApp  = items.filter((b) => b.isPaid).length
+      const paidCount  = alreadyPaid + paidInApp
       const nextDue    = sorted.find((b) => !b.isPaid) ?? sorted[sorted.length - 1]
       const amount     = Number(first.amount)
       const grandTotal = items.reduce((s, b) => s + Number(b.amount), 0)
