@@ -547,7 +547,9 @@ export default function BillsScreen() {
       const paidCount  = alreadyPaid + paidInApp
       const nextDue    = sorted.find((b) => !b.isPaid) ?? sorted[sorted.length - 1]
       const amount     = Number(first.amount)
-      const grandTotal = items.reduce((s, b) => s + Number(b.amount), 0)
+      // total × valor/parcela (não soma só das linhas criadas) — inclui o valor das
+      // parcelas "já paga" na criação, que nunca viram Bill. Alinhado com o web.
+      const grandTotal = total * amount
       return { items: sorted, paidCount, total, nextDue, name: first.name, amount, groupId, grandTotal }
     })
   const activeGroups = allGroups
