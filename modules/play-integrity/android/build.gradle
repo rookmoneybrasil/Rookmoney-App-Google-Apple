@@ -1,0 +1,17 @@
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+apply plugin: 'expo-module-gradle-plugin'
+
+group = 'expo.modules.playintegrity'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.playintegrity"
+  // compileSdk / minSdk are inherited from the app via expo-module-gradle-plugin.
+}
+
+dependencies {
+  // Google Play Integrity API (classic request). Resolved from Google's Maven repo,
+  // already available to Expo/RN gradle builds.
+  implementation 'com.google.android.play:integrity:1.4.0'
+}

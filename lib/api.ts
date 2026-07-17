@@ -895,10 +895,41 @@ export const billingApi = {
     }),
   portal: () =>
     request<{ data: { url: string } }>('/api/v1/billing/portal', { method: 'POST' }),
-  verifyGooglePlay: (productId: string, purchaseToken: string) =>
+  integrityNonce: () =>
+    request<{ data: { nonce: string } }>('/api/v1/billing/integrity-nonce').then(r => r.data.nonce),
+  // Pre-purchase gate. Returns { blocked } — NEVER throws. Only an explicit 403
+  // INTEGRITY_FAILED blocks the purchase; every other outcome (network down, 500,
+  // 401, missing config) fail-opens so a flaky connection or transient server
+  // error can't stop a legitimate upgrade. The post-purchase verify is the backstop.
+  checkIntegrity: async (
+    integrityToken: string | null,
+  ): Promise<{ blocked: boolean; message?: string }> => {
+    await waitUntilReady()
+    const token = useAuthStore.getState().token
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/billing/integrity-check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ integrityToken: integrityToken ?? undefined }),
+      })
+      if (res.status === 403) {
+        const data = await res.json().catch(() => null)
+        if ((data as { code?: string } | null)?.code === 'INTEGRITY_FAILED') {
+          return { blocked: true, message: (data as { error?: string }).error }
+        }
+      }
+      return { blocked: false }
+    } catch {
+      return { blocked: false }
+    }
+  },
+  verifyGooglePlay: (productId: string, purchaseToken: string, integrityToken?: string | null) =>
     request<{ data: { plan: string; expiresAt: string | null } }>('/api/v1/billing/google-play', {
       method: 'POST',
-      body:   JSON.stringify({ productId, purchaseToken }),
+      body:   JSON.stringify({ productId, purchaseToken, integrityToken: integrityToken ?? undefined }),
     }),
   verifyApple: (jwsTransaction: string) =>
     request<{ data: { plan: string; expiresAt: string | null } }>('/api/v1/billing/apple', {

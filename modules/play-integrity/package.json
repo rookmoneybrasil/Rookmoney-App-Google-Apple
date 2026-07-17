@@ -1,0 +1,7 @@
+{
+  "name": "play-integrity",
+  "version": "0.1.0",
+  "description": "Local Expo module wrapping the Google Play Integrity API (Android)",
+  "main": "index.ts",
+  "private": true
+}

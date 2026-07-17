@@ -3,6 +3,7 @@ import { Platform, Alert } from 'react-native'
 import { useQueryClient } from '@tanstack/react-query'
 import { billingApi } from './api'
 import { useWelcomePro } from './welcome-pro'
+import { requestIntegrityToken } from '../modules/play-integrity'
 
 export const APPLE_SKUS = {
   PRO_MONTHLY:      'rook_pro_monthly',
@@ -28,6 +29,38 @@ function getIAP() {
   } catch {
     return null
   }
+}
+
+// Resolves `fallback` if `p` doesn't settle within `ms` — the underlying promise
+// keeps running but its late result is ignored. Used so a hung Play Integrity /
+// nonce call can never freeze the purchase button indefinitely.
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ])
+}
+
+// Play Integrity attestation (Android). Fetches a server-issued nonce, then asks
+// the native module for an integrity token. Returns null on any failure OR if it
+// takes too long — the server tolerates a missing token (fail-open on infra) but
+// still blocks a device that returns a token with a failing verdict. iOS → null.
+async function fetchIntegrityToken(): Promise<string | null> {
+  if (!isGooglePlay) return null
+  return withTimeout(
+    (async () => {
+      try {
+        const nonce = await billingApi.integrityNonce()
+        if (!nonce) return null
+        return await requestIntegrityToken(nonce)
+      } catch (err) {
+        console.warn('[IAP] integrity token failed:', err)
+        return null
+      }
+    })(),
+    10_000,
+    null,
+  )
 }
 
 export function useNativeIAP() {
@@ -104,6 +137,20 @@ export function useNativeIAP() {
       }
 
       setLoading(true)
+
+      // Pre-purchase Play Integrity gate — block a compromised device BEFORE the
+      // Google Play sheet opens, so it's never charged (avoids the charge→refund
+      // churn of blocking post-purchase). Only an explicit integrity denial stops
+      // the flow; checkIntegrity fail-opens on any network/server error (it never
+      // throws), so a flaky connection can't block a legitimate upgrade. The
+      // post-purchase verify re-checks with its own fresh token as a second layer.
+      const gate = await billingApi.checkIntegrity(await fetchIntegrityToken())
+      if (gate.blocked) {
+        setLoading(false)
+        Alert.alert('Não foi possível concluir', gate.message ?? 'Seu dispositivo não passou na verificação de segurança.')
+        return false
+      }
+
       return executeNativePurchase(iap, sku, plan, {
         type: 'subs',
         request: { google: { skus: [sku], subscriptionOffers: [{ sku, offerToken }] } },
@@ -136,13 +183,15 @@ export function useNativeIAP() {
     try {
       const purchases: any[] = await iap.getAvailablePurchases()
       const active = Array.isArray(purchases) ? purchases : []
+      // One integrity attestation for the whole restore batch (Android).
+      const integrityToken = await fetchIntegrityToken()
       let restored = false
       for (const p of active) {
         const token = (p.purchaseToken ?? p.jwsRepresentationIOS ?? p.jwsRepresentation) as string | undefined
         if (!token) continue
         try {
           if (isAppleIAP) await billingApi.verifyApple(token)
-          else if (isGooglePlay) await billingApi.verifyGooglePlay(p.productId, token)
+          else if (isGooglePlay) await billingApi.verifyGooglePlay(p.productId, token, integrityToken)
           restored = true
         } catch (err) {
           console.warn('[IAP] restore verify failed:', err)
@@ -203,7 +252,8 @@ async function executeNativePurchase(
           if (isAppleIAP) {
             await billingApi.verifyApple(token)
           } else if (isGooglePlay) {
-            await billingApi.verifyGooglePlay(sku, token)
+            const integrityToken = await fetchIntegrityToken()
+            await billingApi.verifyGooglePlay(sku, token, integrityToken)
           }
 
           await iap.finishTransaction({ purchase: purchaseData, isConsumable: false })
@@ -215,7 +265,13 @@ async function executeNativePurchase(
           resolve(true)
         } catch (err: any) {
           console.error('[IAP] verify error:', err)
-          Alert.alert('Erro', 'Compra realizada mas falha na verificação. Tente restaurar compras.')
+          // Surface the server's message when there is one (e.g. the Play Integrity
+          // block explains the device was rejected) instead of a misleading generic
+          // "try to restore" — a blocked device would just fail the restore too.
+          Alert.alert(
+            'Não foi possível concluir',
+            err?.message ?? 'Compra realizada mas houve falha na verificação. Tente restaurar compras.',
+          )
           resolve(false)
         } finally {
           setLoading(false)
