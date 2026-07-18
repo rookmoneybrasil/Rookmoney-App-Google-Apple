@@ -23,10 +23,13 @@ export default function EditTransactionScreen() {
   const [error,       setError]       = useState('')
 
   useEffect(() => {
-    // Search all cached transaction lists for this id
-    const allQueries = qc.getQueriesData<Transaction[]>({ queryKey: ['transactions'] })
-    for (const [, list] of allQueries) {
-      const found = list?.find((t) => t.id === id)
+    // Search all cached transaction pages for this id. The ['transactions', …]
+    // queries cache the paginated envelope ({ items, total, page, totalPages }),
+    // NOT a bare array — so read `.items`. Calling `.find` on the envelope object
+    // throws "find is not a function" and crashes the screen on open.
+    const allQueries = qc.getQueriesData<{ items: Transaction[] }>({ queryKey: ['transactions'] })
+    for (const [, pageData] of allQueries) {
+      const found = pageData?.items?.find((t) => t.id === id)
       if (found) {
         setTx(found)
         setType(found.type)
