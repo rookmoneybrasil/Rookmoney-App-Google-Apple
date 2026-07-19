@@ -9,9 +9,27 @@ import { ptBR } from 'date-fns/locale'
 import { COLORS } from '@/lib/constants'
 import { transactionsApi, categoriesApi, type Transaction } from '@/lib/api'
 import { EmptyState } from '@/components/empty-state'
+import { InfoSheet } from '@/components/info-sheet'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
+
+function transactionInfoProps(t: Transaction) {
+  const isIncome = t.type === 'INCOME'
+  return {
+    typeLabel:   'Transação',
+    title:       t.description ?? t.category.name,
+    amount:      `${isIncome ? '+' : '-'}${fmt(Number(t.amount))}`,
+    amountColor: isIncome ? COLORS.success : COLORS.danger,
+    badge:       { label: isIncome ? 'Receita' : 'Despesa', color: isIncome ? COLORS.success : COLORS.danger },
+    rows: [
+      { label: 'Tipo',        value: isIncome ? 'Receita' : 'Despesa' },
+      { label: 'Data',        value: format(new Date(t.date), 'dd/MM/yyyy', { locale: ptBR }) },
+      { label: 'Categoria',   value: `${t.category.icon} ${t.category.name}` },
+      { label: 'Descrição',   value: t.description ?? '' },
+    ],
+  }
+}
 
 const TYPE_FILTERS = [
   { label: 'Todos',    value: undefined  },
@@ -21,6 +39,7 @@ const TYPE_FILTERS = [
 
 function TxItem({ item, onEdit, onDelete }: { item: Transaction; onEdit: () => void; onDelete: () => void }) {
   const isIncome = item.type === 'INCOME'
+  const [infoOpen, setInfoOpen] = useState(false)
 
   const showOptions = () =>
     Alert.alert('Opções', item.description ?? item.category.name, [
@@ -32,9 +51,11 @@ function TxItem({ item, onEdit, onDelete }: { item: Transaction; onEdit: () => v
   return (
     <TouchableOpacity
       style={styles.item}
+      onPress={() => setInfoOpen(true)}
       onLongPress={showOptions}
       activeOpacity={0.8}
     >
+      <InfoSheet visible={infoOpen} onClose={() => setInfoOpen(false)} {...transactionInfoProps(item)} />
       <View style={[styles.icon, { backgroundColor: isIncome ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.12)' }]}>
         <Text style={styles.emoji}>{item.category.icon}</Text>
       </View>

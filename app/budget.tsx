@@ -15,6 +15,26 @@ import { budgetsApi, meApi, type Budget } from '@/lib/api'
 import { ProGate } from '@/components/pro-gate'
 import { FadeIn } from '@/components/animated-entry'
 import { EmptyState } from '@/components/empty-state'
+import { InfoSheet } from '@/components/info-sheet'
+
+function budgetInfoProps(b: Budget) {
+  const limit     = Number(b.amount)
+  const pct       = limit > 0 ? Math.round((b.spent / limit) * 100) : 0
+  const isOver    = b.spent > limit
+  return {
+    typeLabel:   'Orçamento',
+    title:       `${b.category.icon} ${b.category.name}`,
+    amount:      fmt(b.spent),
+    amountColor: isOver ? COLORS.danger : COLORS.text,
+    badge:       isOver ? { label: 'Acima do limite', color: COLORS.danger } : pct >= 80 ? { label: `Atenção ${pct}%`, color: COLORS.warning } : { label: `${pct}%`, color: COLORS.brand },
+    rows: [
+      { label: 'Limite',                value: fmt(limit) },
+      { label: 'Gasto',                 value: fmt(b.spent) },
+      { label: isOver ? 'Excedeu' : 'Resta', value: fmt(Math.abs(limit - b.spent)) },
+      { label: 'Uso',                   value: `${pct}%` },
+    ],
+  }
+}
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
@@ -76,6 +96,7 @@ function BudgetItem({ budget, onEdit, onDelete }: { budget: Budget; onEdit: () =
   const isOver    = budget.spent > Number(budget.amount)
   const isWarning = !isOver && pct >= 80
   const barColor  = isOver ? COLORS.danger : isWarning ? COLORS.warning : COLORS.brand
+  const [infoOpen, setInfoOpen] = useState(false)
 
   const showOptions = () =>
     Alert.alert('Opções', budget.category.name, [
@@ -87,8 +108,10 @@ function BudgetItem({ budget, onEdit, onDelete }: { budget: Budget; onEdit: () =
   return (
     <PressableScale
       style={styles.item}
+      onPress={() => setInfoOpen(true)}
       onLongPress={showOptions}
     >
+      <InfoSheet visible={infoOpen} onClose={() => setInfoOpen(false)} {...budgetInfoProps(budget)} />
       <View style={[styles.catIcon, { backgroundColor: budget.category.color + '22' }]}>
         <Text style={styles.catEmoji}>{budget.category.icon}</Text>
       </View>
