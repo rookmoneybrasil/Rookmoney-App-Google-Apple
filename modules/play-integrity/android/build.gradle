@@ -8,6 +8,13 @@ version = '0.1.0'
 android {
   namespace "expo.modules.playintegrity"
   // compileSdk / minSdk are inherited from the app via expo-module-gradle-plugin.
+  // versionCode/versionName are required by expo-module-gradle-plugin when it
+  // configures the library project — without them the Android build fails at
+  // configure time with "'android.defaultConfig.versionName' is not defined".
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
 }
 
 dependencies {

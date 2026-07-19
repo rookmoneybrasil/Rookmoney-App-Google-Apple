@@ -1,7 +1,7 @@
 package expo.modules.playintegrity
 
-import com.google.android.play.integrity.IntegrityManagerFactory
-import com.google.android.play.integrity.IntegrityTokenRequest
+import com.google.android.play.core.integrity.IntegrityManagerFactory
+import com.google.android.play.core.integrity.IntegrityTokenRequest
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
