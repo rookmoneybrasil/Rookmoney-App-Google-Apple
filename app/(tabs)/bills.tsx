@@ -996,6 +996,7 @@ export default function BillsScreen() {
                         key={bill.id}
                         item={bill}
                         onUnpay={() => guarded(bill.id, () => unpayMutation.mutate(bill.id))}
+                        onEdit={() => router.push(`/edit-bill?id=${bill.id}`)}
                         onDelete={() => Alert.alert('Excluir conta', `Excluir "${bill.name}"?`, [
                           { text: 'Cancelar', style: 'cancel' },
                           { text: 'Excluir', style: 'destructive', onPress: () => guarded(bill.id, () => deleteMutation.mutate(bill.id)) },
