@@ -12,9 +12,30 @@ import { COLORS } from '@/lib/constants'
 import { ListSkeleton } from '@/components/skeleton'
 import { incomeSourcesApi, transactionsApi, categoriesApi, type IncomeSource, type IncomeHistoryEntry, type Category } from '@/lib/api'
 import { FadeIn } from '@/components/animated-entry'
+import { InfoSheet, type InfoRow } from '@/components/info-sheet'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
+
+type InfoProps = { typeLabel: string; title: string; amount?: string; amountColor?: string; badge?: { label: string; color: string } | null; rows: InfoRow[] }
+
+function incomeInfoProps(s: IncomeSource, currentMonth: string, categories: Category[]): InfoProps {
+  const cfg = TYPE_CONFIG[s.type] ?? TYPE_CONFIG.OTHER
+  const received = s.lastAutoPayMonth === currentMonth
+  const cat = s.categoryId ? categories.find(c => c.id === s.categoryId) : null
+  const badge = s.isRecurring
+    ? (received ? { label: 'Recebido', color: COLORS.success } : { label: 'A receber', color: COLORS.warning })
+    : { label: 'Eventual', color: COLORS.warning }
+  const rows: InfoRow[] = [
+    { label: 'Tipo',             value: `${cfg.icon} ${cfg.label}` },
+    { label: 'Frequência',       value: s.isRecurring ? (s.dayOfMonth ? `Mensal · dia ${s.dayOfMonth}` : 'Mensal') : 'Eventual' },
+    { label: 'Categoria',        value: cat ? `${cat.icon} ${cat.name}` : '' },
+    { label: 'Início',           value: s.startDate ? format(new Date(s.startDate), 'dd/MM/yyyy') : '' },
+    { label: 'Últ. recebimento', value: received ? receivedDateLabel(s) : '' },
+    { label: 'Observações',      value: s.notes ?? '' },
+  ]
+  return { typeLabel: 'Receita', title: s.name, amount: `+${fmt(s.amount)}${s.isRecurring ? '/mês' : ''}`, amountColor: COLORS.success, badge, rows }
+}
 
 const TYPE_CONFIG: Record<string, { label: string; icon: string; variant: 'brand' | 'default' }> = {
   EMPLOYMENT: { label: 'CLT / PJ',  icon: '💼', variant: 'brand'   },
@@ -53,12 +74,13 @@ function Badge({ label, color, dot }: { label: string; color: string; dot?: bool
   )
 }
 
-function RecurringRow({ source, currentMonth, now, onEdit, onDelete }: {
+function RecurringRow({ source, currentMonth, now, onEdit, onDelete, onInfo }: {
   source: IncomeSource
   currentMonth: string
   now: Date
   onEdit: () => void
   onDelete: () => void
+  onInfo?: () => void
 }) {
   const cfg       = TYPE_CONFIG[source.type] ?? TYPE_CONFIG.OTHER
   const received  = source.lastAutoPayMonth === currentMonth
@@ -80,6 +102,7 @@ function RecurringRow({ source, currentMonth, now, onEdit, onDelete }: {
         : isFuture ? styles.rowFuture
         : styles.rowSuccess,
       ]}
+      onPress={onInfo}
       onLongPress={showOptions}
     >
       <View style={[styles.rowIcon, { backgroundColor: COLORS.success + (received ? '26' : '1a') }]}>
@@ -105,11 +128,12 @@ function RecurringRow({ source, currentMonth, now, onEdit, onDelete }: {
   )
 }
 
-function EventualRow({ source, onReceive, onEdit, onDelete }: {
+function EventualRow({ source, onReceive, onEdit, onDelete, onInfo }: {
   source: IncomeSource
   onReceive: () => void
   onEdit: () => void
   onDelete: () => void
+  onInfo?: () => void
 }) {
   const cfg = TYPE_CONFIG[source.type] ?? TYPE_CONFIG.OTHER
 
@@ -123,6 +147,7 @@ function EventualRow({ source, onReceive, onEdit, onDelete }: {
   return (
     <PressableScale
       style={[styles.row, styles.rowWarning]}
+      onPress={onInfo}
       onLongPress={showOptions}
     >
       <View style={[styles.rowIcon, { backgroundColor: COLORS.warning + '1a' }]}>
@@ -433,6 +458,7 @@ export default function IncomeScreen() {
   const scrollRef = useRef<any>(null)
 
   const [receiptSource, setReceiptSource] = useState<IncomeSource | null>(null)
+  const [info, setInfo] = useState<InfoProps | null>(null)  // detalhes (tap na receita)
 
   useFocusEffect(useCallback(() => {
     scrollRef.current?.scrollTo?.({ y: 0, animated: false })
@@ -639,6 +665,7 @@ export default function IncomeScreen() {
                       source={source}
                       currentMonth={currentMonth}
                       now={now}
+                      onInfo={() => setInfo(incomeInfoProps(source, currentMonth, categories ?? []))}
                       onEdit={() => router.push(`/edit-income?id=${source.id}`)}
                       onDelete={() => deleteMutation.mutate(source.id)}
                     />
@@ -672,6 +699,7 @@ export default function IncomeScreen() {
                       key={source.id}
                       source={source}
                       onReceive={() => setReceiptSource(source)}
+                      onInfo={() => setInfo(incomeInfoProps(source, currentMonth, categories ?? []))}
                       onEdit={() => router.push(`/edit-income?id=${source.id}`)}
                       onDelete={() => deleteMutation.mutate(source.id)}
                     />
@@ -696,6 +724,7 @@ export default function IncomeScreen() {
         onConfirm={(amount, date, categoryId) => receiveMutation.mutate({ source: receiptSource!, amount, date, categoryId })}
         loading={receiveMutation.isPending}
       />
+      {info && <InfoSheet visible onClose={() => setInfo(null)} {...info} />}
     </View>
   )
 }

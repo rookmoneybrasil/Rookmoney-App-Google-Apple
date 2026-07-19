@@ -15,9 +15,44 @@ import { billsApi, recurringBillsApi, peopleApi, type Bill, type RecurringBill }
 import { hapticSuccess, hapticLight } from '@/lib/haptics'
 import { ListSkeleton } from '@/components/skeleton'
 import { FadeIn } from '@/components/animated-entry'
+import { InfoSheet, type InfoRow } from '@/components/info-sheet'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
+
+type InfoProps = { typeLabel: string; title: string; amount?: string; amountColor?: string; badge?: { label: string; color: string } | null; rows: InfoRow[] }
+
+function recurringInfoProps(r: RecurringBill, paidThisMonth: boolean): InfoProps {
+  const curMonth  = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+  const scheduled = !!r.startMonth && curMonth < r.startMonth
+  const badge =
+    !r.isActive   ? { label: 'Pausada',       color: COLORS.muted }
+    : scheduled   ? { label: 'Agendada',      color: COLORS.muted }
+    : paidThisMonth ? { label: 'Paga este mês', color: COLORS.success }
+    : { label: 'Ativa', color: COLORS.brand }
+  const rows: InfoRow[] = [
+    { label: 'Vencimento',   value: `Todo dia ${r.dayOfMonth}` },
+    { label: 'Categoria',    value: r.category ? `${r.category.icon} ${r.category.name}` : 'Sem categoria' },
+    { label: '1ª cobrança',  value: r.startMonth ? new Date(Number(r.startMonth.split('-')[0]), Number(r.startMonth.split('-')[1]) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '' },
+    { label: 'Observações',  value: r.notes ?? '' },
+  ]
+  return { typeLabel: 'Conta fixa', title: r.name, amount: `-${fmt(Number(r.amount))}/mês`, amountColor: COLORS.danger, badge, rows }
+}
+
+function billInfoProps(b: Bill): InfoProps {
+  const status = classifyBillStatus(b.dueDate, b.isPaid)
+  const cfg = STATUS_CONFIG[status]
+  const isInstallment = !!b.installmentTotal && b.installmentTotal > 1
+  const typeLabel = isInstallment ? 'Parcela' : b.recurringBillId ? 'Conta fixa (mês)' : 'Conta avulsa'
+  const rows: InfoRow[] = [
+    { label: 'Vencimento',  value: format(new Date(b.dueDate), 'dd/MM/yyyy') },
+    { label: 'Categoria',   value: b.category?.name ? `${b.category.icon ?? ''} ${b.category.name}`.trim() : 'Sem categoria' },
+    { label: 'Parcela',     value: isInstallment ? `${b.installmentCurrent}/${b.installmentTotal}` : '' },
+    { label: 'Recorrente',  value: b.isRecurring ? 'Sim' : '' },
+    { label: 'Observações', value: b.notes ?? '' },
+  ]
+  return { typeLabel, title: b.name, amount: `-${fmt(Number(b.amount))}`, amountColor: COLORS.danger, badge: { label: cfg.label, color: cfg.color }, rows }
+}
 
 type BillStatus = 'paid' | 'overdue' | 'urgent' | 'pending'
 
@@ -56,13 +91,14 @@ function Badge({ label, color, dot }: { label: string; color: string; dot?: bool
   )
 }
 
-function RecurringRow({ item, monthRow, onToggle, onEdit, onDelete, onPay }: {
+function RecurringRow({ item, monthRow, onToggle, onEdit, onDelete, onPay, onInfo }: {
   item: RecurringBill
   monthRow?: { id: string; paid: boolean }
   onToggle: () => void
   onEdit: () => void
   onDelete: () => void
   onPay?: () => void
+  onInfo?: () => void
 }) {
   const now       = new Date()
   const curMonth  = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -74,6 +110,7 @@ function RecurringRow({ item, monthRow, onToggle, onEdit, onDelete, onPay }: {
   return (
     <PressableScale
       style={[styles.row, item.isActive ? styles.rowRecurring : styles.rowPaused]}
+      onPress={onInfo}
       onLongPress={() =>
         Alert.alert('Opções', item.name, [
           { text: 'Cancelar', style: 'cancel' },
@@ -125,11 +162,12 @@ function RecurringRow({ item, monthRow, onToggle, onEdit, onDelete, onPay }: {
   )
 }
 
-function PendingRow({ item, onPay, onEdit, onDelete }: {
+function PendingRow({ item, onPay, onEdit, onDelete, onInfo }: {
   item: Bill
   onPay: () => void
   onEdit: () => void
   onDelete: () => void
+  onInfo?: () => void
 }) {
   const status = classifyBillStatus(item.dueDate, item.isPaid)
   const cfg = STATUS_CONFIG[status]
@@ -152,6 +190,7 @@ function PendingRow({ item, onPay, onEdit, onDelete }: {
     >
       <PressableScale
         style={[styles.row, rowStyle]}
+        onPress={onInfo}
         onLongPress={showOptions}
       >
         <View style={[styles.rowIcon, { backgroundColor: cfg.color + '1a' }]}>
@@ -189,11 +228,12 @@ function PendingRow({ item, onPay, onEdit, onDelete }: {
   )
 }
 
-function PaidRow({ item, onUnpay, onEdit, onDelete }: {
+function PaidRow({ item, onUnpay, onEdit, onDelete, onInfo }: {
   item: Bill
   onUnpay: () => void
   onEdit: () => void
   onDelete: () => void
+  onInfo?: () => void
 }) {
   const showOptions = () =>
     Alert.alert('Opções', item.name, [
@@ -206,6 +246,7 @@ function PaidRow({ item, onUnpay, onEdit, onDelete }: {
   return (
     <PressableScale
       style={[styles.row, styles.rowPaid]}
+      onPress={onInfo}
       onLongPress={showOptions}
     >
       <View style={[styles.rowIcon, { backgroundColor: COLORS.success + '1a' }]}>
@@ -480,6 +521,7 @@ export default function BillsScreen() {
   // now defends itself (atomic claim), but guarding here avoids the wasted
   // duplicate request in the first place. Paridade com o busyIds do web.
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set())
+  const [info, setInfo] = useState<InfoProps | null>(null)  // detalhes (tap no item)
   const setBusy = (id: string, busy: boolean) => {
     setBusyIds((prev) => {
       const next = new Set(prev)
@@ -866,6 +908,7 @@ export default function BillsScreen() {
                           key={r.id}
                           item={r}
                           monthRow={mb ? { id: mb.id, paid: mb.isPaid } : undefined}
+                          onInfo={() => setInfo(recurringInfoProps(r, mb?.isPaid ?? false))}
                           onPay={() => mb && guarded(mb.id, () => mb.isPaid ? unpayMutation.mutate(mb.id) : payMutation.mutate(mb.id))}
                           onToggle={() => guarded(r.id, () => toggleRecurringMutation.mutate(r))}
                           onEdit={() => router.push(`/edit-recurring-bill?id=${r.id}`)}
@@ -908,6 +951,7 @@ export default function BillsScreen() {
                     <PendingRow
                       key={bill.id}
                       item={bill}
+                      onInfo={() => setInfo(billInfoProps(bill))}
                       onPay={() => guarded(bill.id, () => payMutation.mutate(bill.id))}
                       onEdit={() => router.push(`/edit-bill?id=${bill.id}`)}
                       onDelete={() => Alert.alert('Excluir conta', `Excluir "${bill.name}"?`, [
@@ -969,6 +1013,7 @@ export default function BillsScreen() {
                       <PaidRow
                         key={bill.id}
                         item={bill}
+                        onInfo={() => setInfo(billInfoProps(bill))}
                         onUnpay={() => guarded(bill.id, () => unpayMutation.mutate(bill.id))}
                         onEdit={() => router.push(`/edit-bill?id=${bill.id}`)}
                         onDelete={() => Alert.alert('Excluir conta', `Excluir "${bill.name}"?`, [
@@ -995,6 +1040,7 @@ export default function BillsScreen() {
                       <PaidRow
                         key={bill.id}
                         item={bill}
+                        onInfo={() => setInfo(billInfoProps(bill))}
                         onUnpay={() => guarded(bill.id, () => unpayMutation.mutate(bill.id))}
                         onEdit={() => router.push(`/edit-bill?id=${bill.id}`)}
                         onDelete={() => Alert.alert('Excluir conta', `Excluir "${bill.name}"?`, [
@@ -1044,6 +1090,7 @@ export default function BillsScreen() {
         iOweTotal={iOweTotal}
         onClose={() => setProjectionIdx(null)}
       />
+      {info && <InfoSheet visible onClose={() => setInfo(null)} {...info} />}
     </View>
   )
 }
