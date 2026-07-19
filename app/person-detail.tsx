@@ -16,6 +16,30 @@ import { EditRecurringModal } from '@/components/people/edit-recurring-modal'
 import { EntryActions } from '@/components/people/entry-actions'
 import { InstallmentGroup } from '@/components/people/installment-group'
 import { RecurringEntryRow } from '@/components/people/recurring-entry-row'
+import { InfoSheet, type InfoRow } from '@/components/info-sheet'
+
+function personEntryInfoProps(entry: PersonEntry, settled: boolean) {
+  const isTheyOwe     = entry.type === 'THEY_OWE_ME'
+  const isInstallment = !!entry.installmentTotal && entry.installmentTotal > 1
+  const badge = settled
+    ? { label: 'Quitado', color: COLORS.success }
+    : isTheyOwe ? { label: 'Te deve', color: COLORS.success } : { label: 'Você deve', color: COLORS.danger }
+  const rows: InfoRow[] = [
+    { label: 'Tipo',        value: isTheyOwe ? 'Te deve' : 'Você deve' },
+    { label: settled ? 'Acertado em' : 'Data', value: format(new Date(settled ? (entry.settledAt ?? entry.date) : entry.date), 'dd/MM/yyyy', { locale: ptBR }) },
+    { label: 'Categoria',   value: entry.category ? `${entry.category.icon} ${entry.category.name}` : '' },
+    { label: 'Parcela',     value: isInstallment ? `${entry.installmentCurrent}/${entry.installmentTotal}` : '' },
+    { label: 'Observações', value: entry.notes ?? '' },
+  ]
+  return {
+    typeLabel:   'Pessoas',
+    title:       entry.description,
+    amount:      `${isTheyOwe ? '+' : '-'}${fmt(entry.amount)}`,
+    amountColor: isTheyOwe ? COLORS.success : COLORS.danger,
+    badge,
+    rows,
+  }
+}
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
@@ -24,13 +48,14 @@ const fmt = (n: number) =>
 
 function EntryCard({ entry, personId, settled = false }: { entry: PersonEntry; personId: string; settled?: boolean }) {
   const [editOpen, setEditOpen] = useState(false)
+  const [infoOpen, setInfoOpen] = useState(false)
   const isTheyOwe = entry.type === 'THEY_OWE_ME'
   const dirColor  = isTheyOwe ? COLORS.success : COLORS.danger
 
   if (settled) {
     return (
       <View style={[styles.entryCard, styles.entryCardSettled]}>
-        <View style={styles.entryTop}>
+        <TouchableOpacity style={styles.entryTop} activeOpacity={0.7} onPress={() => setInfoOpen(true)}>
           <View style={[styles.entryIcon, styles.entryIconSettled]}>
             <Feather name="check-circle" size={15} color={COLORS.muted} />
           </View>
@@ -46,7 +71,7 @@ function EntryCard({ entry, personId, settled = false }: { entry: PersonEntry; p
             </View>
           </View>
           <Text style={[styles.entryAmount, { color: COLORS.muted }]}>{fmt(entry.amount)}</Text>
-        </View>
+        </TouchableOpacity>
         <View style={styles.entryActions}>
           <TouchableOpacity style={styles.iconBtnSmall} onPress={() => setEditOpen(true)}>
             <Feather name="edit-2" size={12} color={COLORS.muted} />
@@ -54,13 +79,14 @@ function EntryCard({ entry, personId, settled = false }: { entry: PersonEntry; p
           <EntryActions entryId={entry.id} personId={personId} isSettled />
         </View>
         <EditEntryModal visible={editOpen} entry={entry} personId={personId} onClose={() => setEditOpen(false)} />
+        <InfoSheet visible={infoOpen} onClose={() => setInfoOpen(false)} {...personEntryInfoProps(entry, settled)} />
       </View>
     )
   }
 
   return (
     <View style={styles.entryCard}>
-      <View style={styles.entryTop}>
+      <TouchableOpacity style={styles.entryTop} activeOpacity={0.7} onPress={() => setInfoOpen(true)}>
         <View style={[styles.entryIcon, { backgroundColor: dirColor + '1a' }]}>
           <Feather name={isTheyOwe ? 'trending-up' : 'trending-down'} size={15} color={dirColor} />
         </View>
@@ -79,7 +105,7 @@ function EntryCard({ entry, personId, settled = false }: { entry: PersonEntry; p
         <Text style={[styles.entryAmount, { color: dirColor }]}>
           {isTheyOwe ? '+' : '-'}{fmt(entry.amount)}
         </Text>
-      </View>
+      </TouchableOpacity>
       <View style={styles.entryActions}>
         <TouchableOpacity style={styles.iconBtnSmall} onPress={() => setEditOpen(true)}>
           <Feather name="edit-2" size={12} color={COLORS.muted} />
