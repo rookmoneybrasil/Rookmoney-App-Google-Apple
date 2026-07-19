@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import { CurrencyInput } from '@/components/currency-input'
+import { DateInput } from '@/components/date-input'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
@@ -14,14 +15,18 @@ export default function EditInstallmentGroupScreen() {
   const params = useLocalSearchParams<{
     groupId: string; name: string; amount: string
     categoryId: string; notes: string; total: string; paidCount: string
+    firstDueDate: string
   }>()
 
   const total     = parseInt(params.total ?? '0', 10)
   const paidCount = parseInt(params.paidCount ?? '0', 10)
   const remaining = total - paidCount
 
+  const origDueDate = params.firstDueDate ?? ''
+
   const [name, setName]             = useState(params.name ?? '')
   const [amount, setAmount]         = useState(params.amount ?? '')
+  const [dueDate, setDueDate]       = useState(origDueDate)
   const [categoryId, setCategoryId] = useState<string | null>(params.categoryId || null)
   const [notes, setNotes]           = useState(params.notes ?? '')
   const [showNotes, setShowNotes]   = useState(!!(params.notes))
@@ -42,6 +47,8 @@ export default function EditInstallmentGroupScreen() {
         amount:     amt,
         categoryId: categoryId ?? null,
         notes:      notes.trim() || null,
+        // Only re-anchor dates if the user actually changed the date.
+        ...(dueDate && dueDate !== origDueDate ? { firstDueDate: dueDate } : {}),
       })
     },
     onSuccess: () => {
@@ -84,7 +91,7 @@ export default function EditInstallmentGroupScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.infoBox}>
           <Text style={styles.infoText}>
-            Valor e categoria serão aplicados nas <Text style={styles.infoBold}>{remaining} parcelas pendentes</Text>.
+            Valor, categoria e vencimentos serão aplicados nas <Text style={styles.infoBold}>{remaining} parcelas pendentes</Text>.
             {paidCount > 0 ? ` As ${paidCount} já pagas mantêm o valor original.` : ''}
           </Text>
         </View>
@@ -105,6 +112,14 @@ export default function EditInstallmentGroupScreen() {
           value={amount}
           onChangeValue={setAmount}
         />
+
+        {remaining > 0 && (
+          <>
+            <Text style={styles.label}>Vencimento da {paidCount > 0 ? 'próxima parcela' : '1ª parcela'}</Text>
+            <DateInput value={dueDate} onChange={setDueDate} placeholder="Selecionar data" />
+            <Text style={styles.hint}>As parcelas seguintes seguem de mês em mês a partir dessa data.</Text>
+          </>
+        )}
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
@@ -202,6 +217,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
     color: COLORS.text, fontSize: 15, borderWidth: 1, borderColor: COLORS.border,
   },
+  hint: { fontSize: 11, color: COLORS.muted, marginTop: 6, lineHeight: 15 },
 
   statsRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
   statCard: {

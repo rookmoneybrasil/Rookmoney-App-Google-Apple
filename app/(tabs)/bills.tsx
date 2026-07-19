@@ -912,6 +912,7 @@ export default function BillsScreen() {
                             notes: group.items[0]?.notes ?? '',
                             total: String(group.total),
                             paidCount: String(group.paidCount),
+                            firstDueDate: group.items.filter(it => !it.isPaid).map(it => it.dueDate).sort()[0]?.slice(0, 10) ?? '',
                           },
                         })}
                       />

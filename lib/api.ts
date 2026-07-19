@@ -254,7 +254,7 @@ export const billsApi = {
     }),
   delete: (id: string) =>
     request<{ success: boolean }>(`/api/v1/bills/${id}`, { method: 'DELETE' }),
-  updateGroup: (groupId: string, body: { name?: string; amount?: number; categoryId?: string | null; notes?: string | null }) =>
+  updateGroup: (groupId: string, body: { name?: string; amount?: number; categoryId?: string | null; notes?: string | null; firstDueDate?: string }) =>
     request<{ data: { updated: number } }>(`/api/v1/bills/group/${groupId}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
