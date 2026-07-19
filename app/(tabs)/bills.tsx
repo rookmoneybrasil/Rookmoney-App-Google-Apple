@@ -229,11 +229,12 @@ function PaidRow({ item, onUnpay, onEdit, onDelete }: {
   )
 }
 
-function InstallmentGroupCard({ group, onPay, onDeleteGroup, onEdit }: {
+function InstallmentGroupCard({ group, onPay, onDeleteGroup, onEdit, onDeleteInstallment }: {
   group: InstallmentGroup
   onPay: (id: string) => void
   onDeleteGroup: () => void
   onEdit: () => void
+  onDeleteInstallment: (billId: string, scope: 'one' | 'future' | 'all', label: string) => void
 }) {
   const [open, setOpen] = useState(true)
   const pct = Math.round((group.paidCount / group.total) * 100)
@@ -302,6 +303,22 @@ function InstallmentGroupCard({ group, onPay, onDeleteGroup, onEdit }: {
                     <Feather name="check" size={12} color={COLORS.success} />
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity
+                  style={styles.instDelBtn}
+                  hitSlop={6}
+                  onPress={() => Alert.alert(
+                    'Excluir parcela',
+                    `Parcela ${inst.installmentCurrent}/${group.total} de "${group.name}". O que você quer apagar?`,
+                    [
+                      { text: 'Somente esta', onPress: () => onDeleteInstallment(inst.id, 'one', `parcela ${inst.installmentCurrent}/${group.total}`) },
+                      { text: 'Esta e as futuras', onPress: () => onDeleteInstallment(inst.id, 'future', `parcela ${inst.installmentCurrent} em diante`) },
+                      { text: 'Todas as parcelas', style: 'destructive', onPress: () => onDeleteInstallment(inst.id, 'all', `todas as ${group.total} parcelas`) },
+                      { text: 'Cancelar', style: 'cancel' },
+                    ],
+                  )}
+                >
+                  <Feather name="trash-2" size={12} color={COLORS.danger} />
+                </TouchableOpacity>
               </View>
             )
           })}
@@ -507,6 +524,14 @@ export default function BillsScreen() {
     onMutate: (id: string) => { hapticLight(); setBusy(id, true); return patchBills((l) => l.filter((b) => b.id !== id)) },
     onError: (e: Error, _id, ctx) => { rollbackBills(ctx); Alert.alert('Erro', e.message) },
     onSettled: (_d, _e, id) => { setBusy(id, false); refetchAll() },
+  })
+  // Granular parcela delete (Somente esta / Esta e as futuras / Todas). No
+  // optimistic patch — 'future'/'all' remove several rows, so we just refetch.
+  const deleteInstallmentMutation = useMutation({
+    mutationFn: ({ id, scope }: { id: string; scope: 'one' | 'future' | 'all' }) => billsApi.delete(id, scope),
+    onMutate: () => { hapticLight() },
+    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onSettled: () => refetchAll(),
   })
   const toggleRecurringMutation = useMutation({
     mutationFn: (item: RecurringBill) => recurringBillsApi.update(item.id, { isActive: !item.isActive }),
@@ -902,6 +927,7 @@ export default function BillsScreen() {
                         group={group}
                         onPay={(id) => guarded(id, () => payMutation.mutate(id))}
                         onDeleteGroup={() => guarded(group.groupId, () => deleteGroupMutation.mutate(group))}
+                        onDeleteInstallment={(billId, scope) => deleteInstallmentMutation.mutate({ id: billId, scope })}
                         onEdit={() => router.push({
                           pathname: '/edit-installment-group',
                           params: {
@@ -1203,5 +1229,9 @@ const styles = StyleSheet.create({
   instPayBtn: {
     width: 24, height: 24, borderRadius: 6, backgroundColor: COLORS.success + '22',
     justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.success + '33',
+  },
+  instDelBtn: {
+    width: 24, height: 24, borderRadius: 6, backgroundColor: COLORS.danger + '18',
+    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.danger + '33',
   },
 })
