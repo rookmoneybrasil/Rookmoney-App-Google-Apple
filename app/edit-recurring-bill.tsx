@@ -81,7 +81,7 @@ export default function EditRecurringBillScreen() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: () => recurringBillsApi.delete(id!),
+    mutationFn: (deleteHistory: boolean) => recurringBillsApi.delete(id!, deleteHistory),
     onSuccess: () => {
       qc.refetchQueries({ queryKey: ['recurringBills'] })
       qc.refetchQueries({ queryKey: ['bills'] })
@@ -92,9 +92,10 @@ export default function EditRecurringBillScreen() {
   })
 
   function confirmDelete() {
-    Alert.alert('Excluir conta fixa', `Excluir "${name}"? Contas já geradas não serão apagadas.`, [
+    Alert.alert('Excluir conta fixa', `"${name}". O que você quer fazer com os meses já pagos?`, [
+      { text: 'Manter histórico', onPress: () => deleteMutation.mutate(false) },
+      { text: 'Apagar tudo (histórico incluso)', style: 'destructive', onPress: () => deleteMutation.mutate(true) },
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate() },
     ])
   }
 

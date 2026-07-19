@@ -540,10 +540,10 @@ export default function BillsScreen() {
     onSettled: (_d, _e, item) => { setBusy(item.id, false); refetchAll() },
   })
   const deleteRecurringMutation = useMutation({
-    mutationFn: (id: string) => recurringBillsApi.delete(id),
-    onMutate: (id: string) => { hapticLight(); setBusy(id, true); return patchRecurring((l) => l.filter((r) => r.id !== id)) },
-    onError: (e: Error, _id, ctx) => { rollbackRecurring(ctx); Alert.alert('Erro', e.message) },
-    onSettled: (_d, _e, id) => { setBusy(id, false); refetchAll() },
+    mutationFn: ({ id, deleteHistory }: { id: string; deleteHistory: boolean }) => recurringBillsApi.delete(id, deleteHistory),
+    onMutate: ({ id }: { id: string; deleteHistory: boolean }) => { hapticLight(); setBusy(id, true); return patchRecurring((l) => l.filter((r) => r.id !== id)) },
+    onError: (e: Error, _v, ctx) => { rollbackRecurring(ctx); Alert.alert('Erro', e.message) },
+    onSettled: (_d, _e, v) => { setBusy(v.id, false); refetchAll() },
   })
   const deleteGroupMutation = useMutation({
     mutationFn: (group: InstallmentGroup) =>
@@ -869,7 +869,15 @@ export default function BillsScreen() {
                           onPay={() => mb && guarded(mb.id, () => mb.isPaid ? unpayMutation.mutate(mb.id) : payMutation.mutate(mb.id))}
                           onToggle={() => guarded(r.id, () => toggleRecurringMutation.mutate(r))}
                           onEdit={() => router.push(`/edit-recurring-bill?id=${r.id}`)}
-                          onDelete={() => guarded(r.id, () => deleteRecurringMutation.mutate(r.id))}
+                          onDelete={() => guarded(r.id, () => Alert.alert(
+                            'Excluir conta fixa',
+                            `"${r.name}". O que fazer com os meses já pagos?`,
+                            [
+                              { text: 'Manter histórico', onPress: () => deleteRecurringMutation.mutate({ id: r.id, deleteHistory: false }) },
+                              { text: 'Apagar tudo (histórico incluso)', style: 'destructive', onPress: () => deleteRecurringMutation.mutate({ id: r.id, deleteHistory: true }) },
+                              { text: 'Cancelar', style: 'cancel' },
+                            ],
+                          ))}
                         />
                       )
                     })}

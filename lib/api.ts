@@ -300,8 +300,8 @@ export const recurringBillsApi = {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
-  delete: (id: string) =>
-    request<{ success: boolean }>(`/api/v1/bills/recurring/${id}`, { method: 'DELETE' }),
+  delete: (id: string, deleteHistory?: boolean) =>
+    request<{ success: boolean }>(`/api/v1/bills/recurring/${id}${deleteHistory ? '?deleteHistory=true' : ''}`, { method: 'DELETE' }),
 }
 
 // ── Goals ─────────────────────────────────────────────────────────────
