@@ -383,6 +383,40 @@ export const budgetsApi = {
     request<{ success: boolean }>(`/api/v1/budget/${id}`, { method: 'DELETE' }),
 }
 
+// ── Accounts / Carteiras ──────────────────────────────────────────────
+
+export type AccountType = 'CASH' | 'CHECKING' | 'SAVINGS' | 'CREDIT_CARD'
+
+export interface Account {
+  id:             string
+  name:           string
+  type:           AccountType
+  icon:           string
+  color:          string
+  initialBalance: number
+  isDefault:      boolean
+  archived:       boolean
+  balance:        number
+}
+
+export interface AccountInput {
+  name:            string
+  type?:           AccountType
+  icon?:           string
+  color?:          string
+  initialBalance?: number
+}
+
+export const accountsApi = {
+  list: () => request<{ data: { accounts: Account[]; total: number } }>('/api/v1/accounts'),
+  create: (body: AccountInput) =>
+    request<{ data: Account }>('/api/v1/accounts', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: string, body: Partial<AccountInput> & { archived?: boolean; isDefault?: boolean }) =>
+    request<{ data: Account }>(`/api/v1/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/api/v1/accounts/${id}`, { method: 'DELETE' }),
+}
+
 // ── Recurring Transactions ────────────────────────────────────────────
 
 export interface Recurring {

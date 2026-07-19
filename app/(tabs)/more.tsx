@@ -15,6 +15,7 @@ interface GridItem {
 }
 
 const MAIN_ITEMS: GridItem[] = [
+  { label: 'Carteiras',    icon: 'credit-card',  route: '/wallets'    },
   { label: 'Extratos',     icon: 'list',         route: '/transactions' },
   { label: 'Metas',        icon: 'target',       route: '/goals'      },
   { label: 'Conquistas',   icon: 'award',        route: '/achievements' },
