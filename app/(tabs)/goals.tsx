@@ -17,6 +17,27 @@ import { goalsApi, categoriesApi, type Goal, type Category } from '@/lib/api'
 import { hapticSuccess, hapticLight } from '@/lib/haptics'
 import { FadeIn } from '@/components/animated-entry'
 import { EmptyState } from '@/components/empty-state'
+import { InfoSheet, type InfoRow } from '@/components/info-sheet'
+
+function goalInfoProps(goal: Goal) {
+  const pct  = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0
+  const rows: InfoRow[] = [
+    { label: 'Guardado',   value: fmt(goal.currentAmount) },
+    { label: 'Meta',       value: fmt(goal.targetAmount) },
+    { label: 'Progresso',  value: `${Math.round(pct)}%` },
+    { label: 'Falta',      value: fmt(Math.max(goal.targetAmount - goal.currentAmount, 0)) },
+    { label: 'Prazo',      value: goal.deadline ? format(new Date(goal.deadline), "MMMM 'de' yyyy", { locale: ptBR }) : '' },
+    { label: 'Descrição',  value: goal.description ?? '' },
+  ]
+  return {
+    typeLabel:   'Meta',
+    title:       goal.name,
+    amount:      fmt(goal.currentAmount),
+    amountColor: COLORS.brand,
+    badge:       goal.isCompleted ? { label: 'Concluída', color: COLORS.success } : { label: `${Math.round(pct)}%`, color: COLORS.brand },
+    rows,
+  }
+}
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
@@ -187,9 +208,10 @@ function GoalCard({
   const current = goal.currentAmount
   const pct     = target > 0 ? (current / target) * 100 : 0
   const contributions = goal.contributions ?? []
+  const [infoOpen, setInfoOpen] = useState(false)
 
   return (
-    <PressableScale style={styles.goalCard}>
+    <PressableScale style={styles.goalCard} onPress={() => setInfoOpen(true)}>
       <View style={styles.goalTop}>
         <View style={[styles.goalIconWrap, { backgroundColor: (goal.color ?? '#3B82F6') + '20' }]}>
           <Text style={styles.goalIcon}>{goal.icon ?? '🎯'}</Text>
@@ -257,6 +279,7 @@ function GoalCard({
           })}
         </View>
       )}
+      <InfoSheet visible={infoOpen} onClose={() => setInfoOpen(false)} {...goalInfoProps(goal)} />
     </PressableScale>
   )
 }
