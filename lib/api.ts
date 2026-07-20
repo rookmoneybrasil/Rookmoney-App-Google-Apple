@@ -429,39 +429,6 @@ export const accountsApi = {
 
 // ── Recurring Transactions ────────────────────────────────────────────
 
-export interface Recurring {
-  id:          string
-  name:        string
-  amount:      number
-  type:        'INCOME' | 'EXPENSE'
-  frequency:   'WEEKLY' | 'MONTHLY' | 'YEARLY'
-  dayOfMonth:  number | null
-  description: string | null
-  isActive:    boolean
-  category:    { id: string; name: string; icon: string }
-}
-
-export const recurringApi = {
-  list: () => request<{ data: Recurring[] }>('/api/v1/recurring'),
-  create: (body: { name: string; amount: number; type: string; frequency: string; dayOfMonth?: number; categoryId: string; description?: string }) =>
-    request<{ data: Recurring }>('/api/v1/recurring', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  update: (id: string, body: { name?: string; type?: string; amount?: number; frequency?: string; dayOfMonth?: number; categoryId?: string; description?: string | null; isActive?: boolean }) =>
-    request<{ data: Recurring }>(`/api/v1/recurring/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-    }),
-  toggle: (id: string, isActive: boolean) =>
-    request<{ data: Recurring }>(`/api/v1/recurring/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ isActive }),
-    }),
-  delete: (id: string) =>
-    request<{ success: boolean }>(`/api/v1/recurring/${id}`, { method: 'DELETE' }),
-}
-
 // ── Income Sources ────────────────────────────────────────────────────
 
 export interface IncomeSource {

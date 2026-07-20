@@ -213,7 +213,6 @@ export default function RootLayout() {
           {/* Stack screens — smooth slide */}
           <Stack.Screen name="budget" />
           <Stack.Screen name="transactions" />
-          <Stack.Screen name="recurring" />
           <Stack.Screen name="reports" />
           <Stack.Screen name="categories" />
           <Stack.Screen name="settings" />
@@ -235,7 +234,6 @@ export default function RootLayout() {
           <Stack.Screen name="edit-bill"           options={{ presentation: 'transparentModal', animation: 'fade' }} />
           <Stack.Screen name="edit-transaction"    options={{ presentation: 'transparentModal', animation: 'fade' }} />
           <Stack.Screen name="edit-income"         options={{ presentation: 'transparentModal', animation: 'fade' }} />
-          <Stack.Screen name="edit-recurring"      options={{ presentation: 'transparentModal', animation: 'fade' }} />
           <Stack.Screen name="edit-recurring-bill" options={{ presentation: 'transparentModal', animation: 'fade' }} />
           <Stack.Screen name="edit-category"       options={{ presentation: 'transparentModal', animation: 'fade' }} />
           <Stack.Screen name="feedback" />
@@ -246,7 +244,6 @@ export default function RootLayout() {
           <Stack.Screen name="new-budget"         options={{ presentation: 'transparentModal', animation: 'fade' }} />
           <Stack.Screen name="new-bill"           options={{ presentation: 'transparentModal', animation: 'fade' }} />
           <Stack.Screen name="new-income"         options={{ presentation: 'transparentModal', animation: 'fade' }} />
-          <Stack.Screen name="new-recurring"      options={{ presentation: 'transparentModal', animation: 'fade' }} />
           <Stack.Screen name="new-recurring-bill" options={{ presentation: 'transparentModal', animation: 'fade' }} />
           <Stack.Screen name="new-category"       options={{ presentation: 'transparentModal', animation: 'fade' }} />
           <Stack.Screen name="new-person"         options={{ presentation: 'transparentModal', animation: 'fade' }} />

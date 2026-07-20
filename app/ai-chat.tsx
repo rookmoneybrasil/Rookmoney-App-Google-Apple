@@ -66,7 +66,6 @@ const PAGE_MAP: Record<string, { label: string; path: string }> = {
   '/reports':      { label: 'Relatorios',    path: '/reports' },
   '/people':       { label: 'Pessoas',       path: '/people' },
   '/categories':   { label: 'Categorias',    path: '/categories' },
-  '/recurring':    { label: 'Recorrencias',  path: '/recurring' },
   '/income':       { label: 'Rendas',        path: '/income' },
   '/settings':     { label: 'Configuracoes', path: '/settings' },
 }
