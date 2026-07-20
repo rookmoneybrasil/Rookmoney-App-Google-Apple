@@ -15,6 +15,7 @@ export function useBillForm({ defaultDueDate, onSuccess }: { defaultDueDate: str
   const [dueDate, setDueDate]           = useState(defaultDueDate)
   const [dayOfMonth, setDayOfMonth]     = useState('1')
   const [categoryId, setCategoryId]     = useState<string | undefined>()
+  const [accountId, setAccountId]       = useState<string | null>(null)
   const [installments, setInstallments] = useState('2')
   const [alreadyPaid, setAlreadyPaid]   = useState('0')
   const [notes, setNotes]               = useState('')
@@ -40,6 +41,7 @@ export function useBillForm({ defaultDueDate, onSuccess }: { defaultDueDate: str
           amount: amt,
           dayOfMonth: day,
           categoryId: categoryId || null,
+          accountId,
           notes: notes.trim() || null,
           generateNow: true,
         })
@@ -58,6 +60,7 @@ export function useBillForm({ defaultDueDate, onSuccess }: { defaultDueDate: str
           dueDate:      dueDate,
           isRecurring:  false,
           categoryId:   categoryId || undefined,
+          accountId,
           installments: inst,
           alreadyPaid:  paid,
           notes:        notes.trim() || undefined,
@@ -71,6 +74,7 @@ export function useBillForm({ defaultDueDate, onSuccess }: { defaultDueDate: str
         dueDate:     dueDate,
         isRecurring: false,
         categoryId:  categoryId || undefined,
+        accountId,
         notes:       notes.trim() || undefined,
       })
     },
@@ -101,6 +105,7 @@ export function useBillForm({ defaultDueDate, onSuccess }: { defaultDueDate: str
     dueDate, setDueDate,
     dayOfMonth, setDayOfMonth,
     categoryId, setCategoryId,
+    accountId, setAccountId,
     installments, setInstallments,
     alreadyPaid, setAlreadyPaid,
     notes, setNotes,

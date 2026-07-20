@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
 import { recurringBillsApi, categoriesApi } from '@/lib/api'
+import { AccountPicker } from '@/components/account-picker'
 import { DateInput } from '@/components/date-input'
 import { format } from 'date-fns'
 
@@ -19,6 +20,7 @@ export default function NewRecurringBillScreen() {
   const [dayOfMonth, setDayOfMonth] = useState('1')
   const [firstDate, setFirstDate]   = useState(format(new Date(), 'yyyy-MM-dd'))
   const [categoryId, setCategoryId] = useState<string | undefined>()
+  const [accountId, setAccountId]   = useState<string | null>(null)
   const [notes, setNotes]           = useState('')
   const [showNotes, setShowNotes]   = useState(false)
 
@@ -40,6 +42,7 @@ export default function NewRecurringBillScreen() {
         amount:      amt,
         dayOfMonth:  day,
         categoryId:  categoryId || null,
+        accountId:   accountId,
         notes:       notes.trim() || null,
         firstDate:   firstDate || undefined, // mês da 1ª data → startMonth; se for este mês e passada, gera já
       })
@@ -126,6 +129,8 @@ export default function NewRecurringBillScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+
+        <AccountPicker value={accountId} onChange={setAccountId} />
 
         {/* Observações */}
         <TouchableOpacity

@@ -5,6 +5,7 @@ import { DateInput } from '@/components/date-input'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
 import { QUICK_BILL_SERVICES } from '@/lib/service-brands'
+import { AccountPicker } from '@/components/account-picker'
 import type { BillMode, UseBillFormReturn } from './use-bill-form'
 
 const MODES: { key: BillMode; label: string; icon: string }[] = [
@@ -21,6 +22,7 @@ export function BillFormFields({ form }: { form: UseBillFormReturn }) {
     dueDate, setDueDate,
     dayOfMonth, setDayOfMonth,
     categoryId, setCategoryId,
+    accountId, setAccountId,
     installments, setInstallments,
     alreadyPaid, setAlreadyPaid,
     notes, setNotes,
@@ -211,6 +213,8 @@ export function BillFormFields({ form }: { form: UseBillFormReturn }) {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      <AccountPicker value={accountId} onChange={setAccountId} />
 
       {/* Notes */}
       <TouchableOpacity

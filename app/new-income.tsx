@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
 import { incomeSourcesApi, categoriesApi, type Category } from '@/lib/api'
+import { AccountPicker } from '@/components/account-picker'
 import { DateInput } from '@/components/date-input'
 
 const TYPES = [
@@ -32,6 +33,7 @@ export default function NewIncomeScreen() {
   const [dayOfMonth, setDay]        = useState('')
   const [startDate, setStartDate]   = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [accountId, setAccountId]   = useState<string | null>(null)
   const [notes, setNotes]           = useState('')
   const [showNotes, setShowNotes]   = useState(false)
 
@@ -68,6 +70,7 @@ export default function NewIncomeScreen() {
         startDate:   startDate.trim() || undefined,
         notes:       notes.trim() || undefined,
         categoryId:  categoryId || undefined,
+        accountId,
       })
     },
     onSuccess: async () => { await refetchAll(); router.back() },
@@ -190,6 +193,8 @@ export default function NewIncomeScreen() {
         {isRecurring && (
           <Text style={styles.hint}>Necessária para registro automático mensal.</Text>
         )}
+
+        <AccountPicker value={accountId} onChange={setAccountId} />
 
         {/* Notes */}
         <TouchableOpacity style={styles.notesToggle} onPress={() => setShowNotes(v => !v)} activeOpacity={0.8}>
