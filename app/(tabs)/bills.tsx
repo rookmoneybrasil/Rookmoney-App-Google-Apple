@@ -33,6 +33,7 @@ function recurringInfoProps(r: RecurringBill, paidThisMonth: boolean): InfoProps
   const rows: InfoRow[] = [
     { label: 'Vencimento',   value: `Todo dia ${r.dayOfMonth}` },
     { label: 'Categoria',    value: r.category ? `${r.category.icon} ${r.category.name}` : 'Sem categoria' },
+    { label: 'Conta',        value: r.account ? `${r.account.icon} ${r.account.name}` : '' },
     { label: '1ª cobrança',  value: r.startMonth ? new Date(Number(r.startMonth.split('-')[0]), Number(r.startMonth.split('-')[1]) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '' },
     { label: 'Observações',  value: r.notes ?? '' },
   ]
@@ -47,6 +48,7 @@ function billInfoProps(b: Bill): InfoProps {
   const rows: InfoRow[] = [
     { label: 'Vencimento',  value: format(new Date(b.dueDate), 'dd/MM/yyyy') },
     { label: 'Categoria',   value: b.category?.name ? `${b.category.icon ?? ''} ${b.category.name}`.trim() : 'Sem categoria' },
+    { label: 'Conta',       value: b.account ? `${b.account.icon} ${b.account.name}` : '' },
     { label: 'Parcela',     value: isInstallment ? `${b.installmentCurrent}/${b.installmentTotal}` : '' },
     { label: 'Recorrente',  value: b.isRecurring ? 'Sim' : '' },
     { label: 'Observações', value: b.notes ?? '' },
