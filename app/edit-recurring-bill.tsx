@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
 import { recurringBillsApi, categoriesApi, type RecurringBill } from '@/lib/api'
+import { AccountPicker } from '@/components/account-picker'
 
 export default function EditRecurringBillScreen() {
   const router = useRouter()
@@ -18,6 +19,7 @@ export default function EditRecurringBillScreen() {
   const [amount, setAmount]         = useState('')
   const [dayOfMonth, setDayOfMonth] = useState('1')
   const [categoryId, setCategoryId] = useState<string | null>(null)
+  const [accountId, setAccountId]   = useState<string | null>(null)
   const [isActive, setIsActive]     = useState(true)
   const [notes, setNotes]           = useState('')
   const [showNotes, setShowNotes]   = useState(false)
@@ -49,6 +51,7 @@ export default function EditRecurringBillScreen() {
     setAmount(String(found.amount))
     setDayOfMonth(String(found.dayOfMonth))
     setCategoryId(found.categoryId ?? found.category?.id ?? null)
+    setAccountId(found.accountId ?? found.account?.id ?? null)
     setIsActive(found.isActive)
     setNotes(found.notes ?? '')
     setShowNotes(!!(found.notes))
@@ -67,6 +70,7 @@ export default function EditRecurringBillScreen() {
         amount:     amt,
         dayOfMonth: day,
         categoryId: categoryId,
+        accountId:  accountId,
         notes:      notes.trim() || null,
         isActive,
       })
@@ -172,6 +176,8 @@ export default function EditRecurringBillScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+
+        <AccountPicker value={accountId} onChange={setAccountId} />
 
         <View style={styles.switchRow}>
           <View>

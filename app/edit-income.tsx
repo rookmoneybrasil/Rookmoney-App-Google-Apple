@@ -8,6 +8,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
 import { incomeSourcesApi, categoriesApi, type IncomeSource, type Category } from '@/lib/api'
+import { AccountPicker } from '@/components/account-picker'
 import { useQuery } from '@tanstack/react-query'
 
 const TYPES = [
@@ -30,6 +31,7 @@ export default function EditIncomeScreen() {
   const [dayOfMonth, setDay]        = useState('')
   const [startDate,  setStartDate]  = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [accountId,  setAccountId]  = useState<string | null>(null)
   const [notes,      setNotes]      = useState('')
   const [showNotes,  setShowNotes]  = useState(false)
 
@@ -50,6 +52,7 @@ export default function EditIncomeScreen() {
       setDay(found.dayOfMonth ? String(found.dayOfMonth) : '')
       setStartDate(found.startDate ? String(found.startDate).slice(0, 10) : '')
       setCategoryId(found.categoryId ?? '')
+      setAccountId(found.accountId ?? found.account?.id ?? null)
       setNotes(found.notes ?? '')
       setShowNotes(!!(found.notes))
     }
@@ -64,7 +67,7 @@ export default function EditIncomeScreen() {
       if (day !== undefined && (isNaN(day) || day < 1 || day > 31)) {
         throw new Error('Dia inválido (1-31)')
       }
-      return incomeSourcesApi.update(id!, { name: name.trim(), type, amount: amt, isRecurring, dayOfMonth: day, startDate: startDate.trim() || null, notes: notes.trim() || null, categoryId: categoryId || null })
+      return incomeSourcesApi.update(id!, { name: name.trim(), type, amount: amt, isRecurring, dayOfMonth: day, startDate: startDate.trim() || null, notes: notes.trim() || null, categoryId: categoryId || null, accountId })
     },
     onSuccess: () => {
       qc.refetchQueries({ queryKey: ['income-sources'] })
@@ -190,6 +193,8 @@ export default function EditIncomeScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        <AccountPicker value={accountId} onChange={setAccountId} />
 
         <TouchableOpacity style={styles.notesToggle} onPress={() => setShowNotes(v => !v)} activeOpacity={0.8}>
           <Feather name={showNotes ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.muted} />

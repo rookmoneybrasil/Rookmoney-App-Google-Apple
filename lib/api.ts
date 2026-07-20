@@ -228,13 +228,15 @@ export interface Bill {
   notes:              string | null
   categoryId?:        string | null
   category?: { id?: string; name: string; icon: string; color?: string } | null
+  accountId?:         string | null
+  account?: { id?: string; name: string; icon: string; color?: string } | null
   recurringBillId?:   string | null
   installmentGroupId?: string | null
 }
 
 export const billsApi = {
   list: () => request<{ data: Bill[] }>('/api/v1/bills'),
-  create: (body: { name: string; amount: number; dueDate: string; isRecurring?: boolean; categoryId?: string; installments?: number; alreadyPaid?: number; notes?: string }) =>
+  create: (body: { name: string; amount: number; dueDate: string; isRecurring?: boolean; categoryId?: string; installments?: number; alreadyPaid?: number; notes?: string; accountId?: string | null }) =>
     request<{ data: Bill | { installmentGroupId: string; count: number } }>('/api/v1/bills', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -249,7 +251,7 @@ export const billsApi = {
       method: 'POST',
       body: JSON.stringify({ paid: false }),
     }),
-  update: (id: string, body: { name?: string; amount?: number; dueDate?: string; isRecurring?: boolean; categoryId?: string | null; notes?: string | null }) =>
+  update: (id: string, body: { name?: string; amount?: number; dueDate?: string; isRecurring?: boolean; categoryId?: string | null; notes?: string | null; accountId?: string | null }) =>
     request<{ data: Bill }>(`/api/v1/bills/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
@@ -278,6 +280,8 @@ export interface RecurringBill {
   notes:          string | null
   categoryId:     string | null
   category?: { id: string; name: string; icon: string; color: string } | null
+  accountId?:     string | null
+  account?: { id: string; name: string; icon: string; color: string } | null
 }
 
 export interface RecurringBillInput {
@@ -285,6 +289,7 @@ export interface RecurringBillInput {
   amount:      number
   dayOfMonth:  number
   categoryId?: string | null
+  accountId?:  string | null
   notes?:      string | null
   generateNow?: boolean
   firstDate?:  string
@@ -466,6 +471,8 @@ export interface IncomeSource {
   startDate:        string | null
   lastAutoPayMonth: string | null
   categoryId:       string | null
+  accountId:        string | null
+  account?: { id: string; name: string; icon: string; color: string } | null
   notes:            string | null
 }
 
@@ -479,12 +486,12 @@ export interface IncomeHistoryEntry {
 export const incomeSourcesApi = {
   list: () => request<{ data: IncomeSource[] }>('/api/v1/income-sources'),
   history: () => request<{ data: Record<string, IncomeHistoryEntry[]> }>('/api/v1/income-sources/history'),
-  create: (body: { name: string; type: string; amount: number; isRecurring?: boolean; dayOfMonth?: number; startDate?: string; notes?: string; categoryId?: string | null }) =>
+  create: (body: { name: string; type: string; amount: number; isRecurring?: boolean; dayOfMonth?: number; startDate?: string; notes?: string; categoryId?: string | null; accountId?: string | null }) =>
     request<{ data: IncomeSource }>('/api/v1/income-sources', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  update: (id: string, body: { name?: string; type?: string; amount?: number; isRecurring?: boolean; dayOfMonth?: number; startDate?: string | null; notes?: string | null; categoryId?: string | null; lastAutoPayMonth?: string | null }) =>
+  update: (id: string, body: { name?: string; type?: string; amount?: number; isRecurring?: boolean; dayOfMonth?: number; startDate?: string | null; notes?: string | null; categoryId?: string | null; lastAutoPayMonth?: string | null; accountId?: string | null }) =>
     request<{ data: IncomeSource }>(`/api/v1/income-sources/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),

@@ -62,8 +62,9 @@ function TxItem({ item, onEdit, onDelete }: { item: Transaction; onEdit: () => v
       </View>
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{item.description ?? item.category.name}</Text>
-        <Text style={styles.meta}>
+        <Text style={styles.meta} numberOfLines={1}>
           {format(new Date(item.date), "d MMM yyyy", { locale: ptBR })} · {item.category.name}
+          {item.account ? ` · ${item.account.icon} ${item.account.name}` : ''}
         </Text>
       </View>
       <View style={styles.itemRight}>
