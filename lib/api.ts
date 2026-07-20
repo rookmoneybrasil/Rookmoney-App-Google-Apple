@@ -141,6 +141,7 @@ export interface Transaction {
   category:    { id: string; name: string; icon: string; color: string }
   accountId?:  string | null
   account?:    { id?: string; name: string; icon: string; color: string } | null
+  ignored?:    boolean
 }
 
 export const transactionsApi = {
@@ -154,12 +155,12 @@ export const transactionsApi = {
       : ''
     return request<{ data: { items: Transaction[]; total: number; page: number; totalPages: number } }>(`/api/v1/transactions${qs}`)
   },
-  create: (body: { amount: number; type: string; description?: string; date: string; categoryId: string; accountId?: string }) =>
+  create: (body: { amount: number; type: string; description?: string; date: string; categoryId: string; accountId?: string; ignored?: boolean }) =>
     request<{ data: { id: string } }>('/api/v1/transactions', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  update: (id: string, body: { amount?: number; type?: string; description?: string; date?: string; categoryId?: string; accountId?: string }) =>
+  update: (id: string, body: { amount?: number; type?: string; description?: string; date?: string; categoryId?: string; accountId?: string; ignored?: boolean }) =>
     request<{ data: Transaction }>(`/api/v1/transactions/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),

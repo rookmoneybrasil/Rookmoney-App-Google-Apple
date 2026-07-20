@@ -23,6 +23,7 @@ export default function NewTransactionModal() {
   const [categoryId,  setCategoryId]  = useState('')
   const [accountId,   setAccountId]   = useState('')
   const [date,        setDate]        = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [ignored,     setIgnored]     = useState(false)
   const [error,       setError]       = useState('')
   const [saving,      setSaving]      = useState(false)
 
@@ -55,6 +56,7 @@ export default function NewTransactionModal() {
         date,
         categoryId,
         accountId: accountId || undefined,
+        ignored,
       })
       queryClient.refetchQueries({ queryKey: ['transactions'] })
       queryClient.refetchQueries({ queryKey: ['dashboard'] })
@@ -170,6 +172,17 @@ export default function NewTransactionModal() {
           </View>
         )}
 
+        {/* Ignorar transação */}
+        <TouchableOpacity style={styles.ignoreRow} onPress={() => setIgnored(v => !v)} activeOpacity={0.8}>
+          <View style={[styles.checkbox, ignored && styles.checkboxOn]}>
+            {ignored && <Feather name="check" size={14} color="#fff" />}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.ignoreTitle}>Ignorar transação</Text>
+            <Text style={styles.ignoreHint}>Não soma no saldo das contas nem nos totais/relatórios.</Text>
+          </View>
+        </TouchableOpacity>
+
         {!!error && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
@@ -244,6 +257,20 @@ const styles = StyleSheet.create({
   catIcon:       { fontSize: 16 },
   catName:       { fontSize: 12, color: COLORS.muted, maxWidth: 70 },
   catNameActive: { color: COLORS.brand },
+
+  ignoreRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: COLORS.card2, borderRadius: 12,
+    borderWidth: 1, borderColor: COLORS.border,
+    padding: 14, marginBottom: 18,
+  },
+  checkbox: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5,
+    borderColor: COLORS.muted, justifyContent: 'center', alignItems: 'center',
+  },
+  checkboxOn:  { backgroundColor: COLORS.brand, borderColor: COLORS.brand },
+  ignoreTitle: { fontSize: 14, color: COLORS.text, fontWeight: '500' },
+  ignoreHint:  { fontSize: 12, color: COLORS.muted, marginTop: 2 },
 
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 10,

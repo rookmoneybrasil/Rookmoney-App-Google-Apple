@@ -28,6 +28,7 @@ function transactionInfoProps(t: Transaction) {
       { label: 'Categoria',   value: `${t.category.icon} ${t.category.name}` },
       { label: 'Conta',       value: t.account ? `${t.account.icon} ${t.account.name}` : '' },
       { label: 'Descrição',   value: t.description ?? '' },
+      ...(t.ignored ? [{ label: 'Ignorada', value: 'Sim — fora dos saldos e relatórios' }] : []),
     ],
   }
 }
@@ -61,7 +62,10 @@ function TxItem({ item, onEdit, onDelete }: { item: Transaction; onEdit: () => v
         <Text style={styles.emoji}>{item.category.icon}</Text>
       </View>
       <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>{item.description ?? item.category.name}</Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.name} numberOfLines={1}>{item.description ?? item.category.name}</Text>
+          {item.ignored && <Text style={styles.ignoredTag}>ignorada</Text>}
+        </View>
         <Text style={styles.meta} numberOfLines={1}>
           {format(new Date(item.date), "d MMM yyyy", { locale: ptBR })} · {item.category.name}
           {item.account ? ` · ${item.account.icon} ${item.account.name}` : ''}
@@ -400,7 +404,13 @@ const styles = StyleSheet.create({
   icon:      { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   emoji:     { fontSize: 18 },
   info:      { flex: 1 },
-  name:      { fontSize: 14, fontWeight: '500', color: COLORS.text },
+  name:      { fontSize: 14, fontWeight: '500', color: COLORS.text, flexShrink: 1 },
+  nameRow:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  ignoredTag: {
+    fontSize: 10, color: COLORS.muted, fontWeight: '600',
+    backgroundColor: COLORS.card2, borderColor: COLORS.border, borderWidth: 1,
+    borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden',
+  },
   meta:      { fontSize: 12, color: COLORS.muted, marginTop: 2 },
   itemRight: { alignItems: 'flex-end', gap: 4 },
   amount:    { fontSize: 14, fontWeight: '600' },
