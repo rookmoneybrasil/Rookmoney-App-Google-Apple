@@ -40,7 +40,7 @@ export default function WalletsScreen() {
   })
 
   function confirmDelete(a: Account) {
-    Alert.alert('Excluir conta', `Excluir "${a.name}"? As transações continuam no histórico, sem conta.`, [
+    Alert.alert('Excluir conta', `Excluir "${a.name}"? O saldo e os lançamentos dela vão para outra conta — nada é perdido.`, [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate(a.id) },
     ])
