@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { AccountPicker } from '@/components/account-picker'
 import { View, Modal, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import { CurrencyInput } from '@/components/currency-input'
@@ -28,6 +29,7 @@ export function EditEntryModal({ visible, entry, personId, isGroup, groupSize, o
   const [amount, setAmount]           = useState('')
   const [date, setDate]               = useState('')
   const [categoryId, setCategoryId]   = useState<string | undefined>()
+  const [accountId, setAccountId]     = useState<string | null>(null)
   const [notes, setNotes]             = useState('')
 
   const { data: categories } = useQuery({
@@ -42,6 +44,7 @@ export function EditEntryModal({ visible, entry, personId, isGroup, groupSize, o
       setAmount(String(entry.amount))
       setDate(format(new Date(entry.date), 'yyyy-MM-dd'))
       setCategoryId(entry.categoryId ?? undefined)
+      setAccountId(entry.accountId ?? entry.account?.id ?? null)
       setNotes(entry.notes ?? '')
     }
   }, [visible, entry])
@@ -60,6 +63,7 @@ export function EditEntryModal({ visible, entry, personId, isGroup, groupSize, o
         amount:      amt,
         date,
         categoryId:  categoryId ?? null,
+        accountId,
         notes:       notes.trim() || null,
         applyToGroup: isGroup,
       })
@@ -160,6 +164,8 @@ export function EditEntryModal({ visible, entry, personId, isGroup, groupSize, o
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
+            <AccountPicker value={accountId} onChange={setAccountId} label="Carteira" />
 
             <Text style={s.label}>Observações</Text>
             <TextInput

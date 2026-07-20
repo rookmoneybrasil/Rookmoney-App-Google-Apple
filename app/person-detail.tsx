@@ -28,6 +28,7 @@ function personEntryInfoProps(entry: PersonEntry, settled: boolean) {
     { label: 'Tipo',        value: isTheyOwe ? 'Te deve' : 'Você deve' },
     { label: settled ? 'Acertado em' : 'Data', value: format(new Date(settled ? (entry.settledAt ?? entry.date) : entry.date), 'dd/MM/yyyy', { locale: ptBR }) },
     { label: 'Categoria',   value: entry.category ? `${entry.category.icon} ${entry.category.name}` : '' },
+    { label: 'Carteira',    value: entry.account ? `${entry.account.icon} ${entry.account.name}` : '' },
     { label: 'Parcela',     value: isInstallment ? `${entry.installmentCurrent}/${entry.installmentTotal}` : '' },
     { label: 'Observações', value: entry.notes ?? '' },
   ]

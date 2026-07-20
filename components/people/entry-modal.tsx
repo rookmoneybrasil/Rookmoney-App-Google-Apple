@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { AccountPicker } from '@/components/account-picker'
 import { View, Modal, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import { CurrencyInput } from '@/components/currency-input'
@@ -39,6 +40,7 @@ export function EntryModal({ visible, personId, personName, onClose }: Props) {
   const [alreadyPaid, setAlreadyPaid]   = useState('0')
   const [dayOfMonth, setDayOfMonth]     = useState('1')
   const [categoryId, setCategoryId]     = useState<string | undefined>()
+  const [accountId, setAccountId]       = useState<string | null>(null)
   const [notes, setNotes]               = useState('')
 
   const { data: categories } = useQuery({
@@ -79,6 +81,7 @@ export function EntryModal({ visible, personId, personName, onClose }: Props) {
           firstDate:   date,
           notes:       notes.trim() || null,
           categoryId:  categoryId || null,
+          accountId,
         })
       }
 
@@ -92,6 +95,7 @@ export function EntryModal({ visible, personId, personName, onClose }: Props) {
         date,
         notes:       notes.trim() || undefined,
         categoryId,
+        accountId,
         installments: inst,
         alreadyPaid:  paid,
       })
@@ -282,6 +286,8 @@ export function EntryModal({ visible, personId, personName, onClose }: Props) {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
+            <AccountPicker value={accountId} onChange={setAccountId} label="Carteira" />
 
             <Text style={s.label}>Observações</Text>
             <TextInput

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { AccountPicker } from '@/components/account-picker'
 import { View, Modal, TouchableOpacity, ScrollView, Alert } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import { CurrencyInput } from '@/components/currency-input'
@@ -20,6 +21,7 @@ export function EditRecurringModal({ visible, item, personId, onClose }: Props) 
   const [amount, setAmount]           = useState('')
   const [dayOfMonth, setDayOfMonth]   = useState('1')
   const [categoryId, setCategoryId]   = useState<string | undefined>()
+  const [accountId, setAccountId]     = useState<string | null>(null)
   const [notes, setNotes]             = useState('')
 
   const { data: categories } = useQuery({
@@ -33,6 +35,7 @@ export function EditRecurringModal({ visible, item, personId, onClose }: Props) 
       setAmount(String(item.amount))
       setDayOfMonth(String(item.dayOfMonth))
       setCategoryId(item.categoryId ?? undefined)
+      setAccountId(item.accountId ?? item.account?.id ?? null)
       setNotes(item.notes ?? '')
     }
   }, [visible, item])
@@ -51,6 +54,7 @@ export function EditRecurringModal({ visible, item, personId, onClose }: Props) 
         amount:      amt,
         dayOfMonth:  day,
         categoryId:  categoryId ?? null,
+        accountId,
         notes:       notes.trim() || null,
       })
     },
@@ -126,6 +130,8 @@ export function EditRecurringModal({ visible, item, personId, onClose }: Props) 
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
+            <AccountPicker value={accountId} onChange={setAccountId} label="Carteira" />
 
             <Text style={s.label}>Observações</Text>
             <TextInput

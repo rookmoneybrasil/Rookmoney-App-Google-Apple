@@ -761,6 +761,8 @@ export interface PersonEntry {
   installmentGroupId?: string | null
   categoryId?:         string | null
   category?: { id: string; name: string; icon: string; color: string } | null
+  accountId?:          string | null
+  account?:  { id?: string; name: string; icon: string; color: string } | null
 }
 
 export interface Person {
@@ -790,7 +792,7 @@ export const peopleApi = {
     }),
   addEntry: (personId: string, body: {
     type: string; description: string; amount: number; date: string
-    notes?: string; categoryId?: string; installments?: number; alreadyPaid?: number
+    notes?: string; categoryId?: string; installments?: number; alreadyPaid?: number; accountId?: string | null
   }) =>
     request<{ data: PersonEntry }>(`/api/v1/people/${personId}?action=entry`, {
       method: 'POST',
@@ -798,7 +800,7 @@ export const peopleApi = {
     }),
   editEntry: (entryId: string, body: {
     type?: string; description?: string; amount?: number; date?: string
-    categoryId?: string | null; notes?: string | null; applyToGroup?: boolean
+    categoryId?: string | null; notes?: string | null; applyToGroup?: boolean; accountId?: string | null
   }) =>
     request<{ data: PersonEntry }>(`/api/v1/people/entries/${entryId}`, {
       method: 'PATCH',
@@ -831,6 +833,8 @@ export interface PersonEntryRecurring {
   notes:       string | null
   categoryId:  string | null
   category?: { id: string; name: string; icon: string; color: string } | null
+  accountId?:  string | null
+  account?: { id?: string; name: string; icon: string; color: string } | null
 }
 
 export interface PersonEntryRecurringInput {
@@ -842,6 +846,7 @@ export interface PersonEntryRecurringInput {
   firstDate?:  string
   notes?:      string | null
   categoryId?: string | null
+  accountId?:  string | null
 }
 
 export const personRecurringApi = {
