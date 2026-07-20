@@ -551,6 +551,25 @@ export default function DashboardScreen() {
             </View>
           )}
 
+          {/* Carteiras */}
+          {(data?.accounts?.length ?? 0) > 0 && (
+            <TouchableOpacity style={[styles.card, { marginTop: 10 }]} activeOpacity={0.85} onPress={() => router.push('/wallets' as any)}>
+              <View style={styles.cardTitleRow}>
+                <Text style={styles.cardTitle}>Carteiras</Text>
+                <Text style={styles.walletTotal}>{fmt(data?.accountsTotal ?? 0)}</Text>
+              </View>
+              {data!.accounts.filter(a => !a.archived).slice(0, 5).map((a) => (
+                <View key={a.id} style={styles.walletRow}>
+                  <View style={[styles.walletIcon, { backgroundColor: a.color + '22' }]}>
+                    <Text style={styles.walletEmoji}>{a.icon}</Text>
+                  </View>
+                  <Text style={styles.walletName} numberOfLines={1}>{a.name}</Text>
+                  <Text style={[styles.walletBalance, { color: a.balance < 0 ? COLORS.danger : COLORS.text }]}>{fmt(a.balance)}</Text>
+                </View>
+              ))}
+            </TouchableOpacity>
+          )}
+
           </FadeIn>
 
           {/* ── ATIVIDADE RECENTE ─────────────────────────────────────── */}
@@ -749,6 +768,12 @@ const styles = StyleSheet.create({
   },
   cardTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   cardTitle: { fontSize: 15, fontWeight: '700', color: COLORS.text },
+  walletTotal:   { fontSize: 15, fontWeight: '800', color: COLORS.text },
+  walletRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
+  walletIcon:    { width: 30, height: 30, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
+  walletEmoji:   { fontSize: 15 },
+  walletName:    { flex: 1, fontSize: 14, color: COLORS.text },
+  walletBalance: { fontSize: 14, fontWeight: '700', color: COLORS.text },
   cardTitleSub: { fontSize: 12, color: COLORS.muted },
   seeAll: { fontSize: 13, color: COLORS.brand },
 

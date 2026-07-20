@@ -96,6 +96,8 @@ export interface DashboardProjection {
 }
 
 export interface DashboardData {
+  accounts:              Account[]
+  accountsTotal:         number
   monthBalance:          number
   monthIncome:           number
   monthExpense:          number
