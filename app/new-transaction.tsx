@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import { CurrencyInput } from '@/components/currency-input'
@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { format } from 'date-fns'
 import { COLORS } from '@/lib/constants'
-import { transactionsApi, categoriesApi, type Category } from '@/lib/api'
+import { transactionsApi, categoriesApi, accountsApi, type Category } from '@/lib/api'
 import { DateInput } from '@/components/date-input'
 
 const fmt = (n: number) =>
@@ -21,6 +21,7 @@ export default function NewTransactionModal() {
   const [amount,      setAmount]      = useState('')
   const [description, setDescription] = useState('')
   const [categoryId,  setCategoryId]  = useState('')
+  const [accountId,   setAccountId]   = useState('')
   const [date,        setDate]        = useState(format(new Date(), 'yyyy-MM-dd'))
   const [error,       setError]       = useState('')
   const [saving,      setSaving]      = useState(false)
@@ -29,6 +30,15 @@ export default function NewTransactionModal() {
     queryKey: ['categories'],
     queryFn:  () => categoriesApi.list().then((r) => r.data),
   })
+  const { data: accountsData } = useQuery({
+    queryKey: ['accounts'],
+    queryFn:  () => accountsApi.list().then((r) => r.data),
+  })
+  const accounts = accountsData?.accounts.filter(a => !a.archived) ?? []
+  // Pré-seleciona a conta padrão quando as contas carregam.
+  useEffect(() => {
+    if (!accountId && accounts.length > 0) setAccountId((accounts.find(a => a.isDefault) ?? accounts[0]).id)
+  }, [accountsData])
 
   async function handleSave() {
     const num = parseFloat(amount.replace(',', '.'))
@@ -44,6 +54,7 @@ export default function NewTransactionModal() {
         description: description.trim() || undefined,
         date,
         categoryId,
+        accountId: accountId || undefined,
       })
       queryClient.refetchQueries({ queryKey: ['transactions'] })
       queryClient.refetchQueries({ queryKey: ['dashboard'] })
@@ -139,6 +150,25 @@ export default function NewTransactionModal() {
             ))}
           </View>
         </View>
+
+        {/* Account / Carteira */}
+        {accounts.length > 0 && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Conta</Text>
+            <View style={styles.cats}>
+              {accounts.map((a) => (
+                <TouchableOpacity
+                  key={a.id}
+                  style={[styles.cat, accountId === a.id && styles.catActive]}
+                  onPress={() => setAccountId(a.id)}
+                >
+                  <Text style={styles.catIcon}>{a.icon}</Text>
+                  <Text style={[styles.catName, accountId === a.id && styles.catNameActive]} numberOfLines={1}>{a.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
         {!!error && (
           <View style={styles.errorBox}>

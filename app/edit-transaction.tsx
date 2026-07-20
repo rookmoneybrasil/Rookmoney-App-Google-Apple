@@ -7,7 +7,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Feather } from '@expo/vector-icons'
 import { COLORS } from '@/lib/constants'
-import { transactionsApi, categoriesApi, type Transaction, type Category } from '@/lib/api'
+import { transactionsApi, categoriesApi, accountsApi, type Transaction, type Category } from '@/lib/api'
 
 export default function EditTransactionScreen() {
   const router = useRouter()
@@ -19,6 +19,7 @@ export default function EditTransactionScreen() {
   const [amount,      setAmount]      = useState('')
   const [description, setDescription] = useState('')
   const [categoryId,  setCategoryId]  = useState('')
+  const [accountId,   setAccountId]   = useState('')
   const [date,        setDate]        = useState('')
   const [error,       setError]       = useState('')
 
@@ -36,6 +37,7 @@ export default function EditTransactionScreen() {
         setAmount(String(found.amount))
         setDescription(found.description ?? '')
         setCategoryId(found.categoryId)
+        setAccountId(found.accountId ?? found.account?.id ?? '')
         setDate(found.date.slice(0, 10))
         break
       }
@@ -46,6 +48,11 @@ export default function EditTransactionScreen() {
     queryKey: ['categories'],
     queryFn:  () => categoriesApi.list().then((r) => r.data),
   })
+  const { data: accountsData } = useQuery({
+    queryKey: ['accounts'],
+    queryFn:  () => accountsApi.list().then((r) => r.data),
+  })
+  const accounts = accountsData?.accounts.filter(a => !a.archived) ?? []
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -59,6 +66,7 @@ export default function EditTransactionScreen() {
         description: description.trim() || undefined,
         date,
         categoryId,
+        accountId: accountId || undefined,
       })
     },
     onSuccess: () => {
@@ -180,6 +188,20 @@ export default function EditTransactionScreen() {
             ))}
           </View>
         </View>
+
+        {accounts.length > 0 && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Conta</Text>
+            <View style={styles.cats}>
+              {accounts.map((a) => (
+                <TouchableOpacity key={a.id} style={[styles.cat, accountId === a.id && styles.catActive]} onPress={() => setAccountId(a.id)}>
+                  <Text style={styles.catIcon}>{a.icon}</Text>
+                  <Text style={[styles.catName, accountId === a.id && styles.catNameActive]} numberOfLines={1}>{a.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
         {!!error && (
           <View style={styles.errorBox}>

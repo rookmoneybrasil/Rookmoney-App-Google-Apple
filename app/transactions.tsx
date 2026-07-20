@@ -26,6 +26,7 @@ function transactionInfoProps(t: Transaction) {
       { label: 'Tipo',        value: isIncome ? 'Receita' : 'Despesa' },
       { label: 'Data',        value: format(new Date(t.date), 'dd/MM/yyyy', { locale: ptBR }) },
       { label: 'Categoria',   value: `${t.category.icon} ${t.category.name}` },
+      { label: 'Conta',       value: t.account ? `${t.account.icon} ${t.account.name}` : '' },
       { label: 'Descrição',   value: t.description ?? '' },
     ],
   }
