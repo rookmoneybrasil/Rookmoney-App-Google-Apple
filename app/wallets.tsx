@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal, Pressable, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert, Modal, Pressable, KeyboardAvoidingView, Platform, Keyboard } from 'react-native'
 import { Text, TextInput } from '@/components/text'
 import { CurrencyInput } from '@/components/currency-input'
 import { useRouter } from 'expo-router'
@@ -179,9 +179,22 @@ function AccountSheet({ account, onClose }: { account: Account | null; onClose: 
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
+          {/* onPress aqui e' o que fecha o TECLADO: o teclado numerico do saldo
+              inicial nao tem botao de concluir, e tocar no backdrop fecharia o
+              sheet inteiro (perdendo o que foi digitado). Tocar em qualquer
+              area vazia do sheet so dispensa o teclado. */}
+          <Pressable style={styles.sheet} onPress={() => Keyboard.dismiss()}>
             <View style={styles.handle} />
             <Text style={styles.sheetTitle}>{account ? 'Editar carteira' : 'Nova carteira'}</Text>
+
+            {/* Sem ScrollView o campo Nome ficava inalcancavel com o teclado
+                aberto — o conteudo era empurrado pra fora e nao rolava. */}
+            <ScrollView
+              style={styles.sheetScroll}
+              contentContainerStyle={{ paddingBottom: 8 }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
 
             <Text style={styles.label}>Nome *</Text>
             <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Ex: Carteira, Nubank, Itaú…" placeholderTextColor={COLORS.muted} />
@@ -215,6 +228,8 @@ function AccountSheet({ account, onClose }: { account: Account | null; onClose: 
                 </TouchableOpacity>
               ))}
             </View>
+
+            </ScrollView>
 
             <TouchableOpacity style={[styles.saveBtn, mutation.isPending && { opacity: 0.6 }]} onPress={() => mutation.mutate()} disabled={mutation.isPending}>
               <Text style={styles.saveBtnText}>{mutation.isPending ? 'Salvando...' : 'Salvar'}</Text>
@@ -264,7 +279,8 @@ const styles = StyleSheet.create({
   hint: { fontSize: 11, color: COLORS.muted2, marginTop: 16, lineHeight: 16, textAlign: 'center' },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: COLORS.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, paddingBottom: 36, borderTopWidth: 1, borderColor: COLORS.border },
+  sheet: { backgroundColor: COLORS.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, paddingBottom: 36, borderTopWidth: 1, borderColor: COLORS.border, maxHeight: '90%' },
+  sheetScroll: { flexGrow: 0 },
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.muted2, alignSelf: 'center', marginBottom: 14 },
   sheetTitle: { fontSize: 17, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
 
