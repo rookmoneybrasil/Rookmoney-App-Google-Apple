@@ -76,6 +76,7 @@ export interface DashboardProjectionItem {
   label:  string
   amount: number
   icon?:  string
+  overdue?: boolean
 }
 
 export interface DashboardProjection {

@@ -37,7 +37,10 @@ function ItemList({ items, color }: { items: DashboardProjectionItem[]; color: '
       {items.map((item) => (
         <View key={item.id} style={styles.itemRow}>
           <Text style={styles.itemIcon}>{item.icon ?? '•'}</Text>
-          <Text style={styles.itemLabel} numberOfLines={1}>{item.label}</Text>
+          <Text style={styles.itemLabel} numberOfLines={1}>
+            {item.label}
+            {item.overdue ? ' ⚠️ atrasada' : ''}
+          </Text>
           <Text style={[styles.itemAmount, { color: color === 'income' ? COLORS.success : COLORS.danger }]}>
             {color === 'income' ? '+' : '-'}{fmt(item.amount)}
           </Text>
