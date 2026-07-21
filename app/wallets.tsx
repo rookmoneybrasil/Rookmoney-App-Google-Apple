@@ -39,6 +39,23 @@ export default function WalletsScreen() {
     onError: (e: Error) => Alert.alert('Erro', e.message),
   })
 
+  // Arquivar tira a conta da lista, do seletor e do saldo total, mas mantem o
+  // historico ONDE ESTA. Excluir move os lancamentos (e o saldo inicial) pra
+  // outra conta. Sao coisas diferentes — por isso as duas opcoes.
+  const archiveMutation = useMutation({
+    mutationFn: ({ id, archived }: { id: string; archived: boolean }) => accountsApi.update(id, { archived }),
+    onSuccess: () => qc.refetchQueries({ queryKey: ['accounts'] }),
+    onError: (e: Error) => Alert.alert('Erro', e.message),
+  })
+
+  function showOptions(a: Account) {
+    Alert.alert(a.name, 'O que você quer fazer?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Arquivar', onPress: () => archiveMutation.mutate({ id: a.id, archived: true }) },
+      { text: 'Excluir', style: 'destructive', onPress: () => confirmDelete(a) },
+    ])
+  }
+
   function confirmDelete(a: Account) {
     Alert.alert('Excluir conta', `Excluir "${a.name}"? O saldo e os lançamentos dela vão para outra conta — nada é perdido.`, [
       { text: 'Cancelar', style: 'cancel' },
@@ -79,7 +96,7 @@ export default function WalletsScreen() {
               key={a.id}
               style={styles.accCard}
               onPress={() => setEditing(a)}
-              onLongPress={() => confirmDelete(a)}
+              onLongPress={() => showOptions(a)}
               activeOpacity={0.8}
             >
               <View style={[styles.accIcon, { backgroundColor: a.color + '22' }]}>
@@ -95,6 +112,31 @@ export default function WalletsScreen() {
               <Text style={[styles.accBalance, { color: a.balance < 0 ? COLORS.danger : COLORS.text }]}>{fmt(a.balance)}</Text>
             </TouchableOpacity>
           ))}
+
+          {accounts.some(a => a.archived) && (
+            <>
+              <Text style={styles.archivedHeader}>Arquivadas — fora do saldo total</Text>
+              {accounts.filter(a => a.archived).map(a => (
+                <View key={a.id} style={styles.archivedCard}>
+                  <View style={[styles.accIcon, { backgroundColor: a.color + '18' }]}>
+                    <Text style={styles.accEmoji}>{a.icon}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.archivedName} numberOfLines={1}>{a.name}</Text>
+                    <Text style={styles.accType}>{typeLabel(a.type)}</Text>
+                  </View>
+                  <Text style={styles.archivedBalance}>{fmt(a.balance)}</Text>
+                  <TouchableOpacity
+                    onPress={() => archiveMutation.mutate({ id: a.id, archived: false })}
+                    hitSlop={8}
+                    style={styles.reactivateBtn}
+                  >
+                    <Text style={styles.reactivateText}>Reativar</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </>
+          )}
 
           <TouchableOpacity style={styles.addCard} onPress={() => setEditing('new')}>
             <Feather name="plus" size={18} color={COLORS.muted} />
@@ -204,6 +246,18 @@ const styles = StyleSheet.create({
   accBalance: { fontSize: 15, fontWeight: '700', color: COLORS.text },
   defBadge: { backgroundColor: COLORS.brandDim, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   defBadgeText: { fontSize: 10, color: COLORS.brand, fontWeight: '700' },
+
+  archivedHeader: { fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 18, marginBottom: 8 },
+  archivedCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: COLORS.card, borderRadius: 14,
+    borderWidth: 1, borderColor: COLORS.border,
+    padding: 12, marginBottom: 8, opacity: 0.75,
+  },
+  archivedName:    { fontSize: 14, color: COLORS.muted, fontWeight: '500' },
+  archivedBalance: { fontSize: 13, color: COLORS.muted, fontVariant: ['tabular-nums'] },
+  reactivateBtn:   { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: COLORS.brandDim },
+  reactivateText:  { fontSize: 12, color: COLORS.brand, fontWeight: '600' },
 
   addCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: COLORS.border, paddingVertical: 18, marginTop: 4 },
   addCardText: { fontSize: 14, color: COLORS.muted, fontWeight: '600' },
