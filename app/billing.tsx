@@ -241,7 +241,6 @@ export default function BillingScreen() {
               <UsageBar used={me.usage.bills}                 limit={me.limits.bills}                label="Contas" />
               <UsageBar used={me.usage.goals}                 limit={me.limits.goals}                label="Metas" />
               <UsageBar used={me.usage.people}                limit={me.limits.people}               label="Pessoas" />
-              <UsageBar used={me.usage.recurring}             limit={me.limits.recurring}            label="Recorrentes" />
             </View>
           </View>
         )}

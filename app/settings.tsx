@@ -877,7 +877,6 @@ export default function SettingsScreen() {
                           <LimitRow used={user.usage.goals}                 limit={user.limits.goals}                label="Metas" />
                           <LimitRow used={user.usage.people}                limit={user.limits.people}               label="Pessoas" />
                           <LimitRow used={user.usage.customCategories}      limit={user.limits.customCategories}     label="Categorias" />
-                          <LimitRow used={user.usage.recurring}             limit={user.limits.recurring}            label="Recorrentes" />
                         </View>
                       </View>
 

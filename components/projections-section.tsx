@@ -67,8 +67,8 @@ function DetailPanel({ proj }: { proj: MonthData }) {
   const incPct     = Math.round((proj.income  / maxBar) * 100)
   const expPct     = Math.round((proj.expense / maxBar) * 100)
 
-  const hasIncome  = proj.incomeItems.sources.length  > 0 || proj.incomeItems.recurring.length  > 0 || proj.incomeItems.people.length  > 0
-  const hasExpense = proj.expenseItems.bills.length   > 0 || proj.expenseItems.recurring.length > 0 || proj.expenseItems.people.length > 0
+  const hasIncome  = proj.incomeItems.sources.length  > 0 || proj.incomeItems.people.length  > 0
+  const hasExpense = proj.expenseItems.bills.length   > 0 || proj.expenseItems.people.length > 0
 
   return (
     <View style={styles.detailPanel}>
@@ -128,7 +128,6 @@ function DetailPanel({ proj }: { proj: MonthData }) {
           ) : (
             <>
               <ItemGroup title="Rendas recorrentes" items={proj.incomeItems.sources} color="income" />
-              <ItemGroup title="Recorrências" items={proj.incomeItems.recurring} color="income" />
               <ItemGroup title="A receber de pessoas" items={proj.incomeItems.people} color="income" />
             </>
           )}
@@ -146,7 +145,6 @@ function DetailPanel({ proj }: { proj: MonthData }) {
           ) : (
             <>
               <ItemGroup title="Contas e parcelas" items={proj.expenseItems.bills} color="expense" />
-              <ItemGroup title="Recorrências" items={proj.expenseItems.recurring} color="expense" />
               <ItemGroup title="A pagar para pessoas" items={proj.expenseItems.people} color="expense" />
             </>
           )}
@@ -206,8 +204,8 @@ export function ProjectionsSection({ projections }: Props) {
     expense:           p.projectedExpense,
     balance:           p.projectedIncome - p.projectedExpense,
     cumulativeBalance: p.projectedBalance,
-    incomeItems:       p.incomeItems  ?? { sources: [], recurring: [], people: [] },
-    expenseItems:      p.expenseItems ?? { bills: [], recurring: [], people: [] },
+    incomeItems:       p.incomeItems  ?? { sources: [], people: [] },
+    expenseItems:      p.expenseItems ?? { bills: [], people: [] },
   }))
 
   const hasAny = months.some((m) => m.income > 0 || m.expense > 0)

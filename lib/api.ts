@@ -86,12 +86,10 @@ export interface DashboardProjection {
   projectedBalance: number
   incomeItems: {
     sources:   DashboardProjectionItem[]
-    recurring: DashboardProjectionItem[]
     people:    DashboardProjectionItem[]
   }
   expenseItems: {
     bills:     DashboardProjectionItem[]
-    recurring: DashboardProjectionItem[]
     people:    DashboardProjectionItem[]
   }
 }
@@ -566,7 +564,6 @@ export interface MeData {
     goals:                 number
     people:                number
     customCategories:      number
-    recurring:             number
   }
   limits: {
     transactionsPerMonth: number | null
@@ -574,7 +571,6 @@ export interface MeData {
     goals:                number | null
     people:               number | null
     customCategories:     number | null
-    recurring:            number | null
     budget:               boolean
     reports:              boolean
     projection:           boolean
@@ -657,7 +653,7 @@ export const settingsApi = {
 export interface CalendarEvent {
   id:     string
   day:    number
-  type:   'bill' | 'income' | 'recurring'
+  type:   'bill' | 'income'
   label:  string
   amount: number
   status: 'pending' | 'paid' | 'overdue' | 'expected' | 'received'

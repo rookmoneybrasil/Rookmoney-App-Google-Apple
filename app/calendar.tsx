@@ -139,7 +139,7 @@ export default function CalendarScreen() {
                  (e.status === 'expected' && e.type === 'bill'))
     .reduce((s, e) => s + Number(e.amount), 0) ?? 0
   const totalExpected = data?.events
-    .filter(e => e.status === 'expected' && (e.type === 'income' || e.type === 'recurring'))
+    .filter(e => e.status === 'expected' && e.type === 'income')
     .reduce((s, e) => s + Number(e.amount), 0) ?? 0
 
   const negTotal = selectedEvents.filter(e => e.status !== 'expected').reduce((s, e) => s + Number(e.amount), 0)
